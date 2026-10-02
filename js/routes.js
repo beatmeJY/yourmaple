@@ -5,9 +5,11 @@ export const routes = [
   { id: "hunts", label: "사냥" },
   { id: "level-plan", label: "레벨업 계산" },
   { id: "dojo", label: "무릉" },
+  { id: "maker", label: "메이커 계산" },
+  { id: "enhance", label: "강화 계산" },
   { id: "monsters", label: "몬스터" },
   { id: "trades", label: "거래" },
   { id: "quests", label: "퀘스트" },
   { id: "notes", label: "메모" },
-  { id: "links", label: "링크", pin: true },
+  { id: "links", label: "링크", pin: true, quick: true },
 ];

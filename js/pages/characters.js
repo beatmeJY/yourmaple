@@ -119,7 +119,7 @@ export async function render(root) {
         </div>
       </form>
       <div class="filters">
-        <label class="field"><span>캐릭터명</span><input data-search placeholder="이름으로 찾기" /></label>
+        <label class="field"><span>캐릭터명</span><input data-search placeholder="이름·메모로 찾기" /></label>
         <label class="field"><span>레벨 최소</span><input data-level-min inputmode="numeric" /></label>
         <label class="field"><span>레벨 최대</span><input data-level-max inputmode="numeric" /></label>
         <div class="boss-filters" data-boss-filters>
@@ -466,7 +466,7 @@ export async function render(root) {
     }
     const filtered = filterRows(serverRows, {
       query: root.querySelector("[data-search]").value,
-      fields: ["name"],
+      fields: ["name", "gear_memo", "extra_memo"],
       levelMode: "point",
       levelField: "level",
       filter: readLevelFilter(

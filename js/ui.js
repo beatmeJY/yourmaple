@@ -68,6 +68,17 @@ export function renderShell() {
         </header>
         <main id="main" class="main"></main>
       </div>
+      <div class="link-panel" data-link-panel>
+        <div class="link-panel-backdrop" data-link-panel-close></div>
+        <div class="link-panel-sheet" role="dialog" aria-modal="true" aria-label="바로가기 링크">
+          <div class="link-panel-handle"></div>
+          <div class="link-panel-head">
+            <p class="link-panel-title">바로가기</p>
+            <a class="text-button" href="#/links" data-link-panel-manage>링크 관리</a>
+          </div>
+          <div class="link-panel-body" data-link-panel-body></div>
+        </div>
+      </div>
     </div>
   `;
   syncNavChrome();

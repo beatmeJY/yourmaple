@@ -1,4 +1,5 @@
 import { signOut, startAuth, translateAuthError } from "./auth.js";
+import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
 import { renderNav, renderRoute } from "./router.js";
 import { clearToasts, notify } from "./toast.js";
@@ -23,6 +24,7 @@ async function showPage() {
   main.dataset.page = activeId;
   renderNav(nav, activeId);
   setNavOpen(false);
+  closeLinkPanel();
 }
 
 function showApp(session) {
@@ -61,6 +63,20 @@ document.body.addEventListener("click", async (event) => {
     if (isDesktopNav()) setNavCollapsed(true);
     else setNavOpen(false);
   }
+  if (event.target.closest("[data-quick-nav='links']")) {
+    if (!isDesktopNav()) setNavOpen(false);
+    openLinkPanel();
+    return;
+  }
+  if (event.target.closest("[data-link-panel-close], [data-link-panel-manage]")) {
+    closeLinkPanel();
+  }
+  const openLinkButton = event.target.closest("[data-open-link]");
+  if (openLinkButton) {
+    closeLinkPanel();
+    window.open(openLinkButton.dataset.openLink, "_blank", "noopener,noreferrer");
+    return;
+  }
   if (event.target.closest("[data-theme-toggle]")) {
     const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
     applyTheme(next);
@@ -76,6 +92,22 @@ document.body.addEventListener("click", async (event) => {
       notify(translateAuthError(error), "error");
     }
   }
+});
+
+document.body.addEventListener(
+  "error",
+  (event) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement) || !image.matches("[data-favicon]")) return;
+    image.hidden = true;
+    const letter = image.parentElement?.querySelector(".link-mark-letter");
+    if (letter) letter.hidden = false;
+  },
+  true,
+);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && isLinkPanelOpen()) closeLinkPanel();
 });
 
 window.addEventListener("hashchange", () => {

@@ -6,6 +6,8 @@ const pages = {
   hunts: () => import("./pages/hunts.js"),
   "level-plan": () => import("./pages/level-plan.js"),
   dojo: () => import("./pages/dojo.js"),
+  maker: () => import("./pages/maker.js"),
+  enhance: () => import("./pages/enhance.js"),
   monsters: () => import("./pages/monsters.js"),
   trades: () => import("./pages/trades.js"),
   quests: () => import("./pages/quests.js"),
@@ -31,6 +33,17 @@ export async function renderRoute(root) {
 }
 
 function navLink(route, activeId) {
+  if (route.quick) {
+    return `
+      <button
+        type="button"
+        class="nav-link${route.id === activeId ? " is-active" : ""}"
+        data-quick-nav="${route.id}"
+      >
+        <span>${route.label}</span>
+      </button>
+    `;
+  }
   return `
     <a
       class="nav-link${route.id === activeId ? " is-active" : ""}"
