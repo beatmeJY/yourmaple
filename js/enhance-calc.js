@@ -104,7 +104,78 @@ export function reachableFinalAttacks(baseAttacks, slotCount) {
   return [...attacks].sort((left, right) => left - right);
 }
 
-export function optimizeEnhancement({ baseAttack, basePrice, slots, shopPrice, scrollPrices, marketPrices }) {
+/** 목표 이상 한 개의 평균 비용. 낮은 공격력부터 계산해 미달 판매가의 순환 참조를 막는다. */
+export function fairEnhancementPrices({ weapons, slots, shopPrice, scrollPrices, marketPrices = {} }) {
+  const fairPrices = new Map();
+  if (shopPrice == null || scrollPrices.ten == null || scrollPrices.sixty == null) return fairPrices;
+  const targets = reachableFinalAttacks(weapons.map((weapon) => weapon.attack), slots);
+
+  const marketAttacks = Object.entries(marketPrices)
+    .filter(([attack, price]) => price != null && Number.isSafeInteger(Number(attack)))
+    .map(([attack]) => Number(attack));
+  const firstMarketAttack = marketAttacks.length ? Math.min(...marketAttacks) : null;
+  const candidates = [];
+  for (const weapon of weapons) {
+    for (const strategy of enhancementPlans(slots)) {
+      const cost = enhancementCost(strategy.plan, weapon.price, scrollPrices);
+      if (cost == null) continue;
+      const outcomes = enhancementDistribution(strategy.plan).map((row) => ({
+        attack: weapon.attack + row.bonus,
+        numerator: row.numerator,
+        denominator: row.denominator,
+      }));
+      candidates.push({ weapon, strategy, cost, outcomes, denominator: outcomes[0].denominator });
+    }
+  }
+  for (const target of targets) {
+      for (const { weapon, strategy, cost, outcomes, denominator } of candidates) {
+        const successNumerator = outcomes.reduce((sum, row) => row.attack >= target ? sum + row.numerator : sum, 0n);
+        if (successNumerator === 0n) continue;
+        const failureRecoveryNumerator = outcomes.reduce((sum, row) => {
+          if (row.attack >= target) return sum;
+          const salePrice = marketPrices[row.attack] ??
+            (firstMarketAttack != null && row.attack < firstMarketAttack ? shopPrice : fairPrices.get(row.attack)?.price ?? shopPrice);
+          return sum + row.numerator * salePrice;
+        }, 0n);
+        const remainingCost = cost * denominator - failureRecoveryNumerator;
+        const estimate = remainingCost <= 0n ? shopPrice : (remainingCost + successNumerator - 1n) / successNumerator;
+        const fair = estimate > shopPrice ? estimate : shopPrice;
+        const previous = fairPrices.get(target);
+        if (previous == null || fair < previous.price) {
+          fairPrices.set(target, {
+            price: fair, baseAttack: weapon.attack, tenCount: strategy.tenCount, sixtyCount: strategy.sixtyCount,
+            successNumerator, denominator, investment: cost,
+            expectedFailureRecovery: divideRounded(failureRecoveryNumerator, denominator),
+          });
+        }
+      }
+  }
+  return fairPrices;
+}
+
+/** 첫 경매장 시세보다 낮은 공격력은 상점가, 그 이상은 입력 시세 또는 기대 가격을 사용한다. */
+export function effectiveEnhancementPrices({ fairPrices, marketPrices, shopPrice }) {
+  const effective = { ...marketPrices };
+  const estimatedPrices = {};
+  const marketAttacks = Object.entries(marketPrices)
+    .filter(([attack, price]) => price != null && Number.isSafeInteger(Number(attack)))
+    .map(([attack]) => Number(attack));
+  const firstMarketAttack = marketAttacks.length ? Math.min(...marketAttacks) : null;
+
+  for (const [attack, row] of fairPrices) {
+    if (effective[String(attack)] != null) continue;
+    if (firstMarketAttack != null && attack < firstMarketAttack) {
+      effective[String(attack)] = shopPrice;
+      continue;
+    }
+    effective[String(attack)] = row.price;
+    estimatedPrices[String(attack)] = true;
+  }
+
+  return { effective, estimatedPrices, firstMarketAttack };
+}
+
+export function optimizeEnhancement({ baseAttack, basePrice, slots, shopPrice, scrollPrices, marketPrices, estimatedPrices = {} }) {
   const powers = Array.from({ length: slots + 1 }, (_, index) => 100n ** BigInt(index));
   const memo = new Map();
 
@@ -122,7 +193,7 @@ export function optimizeEnhancement({ baseAttack, basePrice, slots, shopPrice, s
         attack,
         remaining,
         action: "complete",
-        saleType: useMarket ? "market" : "shop",
+        saleType: useMarket ? estimatedPrices[String(attack)] ? "estimate" : "market" : "shop",
         salePrice,
         expectedValueNumerator: salePrice,
         denominator: 1n,

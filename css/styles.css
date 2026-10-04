@@ -2407,6 +2407,24 @@ input[data-hunt-search] {
   gap: 10px;
 }
 
+.trade-sort { margin: 0; min-width: 180px; }
+.trade-dates {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.trade-form-side [data-selected-value] { font-size: 12px; line-height: 1.5; }
+.trade-card-id .text-button { text-align: left; font: inherit; }
+.trade-form-side small { color: var(--muted); }
+
 .trade-form-side {
   display: grid;
   gap: 10px;
@@ -2494,12 +2512,30 @@ input[data-hunt-search] {
   background: color-mix(in srgb, var(--hover) 70%, var(--bg));
 }
 
-.trade-card.is-loss {
-  box-shadow: inset 2px 0 0 var(--danger);
+.trade-card.is-selected {
+  border-color: var(--gain);
+  background: color-mix(in srgb, var(--gain) 9%, var(--bg));
+  box-shadow: inset 3px 0 0 var(--gain);
 }
 
-.trade-card.is-gain {
-  box-shadow: inset 2px 0 0 var(--gain);
+.trade-card { transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease; }
+.trade-profit-sticker {
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.trade-profit-sticker.is-gain { color: var(--gain); }
+.trade-profit-sticker.is-loss { color: var(--danger); }
+@media (max-width: 700px) {
+  .trade-card-id { flex-wrap: wrap; }
+  .trade-card-id h3 { flex: 1 0 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trade-card { transition: none; }
 }
 
 .trade-card-id {
@@ -2704,7 +2740,7 @@ input[data-hunt-search] {
     display: grid;
     grid-column: 1 / -1;
     grid-row: 2;
-    grid-template-columns: minmax(4.25rem, 6.5rem) minmax(9.5rem, 15.5rem) minmax(7.75rem, 11rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     align-items: stretch;
     justify-content: end;
     justify-items: stretch;
@@ -4564,11 +4600,35 @@ body.link-panel-open .link-panel-sheet {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .maker-craft-head strong {
   font-size: 15px;
   letter-spacing: -0.03em;
+}
+
+.maker-craft-head-hint { margin-left: auto; color: var(--muted); font-size: 11px; }
+.maker-craft-head[aria-expanded="true"] .maker-tier-chevron { transform: rotate(225deg); }
+.maker-craft-head:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+.maker-craft-detail { display: grid; gap: 12px; }
+.maker-craft-detail[hidden] { display: none; }
+.maker-craft-detail:not([hidden]) { animation: maker-card-reveal 0.25s ease-out both; }
+
+@keyframes maker-card-reveal {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .maker-craft-detail:not([hidden]) { animation: none; }
 }
 
 .maker-craft-tiers {
@@ -6822,6 +6882,111 @@ body.link-panel-open .link-panel-sheet {
 .enhance-market-card input { padding: 6px 7px; font-size: 9.5px; }
 .enhance-market-card > em { overflow: hidden; color: var(--muted); font-size: 7.5px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 
+/* 강화 계산은 입력값과 결과 숫자를 편하게 읽을 수 있는 크기로 유지한다. */
+.enhance-page { gap: 22px; }
+.enhance-hero p,
+.enhance-section-head > small,
+.enhance-profile-head > small,
+.enhance-book-help,
+.enhance-ranking-head p,
+.enhance-estimate-note { font-size: 13px; line-height: 1.55; }
+.enhance-section-head h2,
+.enhance-ranking-head h2 { font-size: 20px; }
+.enhance-profile-head h2 { font-size: 18px; }
+.enhance-profile-head span,
+.enhance-section-head > div > span,
+.enhance-ranking-head span,
+.enhance-eyebrow { font-size: 11px; }
+.enhance-profile-slot strong,
+.enhance-profile-slot small,
+.enhance-profile-editor label span,
+.enhance-profile-status,
+.enhance-profile-editor > button,
+.enhance-weapon-types button,
+.enhance-presets button,
+.enhance-weapon-types small,
+.enhance-range-maker button,
+.enhance-rule,
+.enhance-field > span,
+.enhance-field > small { font-size: 12px; }
+.enhance-profile-editor input,
+.enhance-range-maker input,
+.enhance-field input { font-size: 14px; min-height: 42px; }
+.enhance-profile-editor > button,
+.enhance-range-maker button,
+.enhance-weapon-types button,
+.enhance-presets button { min-height: 40px; }
+.enhance-base-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 355px), 1fr)); gap: 10px; }
+.enhance-base-card { grid-template-columns: 34px minmax(100px, 0.7fr) minmax(140px, 1fr) 32px; gap: 10px; padding: 12px; }
+.enhance-base-rank { width: 32px; height: 32px; font-size: 12px; }
+.enhance-base-card label > span { color: var(--text); font-size: 13px; }
+.enhance-base-card label > small { min-height: 17px; font-size: 11px; }
+.enhance-base-card input { min-height: 42px; padding: 8px 10px; font-size: 16px; }
+.enhance-base-attack input { font-weight: 950; }
+.enhance-base-card > button { width: 32px; height: 32px; }
+.enhance-market-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 10px; }
+.enhance-market-card { gap: 7px; padding: 11px; }
+.enhance-market-card > span b { font-size: 15px; }
+.enhance-market-card > span small,
+.enhance-market-card > em,
+.enhance-market-expected,
+.enhance-market-basis,
+.enhance-market-applied,
+.enhance-market-diff { font-size: 11px; line-height: 1.4; }
+.enhance-market-card > em { overflow: visible; white-space: normal; }
+.enhance-market-card input { min-height: 40px; font-size: 14px; }
+.enhance-market-expected { color: var(--text); font-size: 13px; }
+.enhance-market-basis { color: var(--muted); }
+.enhance-market-applied { color: var(--accent); font-weight: 850; }
+.enhance-market-diff { font-weight: 800; }
+.enhance-market-diff.is-gain { color: var(--gain); }
+.enhance-market-diff.is-loss { color: var(--danger); }
+.enhance-estimate-note { margin: 0; color: var(--muted); }
+.enhance-route-card header small,
+.enhance-route-first span,
+.enhance-route-kpis span,
+.enhance-route-usage span,
+.enhance-route-outcomes small,
+.enhance-route-outcomes em,
+.enhance-route-card summary,
+.enhance-policy-list > div,
+.enhance-result-kpis span,
+.enhance-result-summary > div:first-child > small { font-size: 11px; }
+.enhance-route-card header h3,
+.enhance-route-card header > b,
+.enhance-route-first strong,
+.enhance-route-kpis b,
+.enhance-route-outcomes b,
+.enhance-result-kpis b { font-size: 13px; }
+.enhance-route-kpis b,
+.enhance-result-kpis b { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.enhance-route-outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.enhance-profile-slot { padding: 10px; }
+.enhance-profile-slot > span { font-size: 12px; }
+.enhance-profile-slot.is-empty small,
+.enhance-profile-loading,
+.enhance-profile-status,
+.enhance-rule span,
+.enhance-slot-number,
+.enhance-slot > small,
+.enhance-slot strong,
+.enhance-plan-summary b,
+.enhance-plan-summary > em,
+.enhance-ranking-columns > div > h3,
+.enhance-route-usage b,
+.enhance-result-kpis small,
+.enhance-outcome p,
+.enhance-outcome p strong,
+.enhance-outcome footer,
+.enhance-strategy > span small,
+.enhance-strategy > span b,
+.enhance-strategy > em { font-size: 11px; }
+.enhance-slot { min-height: 88px; }
+.enhance-empty strong,
+.enhance-result-lock strong { font-size: 13px; }
+.enhance-empty small { font-size: 12px; }
+.enhance-outcome header em { font-size: 10px; }
+
 .enhance-results { display: grid; gap: 10px; }
 .enhance-result-summary {
   display: grid;
@@ -6922,6 +7087,11 @@ body.link-panel-open .link-panel-sheet {
 
 @media (max-width: 620px) {
   .enhance-hero { min-height: 100px; padding: 16px; }
+  .enhance-base-card { grid-template-columns: 32px minmax(0, 1fr) 32px; }
+  .enhance-base-attack { grid-column: 2; }
+  .enhance-base-price { grid-column: 2; grid-row: 2; }
+  .enhance-base-card > button { grid-column: 3; grid-row: 1; }
+  .enhance-base-rank { grid-column: 1; grid-row: 1; }
   .enhance-hero-orb { flex-basis: 56px; height: 56px; font-size: 9px; }
   .enhance-section-head { align-items: stretch; flex-direction: column; }
   .enhance-section-head > small { text-align: left; }
@@ -10673,6 +10843,76 @@ body.link-panel-open .link-panel-sheet {
 
 .catalog-clip {
   font-size: 0.92em;
+}
+
+/* 원하는 공격력을 고른 뒤 큰 아이템 카드로 시세를 확인한다. */
+[data-enhance-market] { min-width: 0; }
+.enhance-market-toolbar { display: flex; align-items: center; gap: 16px; margin: 8px 0 16px; }
+.enhance-market-toolbar > div:first-child { flex: 1; }
+.enhance-market-toolbar strong { display: block; font-size: 16px; }
+.enhance-market-toolbar small { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; }
+.enhance-market-toolbar > label { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
+.enhance-market-toolbar select { min-width: 100px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 16px; }
+.enhance-market-arrows { display: flex; gap: 6px; }
+.enhance-market-arrows button { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); font-size: 28px; cursor: pointer; }
+.enhance-attack-rail { position: relative; display: flex; gap: 8px; overflow-x: auto; padding: 6px 4px 14px; scrollbar-width: thin; }
+.enhance-attack-rail button { position: relative; flex: 0 0 58px; display: grid; gap: 2px; justify-items: center; min-height: 64px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--muted); cursor: pointer; transition: border-color 160ms, background 160ms, transform 160ms; }
+.enhance-attack-rail button small { font-size: 10px; }
+.enhance-attack-rail button b { font-size: 20px; }
+.enhance-attack-rail button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 14%, transparent); }
+.enhance-attack-rail button.has-market i { position: absolute; top: 7px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--gain); }
+.enhance-market-grid.enhance-market-track { position: relative; display: flex; align-items: flex-start; gap: 18px; overflow-x: auto; padding: 8px 8px 20px; scroll-snap-type: x proximity; scroll-padding-left: 8px; scrollbar-width: thin; scrollbar-color: var(--accent) var(--bg-raised); }
+.enhance-market-track .enhance-market-card { flex: 0 0 min(340px, calc(100% - 12px)); display: flex; flex-direction: column; gap: 14px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(150deg, var(--bg-raised), var(--bg)); scroll-snap-align: start; box-shadow: var(--shadow); transition: border-color 180ms, box-shadow 180ms; animation: enhance-price-appear 200ms ease-out; }
+.enhance-market-track .enhance-market-card.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), 0 8px 24px color-mix(in srgb, var(--accent) 10%, transparent); }
+.enhance-market-card > header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.enhance-market-emblem { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 14px; background: var(--accent-soft); color: var(--accent); font-size: 26px; }
+.enhance-market-card header > div { flex: 1; }
+.enhance-market-card header small { color: var(--muted); font-size: 12px; }
+.enhance-market-card h3 { margin: 2px 0 0; font-size: 20px; font-weight: 500; }
+.enhance-market-card h3 b { font-size: 38px; letter-spacing: -1px; }
+.enhance-market-status { padding: 5px 8px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 800; }
+.enhance-market-card.has-price .enhance-market-status { color: var(--gain); background: color-mix(in srgb, var(--gain) 12%, var(--bg)); }
+.enhance-market-card.is-shop .enhance-market-status { color: var(--muted); background: var(--bg); }
+.enhance-market-price { padding: 16px 0 14px; border-bottom: 1px solid var(--line); }
+.enhance-market-price > span { display: block; color: var(--muted); font-size: 13px; }
+.enhance-market-price strong { display: block; margin-top: 8px; color: var(--text); font-size: 27px; line-height: 1.45; overflow-wrap: anywhere; letter-spacing: -.5px; }
+.enhance-market-reference { margin: 0; min-height: 42px; font-size: 13px; color: var(--muted); line-height: 1.65; }
+.enhance-market-reference b { color: var(--text); font-weight: 700; }
+.enhance-market-input { display: grid; gap: 8px; }
+.enhance-market-input > span { display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; }
+.enhance-market-input small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.enhance-market-track .enhance-market-card input { min-height: 48px; padding: 12px; font-size: 17px; border-radius: 10px; }
+.enhance-market-track .enhance-market-card > em { font-size: 13px; line-height: 1.5; min-height: 20px; }
+.enhance-market-track .enhance-market-diff { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+.enhance-market-diff > span { color: var(--muted); font-weight: 500; }
+.enhance-market-diff strong { font-size: 18px; overflow-wrap: anywhere; }
+.enhance-market-card details { border-top: 1px solid var(--line); padding-top: 12px; }
+.enhance-market-card summary { color: var(--accent); font-size: 14px; font-weight: 700; cursor: pointer; }
+.enhance-market-recipe { display: grid; gap: 14px; padding-top: 16px; font-size: 13px; }
+.enhance-market-recipe > span { display: grid; gap: 5px; color: var(--muted); }
+.enhance-market-recipe b { color: var(--text); font-size: 15px; }
+.enhance-market-recipe > small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.enhance-scroll-recipe { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.enhance-scroll-recipe > span { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.enhance-scroll-recipe b { display: block; margin-top: 4px; }
+.enhance-market-chance { display: grid; gap: 10px; }
+.enhance-market-chance > span { display: grid; gap: 5px; padding-left: 10px; border-left: 3px solid var(--accent); color: var(--muted); }
+.enhance-market-toolbar button:focus-visible,
+.enhance-attack-rail button:focus-visible,
+.enhance-market-card summary:focus-visible,
+.enhance-market-track:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@keyframes enhance-price-appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 620px) {
+  .enhance-market-toolbar { flex-wrap: wrap; gap: 10px; }
+  .enhance-market-toolbar > div:first-child { flex-basis: 100%; }
+  .enhance-market-toolbar > label { flex: 1; }
+  .enhance-market-track .enhance-market-card { padding: 18px; }
+  .enhance-market-card h3 b { font-size: 34px; }
+  .enhance-market-price strong { font-size: 25px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enhance-market-track .enhance-market-card { animation: none; transition: none; }
+  .enhance-attack-rail button { transition: none; }
 }
 
 @media (max-width: 800px) {

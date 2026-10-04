@@ -1,5 +1,5 @@
 import { escapeHtml, formatCount, readBig } from "../format.js";
-import { ENHANCE_SCROLLS, WEAPON_TYPES, optimizeEnhancement, reachableFinalAttacks } from "../enhance-calc.js";
+import { ENHANCE_SCROLLS, WEAPON_TYPES, effectiveEnhancementPrices, fairEnhancementPrices, optimizeEnhancement, reachableFinalAttacks } from "../enhance-calc.js";
 import { translateDbError } from "../db-error.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -33,8 +33,14 @@ function priceReading(value) {
   return `${parts.join(" ")}메소`;
 }
 
-function chanceText(numerator, denominator) {
+function chanceText(numerator, denominator, precise = false) {
   const percent = (Number(numerator) / Number(denominator)) * 100;
+  if (precise) {
+    const text = percent === 0 || percent >= 0.000001
+      ? percent.toFixed(6).replace(/\.?0+$/, "")
+      : percent.toPrecision(4);
+    return `${text}%`;
+  }
   if (percent >= 10) return `${percent.toFixed(1)}%`;
   if (percent >= 0.1) return `${percent.toFixed(2)}%`;
   return `${percent.toPrecision(2)}%`;
@@ -96,6 +102,8 @@ export async function render(root) {
   let profileDirty = false;
   let profileSaving = false;
   let profileLoadId = 0;
+  let focusedMarketAttack = null;
+  let marketScrollTarget = null;
 
   root.innerHTML = `
     <div class="enhance-page enhance-optimizer-page">
@@ -121,7 +129,7 @@ export async function render(root) {
           </div>
         </div>
         <div class="enhance-input-grid is-three">
-          <label class="enhance-field"><span>상점 판매가</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-global-price="shop" placeholder="강화 중단 시 회수 금액" autocomplete="off" /><small data-global-reading="shop">미입력 완성품도 이 가격으로 계산</small></label>
+          <label class="enhance-field"><span>상점 판매가</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-global-price="shop" placeholder="강화 중단 시 회수 금액" autocomplete="off" /><small data-global-reading="shop">강화 중단 시 회수하는 가격</small></label>
           <label class="enhance-field is-ten"><span>10% 주문서 시세</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-global-price="ten" placeholder="1장 가격" autocomplete="off" /><small data-global-reading="ten">성공 시 공격력 +5</small></label>
           <label class="enhance-field is-sixty"><span>60% 주문서 시세</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-global-price="sixty" placeholder="1장 가격" autocomplete="off" /><small data-global-reading="sixty">성공 시 공격력 +2</small></label>
         </div>
@@ -136,7 +144,7 @@ export async function render(root) {
         <div class="enhance-base-list" data-base-weapons></div>
       </section>
       <section class="trade-board" aria-labelledby="enhance-market-title">
-        <div class="enhance-section-head"><div><span>STEP 3</span><h2 id="enhance-market-title">완성 공격력별 경매장 시세</h2></div><small>비워 두면 해당 결과는 상점 판매가로 회수합니다.</small></div>
+        <div class="enhance-section-head"><div><span>STEP 3</span><h2 id="enhance-market-title">완성 공격력별 경매장 시세</h2></div><small>시세를 입력하면 시장가로 계산합니다.<br />제작 근거는 카드에서 펼쳐보세요.</small></div>
         <div data-enhance-market></div>
       </section>
       <section class="enhance-ranking" data-enhance-ranking></section>
@@ -195,7 +203,7 @@ export async function render(root) {
     root.querySelector("[data-global-price='shop']").value = state.shopPrice;
     root.querySelector("[data-global-price='ten']").value = state.scrollPrices.ten;
     root.querySelector("[data-global-price='sixty']").value = state.scrollPrices.sixty;
-    root.querySelector("[data-global-reading='shop']").textContent = state.shopPrice ? priceReading(state.shopPrice) : "미입력 완성품도 이 가격으로 계산";
+    root.querySelector("[data-global-reading='shop']").textContent = state.shopPrice ? priceReading(state.shopPrice) : "강화 중단 시 회수하는 가격";
     root.querySelector("[data-global-reading='ten']").textContent = state.scrollPrices.ten ? priceReading(state.scrollPrices.ten) : "성공 시 공격력 +5";
     root.querySelector("[data-global-reading='sixty']").textContent = state.scrollPrices.sixty ? priceReading(state.scrollPrices.sixty) : "성공 시 공격력 +2";
   }
@@ -228,12 +236,13 @@ export async function render(root) {
   }
 
   function selectProfile(profile) {
+    focusedMarketAttack = null;
     activeProfileId = profile?.id ?? null;
     activeSortOrder = profile?.sort_order ?? profiles.length;
     profileName = profile?.name ?? "";
     if (profile) applyProfileSettings(profile.settings);
     else resetCalculation();
-    profileDirty = false;
+    profileDirty = removeLowMarketPrices() > 0;
     syncStaticInputs();
     paintWeapons();
     paintResults();
@@ -282,6 +291,7 @@ export async function render(root) {
       notify(`아이템은 현재 ${MAX_ENHANCE_PROFILES}개까지 등록할 수 있습니다.`, "error");
       return;
     }
+    removeLowMarketPrices();
     profileSaving = true;
     paintProfileControls();
     const supabase = await getSupabase();
@@ -330,11 +340,36 @@ export async function render(root) {
   }
 
   function globalValues() {
+    const shopPrice = readMeso(state.shopPrice);
     return {
-      shopPrice: readMeso(state.shopPrice),
+      shopPrice,
       scrollPrices: { ten: readMeso(state.scrollPrices.ten), sixty: readMeso(state.scrollPrices.sixty) },
-      marketPrices: Object.fromEntries(Object.entries(state.marketPrices).map(([attack, value]) => [attack, readMeso(value)])),
+      marketPrices: Object.fromEntries(Object.entries(state.marketPrices).map(([attack, value]) => {
+        const price = readMeso(value);
+        return [attack, price != null && shopPrice != null && price > shopPrice ? price : null];
+      })),
     };
+  }
+
+  function removeLowMarketPrices() {
+    const shopPrice = readMeso(state.shopPrice);
+    if (shopPrice == null) return 0;
+    let removed = 0;
+    for (const [attack, value] of Object.entries(state.marketPrices)) {
+      const price = readMeso(value);
+      if (price != null && price <= shopPrice) {
+        delete state.marketPrices[attack];
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
+  function priceModel() {
+    const weapons = validWeapons();
+    const globals = globalValues();
+    const fair = fairEnhancementPrices({ weapons, slots: WEAPON_TYPES[state.weaponType].slots, ...globals });
+    return { weapons, globals, fair, ...effectiveEnhancementPrices({ fairPrices: fair, marketPrices: globals.marketPrices, shopPrice: globals.shopPrice }) };
   }
 
   function paintWeaponTypes() {
@@ -350,8 +385,8 @@ export async function render(root) {
     weaponList.innerHTML = ordered.map((weapon, index) => `
       <article class="enhance-base-card" data-weapon-row="${weapon.id}" style="--i:${index}">
         <span class="enhance-base-rank">${String(index + 1).padStart(2, "0")}</span>
-        <label><span>노작 공격력</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-base-attack value="${escapeHtml(weapon.attack)}" placeholder="공격력" /></label>
-        <label><span>구매 가격</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-base-price value="${escapeHtml(weapon.price)}" placeholder="메소" /><small>${weapon.price ? escapeHtml(priceReading(weapon.price)) : "시세 미입력"}</small></label>
+        <label class="enhance-base-attack"><span>노작 공격력 ${escapeHtml(weapon.attack || "입력")}</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-base-attack value="${escapeHtml(weapon.attack)}" placeholder="공격력" aria-label="${index + 1}번 노작 무기 공격력" /></label>
+        <label class="enhance-base-price"><span>구매 가격</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-base-price value="${escapeHtml(weapon.price)}" placeholder="메소" aria-label="공격력 ${escapeHtml(weapon.attack || "미입력")} 노작 무기 구매 가격" /><small>${weapon.price ? escapeHtml(priceReading(weapon.price)) : "시세 미입력"}</small></label>
         <button type="button" data-remove-weapon aria-label="노작 무기 행 삭제">×</button>
       </article>
     `).join("");
@@ -364,10 +399,68 @@ export async function render(root) {
       return;
     }
     const attacks = reachableFinalAttacks(weapons.map((weapon) => weapon.attack), WEAPON_TYPES[state.weaponType].slots);
-    marketRoot.innerHTML = `<div class="enhance-market-grid">${attacks.map((attack) => {
+    const { globals, fair, effective, firstMarketAttack } = priceModel();
+    const expanded = new Set([...marketRoot.querySelectorAll(".enhance-market-card details[open]")].map((details) => Number(details.closest("[data-price-card]").dataset.priceCard)));
+    if (!attacks.includes(focusedMarketAttack)) focusedMarketAttack = attacks.includes(firstMarketAttack) ? firstMarketAttack : attacks[0];
+    marketRoot.innerHTML = `<div class="enhance-market-toolbar"><div><strong>확인할 공격력을 선택하세요</strong><small>카드를 옆으로 넘겨 시세를 비교할 수 있습니다.</small></div><label>공격력 바로가기<select data-market-jump aria-label="확인할 완성 공격력">${attacks.map((attack) => `<option value="${attack}"${attack === focusedMarketAttack ? " selected" : ""}>공 ${attack}</option>`).join("")}</select></label><div class="enhance-market-arrows"><button type="button" data-market-step="-1" aria-label="이전 공격력">‹</button><button type="button" data-market-step="1" aria-label="다음 공격력">›</button></div></div>
+      <div class="enhance-attack-rail" aria-label="완성 공격력 선택">${attacks.map((attack) => `<button type="button" data-focus-market="${attack}" aria-pressed="${attack === focusedMarketAttack}" class="${globals.marketPrices[String(attack)] != null ? "has-market" : ""}"><small>공</small><b>${attack}</b><i aria-hidden="true"></i></button>`).join("")}</div>
+      <div class="enhance-market-grid enhance-market-track" tabindex="0" aria-label="완성 공격력별 시세 카드, 좌우 방향키로 이동">${attacks.map((attack) => {
       const value = state.marketPrices[String(attack)] ?? "";
-      return `<label class="enhance-market-card${value ? " has-price" : ""}"><span><b>공격력 ${attack}</b><small>${value ? "경매장" : "상점가 적용"}</small></span><input type="text" inputmode="numeric" pattern="[0-9]*" data-market-attack="${attack}" value="${escapeHtml(value)}" placeholder="경매장 시세" autocomplete="off" /><em>${escapeHtml(value ? priceReading(value) : "미입력 시 상점 판매")}</em></label>`;
+      const market = globals.marketPrices[String(attack)];
+      const shopOnly = firstMarketAttack != null && attack < firstMarketAttack;
+      const basis = fair.get(attack);
+      const estimate = basis?.price ?? null;
+      const difference = market != null && estimate != null ? market - estimate : null;
+      const comparison = difference == null ? "" : `<div class="enhance-market-diff${difference >= 0n ? " is-gain" : " is-loss"}"><span>획득 비용 대비 시장가</span><strong>${escapeHtml(signedMeso(difference))}</strong><small>${escapeHtml(ratioText(difference, estimate))}</small></div>`;
+      const applied = effective[String(attack)] ?? null;
+      const status = market != null ? "시장가 적용" : shopOnly ? "상점 판매" : estimate != null ? "획득 비용 추정" : "계산 대기";
+      const basisPanel = !shopOnly && basis ? `<details${expanded.has(attack) ? " open" : ""}><summary>제작 확률 · 비용 자세히</summary><div class="enhance-market-recipe"><span>최저 비용 출발 무기 <b>노작 공 ${basis.baseAttack}</b></span><div class="enhance-scroll-recipe"><span>10% <b>${basis.tenCount}장</b></span><span>60% <b>${basis.sixtyCount}장</b></span></div><div class="enhance-market-chance"><span>공 ${attack} 이상 획득 확률<b>${chanceText(basis.successNumerator, basis.denominator, true)}</b></span></div><span>1회 제작비 <b>${escapeHtml(priceReading(basis.investment))}</b></span><span>미달 결과 평균 회수 <b>${escapeHtml(priceReading(basis.expectedFailureRecovery))}</b></span><small>평균 획득 비용은 위의 이상 확률로 계산합니다. 더 높은 공격력도 성공에 포함합니다.</small></div></details>` : "";
+      return `<article class="enhance-market-card${market != null ? " has-price" : ""}${shopOnly ? " is-shop" : ""}" data-price-card="${attack}" aria-labelledby="enhance-price-title-${attack}"><header><span class="enhance-market-emblem" aria-hidden="true">⚔</span><div><small>완성 공격력</small><h3 id="enhance-price-title-${attack}">공 <b>${attack}</b></h3></div><span class="enhance-market-status" data-market-status>${status}</span></header><div class="enhance-market-price"><span>계산에 적용하는 가격</span><strong>${escapeHtml(applied == null ? "입력 대기" : priceReading(applied))}</strong></div><p class="enhance-market-reference">${shopOnly ? "첫 경매장 시세보다 낮아 상점가로 계산합니다." : estimate == null ? "무기와 주문서 가격을 입력해 주세요." : `공 ${attack} 이상 평균 획득 비용 <b>${escapeHtml(priceReading(estimate))}</b>`}</p><label class="enhance-market-input"><span>경매장 시세 <small>메소</small></span><input type="text" inputmode="numeric" pattern="[0-9]*" data-market-attack="${attack}" aria-label="공 ${attack} 경매장 시세" value="${escapeHtml(value)}" placeholder="시세를 직접 입력하세요" autocomplete="off" /></label><em data-market-reading>${escapeHtml(market != null ? priceReading(value) : "시세 입력 시 이 가격으로 계산합니다.")}</em>${comparison}${basisPanel}</article>`;
     }).join("")}</div>`;
+    focusMarketAttack(focusedMarketAttack, false);
+    const track = marketRoot.querySelector(".enhance-market-track");
+    for (const event of ["wheel", "touchstart", "pointerdown"]) track.addEventListener(event, () => { marketScrollTarget = null; }, { passive: true });
+    track.addEventListener("scroll", () => {
+      const selected = marketRoot.querySelector(".enhance-market-card.is-selected");
+      if (!selected) return;
+      const bounds = track.getBoundingClientRect();
+      const position = selected.getBoundingClientRect();
+      const visible = position.right > bounds.left + 8 && position.left < bounds.right - 8;
+      if (marketScrollTarget != null) {
+        if (!visible) return;
+        marketScrollTarget = null;
+      }
+      if (visible) return;
+      const cards = [...track.querySelectorAll("[data-price-card]")];
+      const nearest = cards.reduce((best, card) => Math.abs(card.getBoundingClientRect().left - bounds.left) < Math.abs(best.getBoundingClientRect().left - bounds.left) ? card : best);
+      focusedMarketAttack = Number(nearest.dataset.priceCard);
+      syncMarketFocus();
+    }, { passive: true });
+  }
+
+  function syncMarketFocus() {
+    for (const button of marketRoot.querySelectorAll("[data-focus-market]")) button.setAttribute("aria-pressed", String(Number(button.dataset.focusMarket) === focusedMarketAttack));
+    for (const card of marketRoot.querySelectorAll("[data-price-card]")) {
+      const selected = Number(card.dataset.priceCard) === focusedMarketAttack;
+      card.classList.toggle("is-selected", selected);
+      if (!selected) card.querySelector("details")?.removeAttribute("open");
+    }
+    const jump = marketRoot.querySelector("[data-market-jump]");
+    if (jump) jump.value = String(focusedMarketAttack);
+  }
+
+  function focusMarketAttack(attack, smooth = true) {
+    const card = marketRoot.querySelector(`[data-price-card="${attack}"]`);
+    const track = marketRoot.querySelector(".enhance-market-track");
+    if (!card || !track) return;
+    focusedMarketAttack = attack;
+    marketScrollTarget = attack;
+    syncMarketFocus();
+    const behavior = smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "instant";
+    track.scrollTo({ left: card.offsetLeft - 8, behavior });
+    const rail = marketRoot.querySelector(".enhance-attack-rail");
+    const button = marketRoot.querySelector(`[data-focus-market="${attack}"]`);
+    if (rail && button) rail.scrollTo({ left: button.offsetLeft - rail.clientWidth / 2 + button.clientWidth / 2, behavior });
   }
 
   function routeCard(result, rank, mode) {
@@ -383,26 +476,26 @@ export async function render(root) {
           <p><span>평균 회수액</span><b>${formatCount(result.expectedSale)}메소</b></p>
         </div>
         <div class="enhance-route-usage"><span>10% 평균 <b>${decimalHundredths(result.expectedUsageHundredths.ten)}장</b></span><span>60% 평균 <b>${decimalHundredths(result.expectedUsageHundredths.sixty)}장</b></span><span>중도 판매 <b>${chanceText(result.earlyStopNumerator, result.denominator)}</b></span></div>
-        <div class="enhance-route-outcomes">${topOutcomes.map((outcome) => `<span><b>공 ${outcome.attack}</b><small>${outcome.remaining ? `${outcome.remaining}회 남기고 상점` : outcome.saleType === "market" ? "경매장 판매" : "상점 판매"}</small><em>${chanceText(outcome.probabilityNumerator, outcome.denominator)}</em></span>`).join("")}</div>
+        <div class="enhance-route-outcomes">${topOutcomes.map((outcome) => `<span><b>공 ${outcome.attack}</b><small>${outcome.remaining ? `${outcome.remaining}회 남기고 상점` : outcome.saleType === "market" ? "경매장 판매" : outcome.saleType === "estimate" ? "획득 비용 추정" : "상점 판매"}</small><em>${chanceText(outcome.probabilityNumerator, outcome.denominator)}</em></span>`).join("")}</div>
         <details><summary>상태별 최적 행동 보기</summary><div class="enhance-policy-list">${result.policy.map((node) => `<div><span>공격력 <b>${node.attack}</b> · ${node.remaining}회 남음</span><strong class="${actionClass(node.action)}">${actionLabel(node.action)}</strong></div>`).join("")}</div></details>
       </article>
     `;
   }
 
   function paintRanking() {
-    const weapons = validWeapons();
-    const globals = globalValues();
+    const { weapons, globals, effective, estimatedPrices } = priceModel();
     if (!weapons.length || globals.shopPrice == null || globals.scrollPrices.ten == null || globals.scrollPrices.sixty == null) {
       rankingRoot.innerHTML = `<div class="enhance-result-lock"><span aria-hidden="true">✦</span><strong>상점가·주문서 시세·노작 무기 시세를 입력하면 최적 경로를 계산합니다.</strong></div>`;
       return;
     }
     const slots = WEAPON_TYPES[state.weaponType].slots;
-    const results = weapons.map((weapon) => optimizeEnhancement({ baseAttack: weapon.attack, basePrice: weapon.price, slots, ...globals }));
+    const results = weapons.map((weapon) => optimizeEnhancement({ baseAttack: weapon.attack, basePrice: weapon.price, slots, ...globals, marketPrices: effective, estimatedPrices }));
     const profitTop = sortByProfit(results).slice(0, 3);
     const roiTop = sortByRoi(results).slice(0, 3);
     rankingRoot.innerHTML = `
       <section class="enhance-ranking-board">
         <div class="enhance-ranking-head"><div><span>RESULT</span><h2>최적 강화 경로</h2></div><p>강화 도중 기대가치가 상점가보다 낮아지는 순간 자동으로 중단합니다.</p></div>
+        <p class="enhance-estimate-note">평균 획득 비용 = (1회 무기·주문서 비용 − 목표 미달 결과의 평균 판매 회수액) ÷ 해당 공격력 이상 확률. 미달 결과도 입력한 경매장 시세 또는 낮은 공격력부터 계산한 추정 가격으로 판매합니다. 첫 경매장 시세보다 낮은 미입력 공격력은 상점가입니다. 추정 가격을 판매가로 사용한 수익은 실제 시세와 다를 수 있습니다.</p>
         <div class="enhance-ranking-columns">
           <div><h3>메소를 가장 많이 남기는 무기</h3>${profitTop.map((result, index) => routeCard(result, index + 1, "profit")).join("")}</div>
           <div><h3>투입 대비 효율이 좋은 무기</h3>${roiTop.map((result, index) => routeCard(result, index + 1, "roi")).join("")}</div>
@@ -421,7 +514,26 @@ export async function render(root) {
     return !profileDirty || window.confirm("저장하지 않은 변경 내용이 있습니다. 다른 아이템으로 이동할까요?");
   }
 
+  marketRoot.addEventListener("focusin", (event) => {
+    const card = event.target.closest("[data-price-card]");
+    if (!card) return;
+    focusedMarketAttack = Number(card.dataset.priceCard);
+    syncMarketFocus();
+  });
+
   root.addEventListener("click", (event) => {
+    const attackButton = event.target.closest("[data-focus-market]");
+    if (attackButton) {
+      focusMarketAttack(Number(attackButton.dataset.focusMarket));
+      return;
+    }
+    const stepButton = event.target.closest("[data-market-step]");
+    if (stepButton) {
+      const attacks = [...marketRoot.querySelectorAll("[data-price-card]")].map((card) => Number(card.dataset.priceCard));
+      const index = attacks.indexOf(focusedMarketAttack) + Number(stepButton.dataset.marketStep);
+      if (attacks[index] != null) focusMarketAttack(attacks[index]);
+      return;
+    }
     const profileButton = event.target.closest("[data-profile-id]");
     if (profileButton) {
       if (profileButton.dataset.profileId === activeProfileId || !canSwitchProfile()) return;
@@ -498,7 +610,7 @@ export async function render(root) {
       if (id === "shop") state.shopPrice = input.value;
       else state.scrollPrices[id] = input.value;
       const reading = root.querySelector(`[data-global-reading="${id}"]`);
-      if (reading) reading.textContent = input.value ? priceReading(input.value) : id === "shop" ? "미입력 완성품도 이 가격으로 계산" : `성공 시 공격력 +${ENHANCE_SCROLLS[id].attackGain}`;
+      if (reading) reading.textContent = input.value ? priceReading(input.value) : id === "shop" ? "강화 중단 시 회수하는 가격" : `성공 시 공격력 +${ENHANCE_SCROLLS[id].attackGain}`;
       markProfileDirty();
     }
     const row = input.closest("[data-weapon-row]");
@@ -515,22 +627,52 @@ export async function render(root) {
       state.marketPrices[input.dataset.marketAttack] = input.value;
       const card = input.closest(".enhance-market-card");
       card.classList.toggle("has-price", readMeso(input.value) != null);
-      card.querySelector("small").textContent = input.value ? "경매장" : "상점가 적용";
-      card.querySelector("em").textContent = input.value ? priceReading(input.value) : "미입력 시 상점 판매";
+      focusedMarketAttack = Number(input.dataset.marketAttack);
+      syncMarketFocus();
+      card.querySelector("[data-market-status]").textContent = input.value ? "시장가 입력 중" : "재계산 대기";
+      card.querySelector("[data-market-reading]").textContent = input.value ? priceReading(input.value) : "시세 입력 시 이 가격으로 계산합니다.";
       markProfileDirty();
     }
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target.matches("[data-market-jump]")) {
+      focusMarketAttack(Number(event.target.value));
+      return;
+    }
     if (event.target.matches("[data-base-attack], [data-base-price]")) {
       paintWeapons();
       paintResults();
       return;
     }
-    if (event.target.matches("[data-global-price], [data-market-attack]")) paintRanking();
+    if (event.target.matches("[data-global-price='shop'], [data-market-attack]")) {
+      const removed = removeLowMarketPrices();
+      if (removed) {
+        markProfileDirty();
+        notify(`상점가 이하의 경매장 시세 ${removed}개를 정리했습니다.`, "info");
+      }
+      paintMarket();
+      paintRanking();
+      return;
+    }
+    if (event.target.matches("[data-global-price]")) {
+      paintMarket();
+      paintRanking();
+    }
   });
 
   root.addEventListener("keydown", (event) => {
+    if (event.target.matches(".enhance-market-track, [data-focus-market]") && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault();
+      const step = event.key === "ArrowLeft" ? -1 : 1;
+      const buttons = [...marketRoot.querySelectorAll("[data-focus-market]")];
+      const index = buttons.findIndex((button) => Number(button.dataset.focusMarket) === focusedMarketAttack) + step;
+      if (buttons[index]) {
+        focusMarketAttack(Number(buttons[index].dataset.focusMarket));
+        if (event.target.matches("[data-focus-market]")) buttons[index].focus({ preventScroll: true });
+      }
+      return;
+    }
     if (event.key !== "Enter" || !event.target.matches("input")) return;
     event.preventDefault();
     event.target.blur();

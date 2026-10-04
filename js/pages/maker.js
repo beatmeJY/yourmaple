@@ -648,6 +648,7 @@ export async function render(root) {
   let priceRows = [];
   let loadId = 0;
   const openExplain = new Set();
+  const openCraftCards = new Set();
   const reverseHighSelections = [null, null, null];
   let reverseActiveSlot = null;
   const enchantSelections = [
@@ -876,7 +877,8 @@ export async function render(root) {
       const extra = { routes, breakEven, midMarket: midMarketPrice, lowBuyBreakEven, lowMarket: lowMarketPrice };
       return `
         <article class="maker-craft-card">
-          <header class="maker-craft-head">${stageIcon(item.id, "normal", item.name)}<strong>${escapeHtml(item.name)}</strong></header>
+          <button type="button" class="maker-craft-head" data-craft-toggle="${item.id}" aria-expanded="${openCraftCards.has(item.id)}" aria-controls="maker-craft-detail-${item.id}">${stageIcon(item.id, "normal", item.name)}<strong>${escapeHtml(item.name)}</strong><span class="maker-craft-head-hint">${openCraftCards.has(item.id) ? "접기" : "펼치기"}</span><i class="maker-tier-chevron" aria-hidden="true"></i></button>
+          <div class="maker-craft-detail" id="maker-craft-detail-${item.id}"${openCraftCards.has(item.id) ? "" : " hidden"}>
           <div class="maker-craft-tiers">
             ${craftTierRow(item, "low", "하급", prices, prices?.low, extra)}
             ${craftTierRow(item, "mid", "중급", prices, prices?.mid, extra)}
@@ -898,6 +900,7 @@ export async function render(root) {
             ${lowBuyBreakEven.value != null ? `<div class="maker-compare-row maker-compare-hint${lowBuyBreakEven.value === 0n ? " is-muted" : ""}"><span>${lowBuyBreakEven.value === 0n ? "하급 구매·재고 의미 없음" : "하급이 이 가격 이하면 중급 제련 이득"}</span><b>${lowBuyBreakEven.value === 0n ? "가치 없음" : meso(lowBuyBreakEven.value)}</b></div>` : ""}
           </div>
           ${marketProfitBlock(item, marketProfits)}
+          </div>
         </article>
       `;
     }).join("");
@@ -1257,6 +1260,18 @@ export async function render(root) {
     const saveButton = event.target.closest("[data-save-price]");
     if (saveButton) {
       savePrice(saveButton.dataset.savePrice);
+      return;
+    }
+    const craftToggle = event.target.closest("[data-craft-toggle]");
+    if (craftToggle) {
+      const itemId = craftToggle.dataset.craftToggle;
+      const detail = craftBody.querySelector(`#maker-craft-detail-${itemId}`);
+      const willOpen = detail.hidden;
+      detail.hidden = !willOpen;
+      craftToggle.setAttribute("aria-expanded", String(willOpen));
+      craftToggle.querySelector(".maker-craft-head-hint").textContent = willOpen ? "접기" : "펼치기";
+      if (willOpen) openCraftCards.add(itemId);
+      else openCraftCards.delete(itemId);
       return;
     }
     const explainButton = event.target.closest("[data-explain-toggle]");

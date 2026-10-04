@@ -16,7 +16,7 @@ export const CRYSTALS = [
   { id: "int_crystal", name: "지혜의 크리스탈", category: "crystal" },
 ];
 
-export const MAKER_ITEMS = [...GEMS, ...CRYSTALS];
+export const MAKER_ITEMS = [...CRYSTALS, ...GEMS];
 
 export function makerItemById(id) {
   return MAKER_ITEMS.find((item) => item.id === id) ?? null;

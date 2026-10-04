@@ -24,11 +24,6 @@ function statusOf(row) {
   return remainingOf(row) > 0 ? "보유중" : "판매 완료";
 }
 
-function gapOf(row) {
-  if (row.sell_price == null || !row.sell_qty) return null;
-  return row.buy_price - row.sell_price;
-}
-
 function profitOf(row) {
   if (row.sell_price == null || !row.sell_qty) return null;
   return (row.sell_price - row.buy_price) * row.sell_qty;
@@ -64,25 +59,34 @@ export async function render(root) {
             <button type="button" data-view="sold" aria-pressed="false">판매 완료</button>
           </div>
           <label class="field trade-search"><span>아이템명</span><input data-search placeholder="이름으로 찾기" /></label>
+          <label class="field trade-sort"><span>정렬</span><select data-sort aria-label="거래 정렬 기준">
+            <option value="total-desc">매수 총액 높은 순</option><option value="total-asc">매수 총액 낮은 순</option>
+            <option value="price-desc">매수 단가 높은 순</option><option value="price-asc">매수 단가 낮은 순</option>
+            <option value="created-desc">등록일 최신 순</option><option value="created-asc">등록일 오래된 순</option>
+            <option value="updated-desc">수정일 최신 순</option><option value="updated-asc">수정일 오래된 순</option>
+          </select></label>
         </div>
-        <form class="editor trade-editor" id="trade-form" hidden>
+        <form class="editor trade-editor" id="trade-form">
           <h2 data-form-title>거래 추가</h2>
           <label class="field span-all"><span>아이템명</span><input name="name" required autocomplete="off" /></label>
           <div class="trade-form-sides span-all">
             <fieldset class="trade-form-side is-buy">
               <legend>매수</legend>
-              <label class="field"><span>개당 가격</span><input name="buy_price" inputmode="numeric" required autocomplete="off" /></label>
-              <label class="field"><span>개수</span><input name="buy_qty" inputmode="numeric" required autocomplete="off" /></label>
+              <label class="field"><span>개당 가격</span><input name="buy_price" inputmode="numeric" required autocomplete="off" /><small data-selected-value="buy_price" hidden aria-live="polite"></small></label>
+              <label class="field"><span>개수</span><input name="buy_qty" inputmode="numeric" required autocomplete="off" /><small data-selected-value="buy_qty" hidden aria-live="polite"></small></label>
+              <button class="secondary-button" type="button" data-save-buy>매수 저장</button>
             </fieldset>
             <fieldset class="trade-form-side is-sell">
               <legend>매도</legend>
-              <label class="field"><span>개당 가격</span><input name="sell_price" inputmode="numeric" placeholder="아직 안 팔렸으면 비움" autocomplete="off" /></label>
-              <label class="field"><span>개수</span><input name="sell_qty" inputmode="numeric" placeholder="아직 안 팔렸으면 비움" autocomplete="off" /></label>
+              <label class="field"><span>개당 가격</span><input name="sell_price" inputmode="numeric" placeholder="아직 안 팔렸으면 비움" autocomplete="off" /><small data-selected-value="sell_price" hidden aria-live="polite"></small></label>
+              <label class="field"><span>개수</span><input name="sell_qty" inputmode="numeric" placeholder="아직 안 팔렸으면 비움" autocomplete="off" /><small data-selected-value="sell_qty" hidden aria-live="polite"></small></label>
+              <button class="secondary-button" type="button" data-save-sell>매도 저장</button>
+              <small>목록에서 선택한 거래에 이번 판매분을 추가합니다.</small>
             </fieldset>
           </div>
           <div class="button-row span-all">
-            <button class="primary-button" type="submit" data-save>저장</button>
-            <button class="secondary-button" type="button" data-cancel>취소</button>
+            <button class="primary-button" type="submit" data-save>통합 저장</button>
+            <button class="secondary-button" type="button" data-cancel>입력 초기화</button>
           </div>
         </form>
         <div data-list></div>
@@ -97,6 +101,8 @@ export async function render(root) {
   let rows = [];
   let view = "all";
   let loadId = 0;
+  let selectedId = "";
+  let sort = "total-desc";
 
   function showStatus(text, kind) {
     notify(text, kind);
@@ -166,8 +172,12 @@ export async function render(root) {
     return [...source].sort((a, b) => {
       const status = statusRank(a) - statusRank(b);
       if (status) return status;
-      const total = b.buy_price * b.buy_qty - a.buy_price * a.buy_qty;
-      if (total) return total;
+      const [field, direction] = sort.split("-");
+      const valueOf = (row) => field === "price" ? BigInt(row.buy_price) : field === "total" ? BigInt(row.buy_price) * BigInt(row.buy_qty) : Date.parse(field === "created" ? row.created_at : row.updated_at) || 0;
+      const left = valueOf(a);
+      const right = valueOf(b);
+      const order = left < right ? -1 : left > right ? 1 : 0;
+      if (order) return direction === "asc" ? order : -order;
       return a.name.localeCompare(b.name, "ko");
     });
   }
@@ -178,24 +188,18 @@ export async function render(root) {
   }
 
   function card(row) {
-    const gap = gapOf(row);
     const profit = profitOf(row);
-    const gapText = gap == null ? "—" : gap > 0 ? `감가 ${formatCount(gap)}` : gap < 0 ? `이익 ${formatCount(-gap)}` : "0";
-    const rate = gap == null || !row.buy_price ? null : (gap / row.buy_price) * 100;
-    const gapWithRate = rate == null ? gapText : `${gapText} (${Math.abs(rate).toFixed(1)}%)`;
-    const gapTone = gap > 0 ? "is-loss" : gap < 0 ? "is-gain" : "";
     const remaining = remainingOf(row);
     const sold = row.sell_price != null && row.sell_qty > 0;
-    const tone = gap > 0 ? "is-loss" : gap < 0 ? "is-gain" : "";
-    const holding = remaining > 0;
+    const tone = moneyClass(profit);
     const buyTotal = formatCount(row.buy_price * row.buy_qty);
     const sellTotal = sold ? formatCount(row.sell_price * row.sell_qty) : "—";
     const profitText = signedMoney(profit);
     return `
-      <article class="trade-card ${tone}">
+      <article class="trade-card${selectedId === row.id ? " is-selected" : ""}" data-select-trade="${escapeHtml(row.id)}">
         <div class="trade-card-id">
-          <h3 title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</h3>
-          <span class="trade-badge${holding ? "" : " is-sold"}">${holding ? "보유중" : "판매 완료"}</span>
+          <h3><button class="text-button" type="button" data-select-name="${escapeHtml(row.id)}" aria-pressed="${selectedId === row.id}">${escapeHtml(row.name)}</button></h3>
+          ${profit == null || profit === 0 ? "" : `<span class="trade-profit-sticker ${tone}">${profit > 0 ? "흑자" : "적자"}</span>`}
         </div>
         <section class="trade-lane is-buy">
           <p class="trade-lane-kicker">매수</p>
@@ -211,15 +215,21 @@ export async function render(root) {
         </section>
         <section class="trade-lane is-result">
           <p class="trade-metric"><span>재고</span><strong class="${remaining === row.buy_qty ? "is-quiet" : ""}">${escapeHtml(formatCount(remaining))}</strong></p>
-          <p class="trade-metric"><span>개당 차이</span><strong class="${gapTone}" title="${escapeHtml(gapWithRate)}">${escapeHtml(gapWithRate)}</strong></p>
-          <p class="trade-profit ${moneyClass(profit)}"><span>실현 손익</span><strong title="${escapeHtml(profitText)}">${escapeHtml(profitText)}</strong></p>
+          <p class="trade-profit ${moneyClass(profit)}"><span>총 실현 수익</span><strong title="${escapeHtml(profitText)}">${escapeHtml(profitText)}</strong></p>
         </section>
         <div class="row-actions">
           <button class="text-button" type="button" data-edit="${row.id}">수정</button>
           <button class="text-button is-danger" type="button" data-delete="${row.id}">삭제</button>
         </div>
+        <footer class="trade-dates"><span>최초 등록 ${tradeDate(row.created_at)}</span><span>마지막 수정 ${tradeDate(row.updated_at)}</span></footer>
       </article>
     `;
+  }
+
+  function tradeDate(value) {
+    const date = new Date(value);
+    if (!value || Number.isNaN(date.getTime())) return "—";
+    return escapeHtml(new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(date));
   }
 
   function paintList() {
@@ -412,17 +422,51 @@ export async function render(root) {
     form.elements.buy_qty.value = row.buy_qty ?? "";
     form.elements.sell_price.value = row.sell_price ?? "";
     form.elements.sell_qty.value = row.sell_qty ? row.sell_qty : "";
+    selectedId = row.id || "";
+    paintSelection();
     form.elements.name.focus();
     form.scrollIntoView({ block: "nearest" });
   }
 
   function closeForm() {
-    form.hidden = true;
+    form.hidden = false;
     form.dataset.editingId = "";
     form.reset();
+    selectedId = "";
+    title.textContent = "거래 추가";
+    paintSelection();
   }
 
-  function readForm() {
+  function paintSelection() {
+    const selected = rows.find((row) => row.id === selectedId);
+    for (const card of list.querySelectorAll("[data-select-trade]")) {
+      const on = !!selected && card.dataset.selectTrade === selectedId;
+      card.classList.toggle("is-selected", on);
+      card.querySelector("[data-select-name]").setAttribute("aria-pressed", String(on));
+    }
+    const labels = { buy_price: "현재 평균 매수가", buy_qty: "누적 매수 수량", sell_price: "현재 평균 매도가", sell_qty: "누적 매도 수량" };
+    for (const hint of form.querySelectorAll("[data-selected-value]")) {
+      const field = hint.dataset.selectedValue;
+      hint.hidden = !selected;
+      const value = selected?.[field];
+      hint.textContent = !selected ? "" : `${labels[field]} · ${value == null ? "판매 내역 없음" : `${formatCount(value)}${field.endsWith("price") ? "메소" : "개"}`}`;
+    }
+  }
+
+  function readForm(mode = "all") {
+    if (mode === "sell") {
+      const selected = rows.find((row) => row.id === selectedId);
+      if (!selected) return { error: "매도할 보유 거래를 목록에서 선택해 주세요." };
+      if (tradeName(form.elements.name.value) !== tradeName(selected.name)) return { error: "아이템명이 선택한 거래와 다릅니다. 매도할 거래를 다시 선택해 주세요." };
+      if (remainingOf(selected) <= 0) return { error: "선택한 거래에는 판매할 재고가 없습니다." };
+      const sold = readSellFields(form.elements.sell_price.value.trim(), form.elements.sell_qty.value.trim(), remainingOf(selected));
+      if (sold.error) return sold;
+      if (sold.sellPrice == null || sold.sellQty === 0) return { error: "이번에 판 가격과 개수를 모두 입력해 주세요." };
+      const sellQty = selected.sell_qty + sold.sellQty;
+      const revenue = BigInt(selected.sell_price ?? 0) * BigInt(selected.sell_qty) + BigInt(sold.sellPrice) * BigInt(sold.sellQty);
+      const sellPrice = Number((revenue + BigInt(sellQty) / 2n) / BigInt(sellQty));
+      return { value: { name: selected.name, buy_price: selected.buy_price, buy_qty: selected.buy_qty, sell_price: sellPrice, sell_qty: sellQty } };
+    }
     const name = form.elements.name.value.trim();
     if (!name) return { error: "아이템명을 입력해 주세요." };
     const buyPrice = readCount(form.elements.buy_price.value, "개당 산 가격", 0);
@@ -431,7 +475,7 @@ export async function render(root) {
     const buyQty = readCount(form.elements.buy_qty.value, "산 개수", 1);
     if (buyQty.error) return buyQty;
     if (buyQty.value == null) return { error: "산 개수를 입력해 주세요." };
-    const sold = readSellFields(form.elements.sell_price.value.trim(), form.elements.sell_qty.value.trim(), buyQty.value);
+    const sold = mode === "buy" ? { sellPrice: null, sellQty: 0 } : readSellFields(form.elements.sell_price.value.trim(), form.elements.sell_qty.value.trim(), buyQty.value);
     if (sold.error) return sold;
     return {
       value: {
@@ -483,11 +527,18 @@ export async function render(root) {
     }
     if (current !== loadId || !list.isConnected) return;
     paintList();
+    paintSelection();
   }
 
   root.addEventListener("input", (event) => {
     if (event.target.closest("[data-trade-field]")) applyAmountCommas(event.target);
     if (event.target.closest("[data-search]")) paintList();
+  });
+
+  root.addEventListener("change", (event) => {
+    if (!event.target.matches("[data-sort]")) return;
+    sort = event.target.value;
+    paintList();
   });
 
   root.addEventListener("keydown", (event) => {
@@ -513,6 +564,21 @@ export async function render(root) {
       fillForm(blank);
     }
     if (event.target.closest("[data-cancel]")) closeForm();
+    if (event.target.closest("[data-save-buy]")) await saveForm("buy");
+    if (event.target.closest("[data-save-sell]")) await saveForm("sell");
+
+    const selectedCard = event.target.closest("[data-select-trade]");
+    if (selectedCard && !event.target.closest("input, label, [data-edit], [data-delete]")) {
+      selectedId = selectedCard.dataset.selectTrade;
+      const selected = rows.find((row) => row.id === selectedId);
+      if (selected) {
+        form.dataset.editingId = "";
+        title.textContent = "거래 추가";
+        form.elements.name.value = selected.name;
+        paintSelection();
+        form.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      }
+    }
 
     const editButton = event.target.closest("[data-edit]");
     if (editButton) {
@@ -538,29 +604,43 @@ export async function render(root) {
     await loadRows();
   });
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const parsed = readForm();
+  let formSaving = false;
+  async function saveForm(mode = "all") {
+    if (formSaving) return;
+    const parsed = readForm(mode);
     if (parsed.error) {
       showStatus(parsed.error, "error");
       return;
     }
-    const saveButton = form.querySelector("[data-save]");
-    saveButton.disabled = true;
-    showStatus("저장하는 중입니다.", "info");
-    const id = form.dataset.editingId;
-    const saved = await persistTrade(id, parsed.value);
-    saveButton.disabled = false;
-    if (saved.error) {
-      showStatus(translateDbError(saved.error), "error");
-      return;
+    formSaving = true;
+    const buttons = [...form.querySelectorAll("button")];
+    buttons.forEach((button) => button.disabled = true);
+    try {
+      showStatus("저장하는 중입니다.", "info");
+      const id = mode === "buy" ? "" : mode === "sell" ? selectedId : form.dataset.editingId;
+      const saved = await persistTrade(id, parsed.value);
+      if (saved.error) {
+        showStatus(translateDbError(saved.error), "error");
+        return;
+      }
+      form.dataset.editingId = "";
+      title.textContent = "거래 추가";
+      showStatus(
+        saved.merged ? "이름이 같은 거래를 한 줄로 합쳤습니다." : mode === "sell" ? "이번 판매분을 저장했습니다." : id ? "거래를 수정했습니다." : "거래를 저장했습니다.",
+        "info",
+      );
+      await loadRows();
+    } catch (error) {
+      showStatus(translateDbError(error), "error");
+    } finally {
+      formSaving = false;
+      buttons.forEach((button) => button.disabled = false);
     }
-    closeForm();
-    showStatus(
-      saved.merged ? "이름이 같은 거래를 한 줄로 합쳤습니다." : id ? "거래를 수정했습니다." : "거래를 저장했습니다.",
-      "info",
-    );
-    await loadRows();
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await saveForm();
   });
 
   await loadRows();
