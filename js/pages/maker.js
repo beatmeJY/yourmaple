@@ -596,11 +596,12 @@ export async function render(root) {
           </div>
         </div>
         <section class="maker-price-board" aria-label="보석 시세 보관함">
-          <div class="maker-price-board-head">
+          <div class="maker-price-card-grid" id="maker-price-body" data-price-body inert aria-hidden="true"></div>
+          <button type="button" class="maker-price-board-head" data-toggle-price-board aria-expanded="false" aria-controls="maker-price-body">
             <strong><span aria-hidden="true">◆</span> 보석 시세</strong>
             <small data-price-board-summary>불러오는 중</small>
-          </div>
-          <div class="maker-price-card-grid" data-price-body></div>
+            <span class="maker-price-toggle" aria-hidden="true">⌄</span>
+          </button>
         </section>
       </header>
       <div class="trade-segments maker-tabs" data-maker-tabs role="tablist" aria-label="메이커 기능">
@@ -1174,6 +1175,15 @@ export async function render(root) {
   });
 
   root.addEventListener("click", (event) => {
+    const priceToggle = event.target.closest("[data-toggle-price-board]");
+    if (priceToggle) {
+      const open = priceToggle.getAttribute("aria-expanded") !== "true";
+      priceToggle.setAttribute("aria-expanded", String(open));
+      priceToggle.closest(".maker-price-board").classList.toggle("is-open", open);
+      priceBody.inert = !open;
+      priceBody.setAttribute("aria-hidden", String(!open));
+      return;
+    }
     if (event.target === quickPriceLayer || event.target.closest("[data-quick-price-close]")) {
       closeQuickPrice();
       return;

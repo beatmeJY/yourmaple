@@ -195,6 +195,9 @@ export async function render(root) {
     const buyTotal = formatCount(row.buy_price * row.buy_qty);
     const sellTotal = sold ? formatCount(row.sell_price * row.sell_qty) : "—";
     const profitText = signedMoney(profit);
+    const soldCost = row.buy_price * row.sell_qty;
+    const profitRate = profit == null || soldCost === 0 ? null : profit / soldCost * 100;
+    const rateText = profitRate == null ? "" : `${profitRate > 0 ? "+" : ""}${profitRate.toFixed(1)}%`;
     return `
       <article class="trade-card${selectedId === row.id ? " is-selected" : ""}" data-select-trade="${escapeHtml(row.id)}">
         <div class="trade-card-id">
@@ -215,7 +218,7 @@ export async function render(root) {
         </section>
         <section class="trade-lane is-result">
           <p class="trade-metric"><span>재고</span><strong class="${remaining === row.buy_qty ? "is-quiet" : ""}">${escapeHtml(formatCount(remaining))}</strong></p>
-          <p class="trade-profit ${moneyClass(profit)}"><span>총 실현 수익</span><strong title="${escapeHtml(profitText)}">${escapeHtml(profitText)}</strong></p>
+          <p class="trade-profit ${moneyClass(profit)}"><span>총 실현 수익</span><strong title="${escapeHtml(profitText)}">${escapeHtml(profitText)}</strong>${rateText ? `<small class="trade-profit-rate">${escapeHtml(rateText)}</small>` : ""}</p>
         </section>
         <div class="row-actions">
           <button class="text-button" type="button" data-edit="${row.id}">수정</button>

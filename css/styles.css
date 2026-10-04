@@ -2513,12 +2513,45 @@ input[data-hunt-search] {
 }
 
 .trade-card.is-selected {
-  border-color: var(--gain);
-  background: color-mix(in srgb, var(--gain) 9%, var(--bg));
-  box-shadow: inset 3px 0 0 var(--gain);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--gain) 11%, var(--bg)), var(--bg) 65%);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--gain) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--gain) 20%, transparent);
+  transform: translateY(-2px);
 }
 
-.trade-card { transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease; }
+.trade-card { position: relative; isolation: isolate; transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 280ms ease, background-color 240ms ease; }
+.trade-card::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 20px;
+  width: 3px;
+  height: 24px;
+  border-radius: 0 3px 3px 0;
+  background: var(--gain);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--gain) 45%, transparent);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition: opacity 200ms ease, transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.trade-card.is-selected::before { opacity: 1; transform: scaleY(1); }
+.trade-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--gain) 15%, transparent) 45%, color-mix(in srgb, var(--bg-raised) 55%, transparent) 50%, transparent 65%);
+  background-size: 240% 100%;
+}
+.trade-card.is-selected::after { animation: trade-select-shine 540ms ease-out; }
+@keyframes trade-select-shine {
+  0% { opacity: 0; background-position: 100% 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; background-position: 0% 0; }
+}
+.trade-card.is-selected [data-select-name] { color: var(--gain); }
 .trade-profit-sticker {
   flex: none;
   padding: 2px 6px;
@@ -2530,12 +2563,17 @@ input[data-hunt-search] {
 }
 .trade-profit-sticker.is-gain { color: var(--gain); }
 .trade-profit-sticker.is-loss { color: var(--danger); }
+.trade-profit-rate { flex: none; font-size: 11px; font-weight: 600; color: var(--muted); }
+.trade-profit.is-gain .trade-profit-rate { color: var(--gain); }
+.trade-profit.is-loss .trade-profit-rate { color: var(--danger); }
 @media (max-width: 700px) {
   .trade-card-id { flex-wrap: wrap; }
   .trade-card-id h3 { flex: 1 0 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .trade-card { transition: none; }
+  .trade-card, .trade-card::before { transition: none; }
+  .trade-card.is-selected { transform: none; }
+  .trade-card.is-selected::after { animation: none; }
 }
 
 .trade-card-id {
@@ -4023,12 +4061,6 @@ body.link-panel-open .link-panel-sheet {
 .maker-price-board {
   container-type: inline-size;
   width: 100%;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg-raised) 96%, transparent);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
 }
 
 .maker-price-board-head {
@@ -4042,6 +4074,31 @@ body.link-panel-open .link-panel-sheet {
 }
 
 .maker-price-board-head strong { color: var(--accent); font-size: 10px; }
+.maker-price-board-head { cursor: pointer; width: 100%; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 12px; font: inherit; text-align: left; box-shadow: var(--shadow); }
+.maker-price-board.is-open .maker-price-board-head { border-radius: 0 0 12px 12px; }
+.maker-price-board-head:focus-visible { outline: 2px solid var(--gain); outline-offset: -2px; }
+.maker-price-toggle { color: var(--accent); transition: transform 180ms ease; }
+.maker-price-board.is-open .maker-price-toggle { transform: rotate(180deg); }
+.maker-price-board [data-price-body] {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px) scale(0.985);
+  transform-origin: bottom center;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: var(--bg-raised);
+  transition: opacity 240ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s 280ms;
+}
+.maker-price-board.is-open [data-price-body] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .maker-price-toggle, .maker-price-board [data-price-body] { transition: none; transform: none; }
+}
 .maker-price-board-head small { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .maker-price-card-grid {
   display: grid;
