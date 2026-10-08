@@ -1,16 +1,16 @@
 export const MAX_FLOOR = 27;
 export const DAILY_CAP = 3500;
-export const GOAL_SCORE = 17000;
 export const SAVE_FLOORS = [5, 10, 15, 20, 25];
 export const SAVE_SECONDS = 5;
 
 export const BELTS = [
-  { id: "white", name: "흰색 허리띠", score: 200 },
-  { id: "yellow", name: "노란색 허리띠", score: 1800 },
-  { id: "blue", name: "파란색 허리띠", score: 4000 },
-  { id: "red", name: "빨간색 허리띠", score: 9200 },
-  { id: "black", name: "검은색 허리띠", score: 17000 },
+  { id: "white", name: "흰색 허리띠", score: 140 },
+  { id: "yellow", name: "노란색 허리띠", score: 1300 },
+  { id: "blue", name: "파란색 허리띠", score: 2800 },
+  { id: "red", name: "빨간색 허리띠", score: 6400 },
+  { id: "black", name: "검은색 허리띠", score: 12000 },
 ];
+export const GOAL_SCORE = BELTS.find((belt) => belt.id === "black").score;
 
 export const BANDS = [
   { start: 1, end: 5 },

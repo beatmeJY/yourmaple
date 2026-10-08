@@ -85,7 +85,7 @@ export function translateDbError(error) {
     return "직업 표가 없습니다. Supabase SQL Editor에서 sql/008_jobs.sql 을 실행해 주세요.";
   }
   if (/dojo_belt_prices_price_check/i.test(raw)) return "시세는 0 이상이어야 합니다.";
-  if (/dojo_records_score_check/i.test(raw)) return "지금 점수는 0부터 17,000까지입니다.";
+  if (/dojo_records_score_check/i.test(raw)) return "지금 점수가 허용 범위를 벗어났습니다. 입력한 점수를 확인해 주세요.";
   if (/dojo_records_user_character/i.test(raw)) return "이 캐릭터의 이 방식 구간 시간은 이미 있습니다.";
   if (/dojo_records_actual_minutes_check/i.test(raw)) return "실제 한 바퀴는 1분 이상이어야 합니다.";
   if (/\bruns\b/i.test(raw) && /could not find|schema cache|does not exist/i.test(raw)) {

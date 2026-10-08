@@ -157,7 +157,7 @@ export async function render(root) {
       <div class="editor">
         <details class="dojo-note span-all">
           <summary>계산 기준</summary>
-          <p class="hint">구간 전체를 깨는 초를 적습니다. 층에는 쉬는 층도 포함되어 있어서, 5라운드를 마칠 때마다 나오는 쉬는 층(${SAVE_FLOORS.map((floor) => `${saveFloorToFloor(floor)}층`).join(", ")})에서 저장할 수 있고, 이어서 5라운드 단위로 다시 저장할 수 있습니다. 개인은 1~5층(1~5라운드)이 층마다 2점, 팀은 1점입니다. 저장 한 번에 참고 시간 ${SAVE_SECONDS}초를 더합니다. 하루 최대 3,500점이고, 검은 허리띠는 17,000점입니다.</p>
+          <p class="hint">구간 전체를 깨는 초를 적습니다. 층에는 쉬는 층도 포함되어 있어서, 5라운드를 마칠 때마다 나오는 쉬는 층(${SAVE_FLOORS.map((floor) => `${saveFloorToFloor(floor)}층`).join(", ")})에서 저장할 수 있고, 이어서 5라운드 단위로 다시 저장할 수 있습니다. 개인은 1~5층(1~5라운드)이 층마다 2점, 팀은 1점입니다. 저장 한 번에 참고 시간 ${SAVE_SECONDS}초를 더합니다. 하루 최대 3,500점이고, 검은 허리띠는 ${formatCount(GOAL_SCORE)}점입니다.</p>
         </details>
         <div class="dojo-fields">
           <label class="field dojo-field-character"><span>캐릭터</span>
@@ -304,7 +304,7 @@ export async function render(root) {
     }
     const score = readCount(form.elements.score.value, "지금 점수", 0);
     if (score.error) return score;
-    if (score.value != null && score.value > GOAL_SCORE) return { error: "지금 점수는 17,000 이하여야 합니다." };
+    if (score.value != null && score.value > GOAL_SCORE) return { error: `지금 점수는 ${formatCount(GOAL_SCORE)} 이하여야 합니다.` };
     return { times, score: score.value ?? 0, party: partyOf() };
   }
 
@@ -658,7 +658,7 @@ export async function render(root) {
       <span class="dojo-cell is-act-time">실제</span>
       <span class="dojo-cell is-act-rate">실제 초당</span>
       <span class="dojo-cell is-act-point">실제 점수당</span>
-      <span class="dojo-cell is-belt" title="실제 시간으로 지금 점수에서 17,000점까지">검은 허리띠</span>
+      <span class="dojo-cell is-belt" title="실제 시간으로 지금 점수에서 ${formatCount(GOAL_SCORE)}점까지">검은 허리띠</span>
       <span class="dojo-cell is-hour">시간당</span>
     </div>`;
   }
