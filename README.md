@@ -127,6 +127,15 @@ GitHub 저장소는 공개이고, 데이터는 Supabase에 남습니다.
 
 Secret key 는 Secret 에도 넣지 않습니다.
 
-배포가 끝나면 주소는 `https://사용자이름.github.io/yourmaple/` 입니다.  
-Supabase **Authentication → URL Configuration** 의 Site URL 을 그 주소로 바꿉니다.  
-Redirect URLs 에는 그 주소와 `http://127.0.0.1:5500` 을 함께 넣습니다.
+- 배포 주소는 `https://yourmaple.kr` 입니다. 예전 주소 `https://beatmejy.github.io/yourmaple/` 로 들어오면 GitHub 가 새 주소로 옮겨 줍니다.
+- Supabase **Authentication → URL Configuration** 의 Site URL 은 `https://yourmaple.kr` 입니다.
+- Redirect URLs 에는 `https://yourmaple.kr/**` 와 `http://127.0.0.1:5500` 을 함께 넣습니다.
+
+### 도메인 (yourmaple.kr)
+
+- 가비아에서 구입했고 DNS 도 가비아에서 관리합니다.
+  - `@` A 레코드 4개: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` (GitHub Pages 서버)
+  - `www` CNAME: `beatmejy.github.io`
+  - TXT `_github-pages-challenge-beatmeJY`: GitHub 계정의 도메인 소유 인증용. 지우지 않습니다.
+- 저장소 Settings → Pages 의 Custom domain 은 `yourmaple.kr`, Enforce HTTPS 는 켜 둡니다. Actions 배포라 `CNAME` 파일은 두지 않습니다.
+- 주소가 바뀌면 로그인 상태와 다크 모드 같은 브라우저 저장값은 새로 시작합니다. 데이터는 Supabase 에 있어 그대로입니다.
