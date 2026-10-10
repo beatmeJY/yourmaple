@@ -2,13 +2,35 @@ import { DAY_MS } from "./boss-cooldown.js";
 
 // 숙제 초기화 규칙 (2026-10-10 사용자 결정)
 // - daily: 매일 00시(이 기기 시간)에 초기화. 예: 무릉도장
+// - after6h: 끝낸 시각부터 6시간 뒤. 예: 웨딩 파티 퀘스트 (2026-10-11 사용자 요청, 직접 추가 숙제에서는 고르지 않음)
 // - after24h: 끝낸 시각부터 24시간 뒤. 예: 파풀라투스, 차원의 균열 조각
 // - after7d: 끝낸 시각부터 7일 뒤. 예: 피아누스
 export const RESET_KINDS = {
   daily: { id: "daily", label: "매일 00시", short: "00시" },
+  after6h: { id: "after6h", label: "끝낸 뒤 6시간", short: "6시간", builtInOnly: true },
   after24h: { id: "after24h", label: "끝낸 뒤 24시간", short: "24시간" },
   after7d: { id: "after7d", label: "끝낸 뒤 7일", short: "7일" },
 };
+
+// 자쿰·혼테일·핑크빈 (2026-10-11 사용자 요청): 입장한 시각 기준.
+// 자쿰·혼테일은 노말·카오스를 따로 세고 각각 24시간, 핑크빈은 7일(카오스 없음). 혼테일 카오스는 아직 게임에 없어 막아 둔다.
+// 숙제표는 보스마다 카드 하나(key: 표시 캐릭터 기준), 끝낸 시각은 모드마다(homework_checks.task_key = 모드 key).
+export const RAIDS = [
+  { key: "zakum", name: "자쿰", kind: "after24h", modes: [{ key: "zakum-normal", label: "노말", short: "자쿰" }, { key: "zakum-chaos", label: "카오스", short: "카쿰" }] },
+  { key: "horntail", name: "혼테일", kind: "after24h", modes: [{ key: "horntail-normal", label: "노말", short: "혼테일" }, { key: "horntail-chaos", label: "카오스", short: "카혼", disabled: true }] },
+  { key: "pinkbean", name: "핑크빈", kind: "after7d", modes: [{ key: "pinkbean", label: "입장", short: "핑크빈" }] },
+  // 파티 퀘스트 (2026-10-11 사용자 요청): 웨딩은 입장 후 6시간, 크림슨·말레이시아는 입장 후 7일.
+  { key: "wedding-pq", name: "웨딩 파퀘", type: "파티 퀘스트", kind: "after6h", modes: [{ key: "wedding-pq", label: "입장", short: "웨딩" }] },
+  { key: "crimson-pq", name: "크림슨 파퀘", type: "파티 퀘스트", kind: "after7d", modes: [{ key: "crimson-pq", label: "입장", short: "크림슨" }] },
+  { key: "malaysia-pq", name: "말레이시아 파퀘", type: "파티 퀘스트", kind: "after7d", modes: [{ key: "malaysia-pq", label: "입장", short: "말레이" }] },
+];
+
+/** 다시 할 수 있기까지 걸리는 시간(ms). daily 는 쓰지 않는다(00시 기준). */
+export function periodMs(kind) {
+  if (kind === "after6h") return 6 * 3_600_000;
+  if (kind === "after7d") return 7 * DAY_MS;
+  return DAY_MS;
+}
 
 export function startOfDay(now) {
   const date = new Date(now);
@@ -39,7 +61,7 @@ export function homeworkState(kind, checkedAt, now) {
     // 오늘 00시 이후에 끝냈으면 오늘 몫은 했다. 다음 00시에 다시.
     return at >= startOfDay(now) ? { done: true, next: nextMidnight(now) } : { done: false, next: null };
   }
-  const period = kind === "after7d" ? 7 * DAY_MS : DAY_MS;
+  const period = periodMs(kind);
   const next = at + period;
   return now < next ? { done: true, next } : { done: false, next: null };
 }

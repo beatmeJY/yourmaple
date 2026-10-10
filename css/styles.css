@@ -14315,3 +14315,18 @@ button.dj-log-row:hover { background: rgba(0, 0, 0, 0.32); }
 .char-hw-chip.is-papulatus { --chip-h: 245; }
 .char-hw-chip.is-rift { --chip-h: 150; }
 .char-hw-chip.is-done { border-color: rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); color: rgba(243, 239, 251, 0.5); }
+/* 자쿰·혼테일·핑크빈: 모드 줄(카오스는 붉은 기운), 막아 둔 모드는 흐린 "준비 중" 칸 */
+.hw-trow.is-chaos .hw-tlabel strong { color: oklch(0.8 0.16 25); }
+.hw-trow.is-off .hw-tlabel { opacity: 0.5; }
+.hw-tcell.is-off { opacity: 0.45; }
+.hw-cell.is-off { display: grid; place-items: center; cursor: not-allowed; border-style: dashed; background: rgba(255, 255, 255, 0.03); }
+.hw-cell.is-off small { color: var(--muted); font-size: 11px; }
+/* 캐릭터 카드 칩 색: 자쿰 금갈색, 카쿰 주황, 혼테일 청록, 핑크빈 분홍 */
+.char-hw-chip.is-zakum-normal { --chip-h: 70; }
+.char-hw-chip.is-zakum-chaos { --chip-h: 45; }
+.char-hw-chip.is-horntail-normal { --chip-h: 195; }
+.char-hw-chip.is-pinkbean { --chip-h: 350; }
+/* 파티 퀘스트 칩: 웨딩 연분홍, 크림슨 진홍 */
+.char-hw-chip.is-wedding-pq { --chip-h: 330; }
+.char-hw-chip.is-crimson-pq { --chip-h: 10; }
+.char-hw-chip.is-malaysia-pq { --chip-h: 100; }

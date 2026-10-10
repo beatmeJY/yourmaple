@@ -94,4 +94,10 @@ const cleared = dojoProgress([
 ], at("2026-10-11T13:00:00"));
 assert.deepEqual([cleared.total, cleared.today, cleared.partial], [9700, 500, false]);
 
+// 6시간(웨딩 파퀘)
+import { periodMs } from "./homework-calc.js";
+assert.equal(periodMs("after6h"), 6 * HOUR);
+assert.equal(homeworkState("after6h", last, last + 6 * HOUR - 1).done, true);
+assert.equal(homeworkState("after6h", last, last + 6 * HOUR).done, false);
+
 console.log("dojo score log ok");

@@ -3,7 +3,7 @@ import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
-import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, RESET_KINDS, availableDay, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
+import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, RAIDS, RESET_KINDS, availableDay, periodMs, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
 import { jobRecord } from "../job-label.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -14,7 +14,7 @@ import { notify } from "../toast.js";
 // 무릉도장과 직접 추가한 숙제는 homework_checks 에 끝낸 시각을 남긴다(sql/030).
 // 숙제마다 "+"로 표시할 캐릭터를 고른다: 보스는 …_enabled, 그 밖은 homework_members(sql/031). 숙제 카드 숨기기는 homework_prefs.
 
-const BOSS_ART = { pianus: "img/pianus.png", papulatus: "img/papulatus.png", rift: "img/rift.png" };
+const BOSS_ART = { pianus: "img/pianus.png", papulatus: "img/papulatus.png", rift: "img/rift.png", zakum: "img/zakum.png", horntail: "img/horntail.png", pinkbean: "img/pinkbean.png", "wedding-pq": "img/wedding-pq.png", "crimson-pq": "img/crimson-pq.png", "malaysia-pq": "img/malaysia-pq.png" };
 const BOSS_KIND = { papulatus: "after24h", rift: "after24h", pianus: "after7d" };
 const BOSS_ORDER = ["papulatus", "rift", "pianus"];
 const BOSS_BURST = {
@@ -26,6 +26,7 @@ const BASE_COLUMNS = "id, name, level, account_id, accounts(name), jobs(name, co
 const TABS = [
   { id: "all", label: "전체" },
   { id: "daily", label: "매일 00시" },
+  { id: "after6h", label: "6시간" },
   { id: "after24h", label: "24시간" },
   { id: "after7d", label: "7일" },
 ];
@@ -93,7 +94,7 @@ export async function render(root) {
         <span class="hw-add-title">숙제 추가</span>
         <input name="name" maxlength="40" placeholder="예: 일일 퀘스트" autocomplete="off" aria-label="숙제 이름" />
         <select name="reset_kind" aria-label="초기화 방식">
-          ${Object.values(RESET_KINDS).map((kind) => `<option value="${kind.id}">${kind.label}</option>`).join("")}
+          ${Object.values(RESET_KINDS).filter((kind) => !kind.builtInOnly).map((kind) => `<option value="${kind.id}">${kind.label}</option>`).join("")}
         </select>
         <button type="submit" class="hw-add-save">추가</button>
       </form>
@@ -167,6 +168,15 @@ export async function render(root) {
         const boss = bosses.find((item) => item.key === key);
         return { key, name: boss.label, kind: BOSS_KIND[key], boss, img: BOSS_ART[key], sub: key === "pianus" ? "보스 · 입장 후 7일" : "보스 · 입장 후 24시간" };
       }),
+      ...RAIDS.map((raid) => ({
+        key: raid.key,
+        name: raid.name,
+        kind: raid.kind,
+        img: BOSS_ART[raid.key],
+        sub: `${raid.type ?? "보스"} · 입장 후 ${RESET_KINDS[raid.kind].short}${raid.modes.length > 1 ? " · 노말·카오스 따로" : ""}`,
+        needsTable: true,
+        modes: raid.modes,
+      })),
       { key: "dojo", name: "무릉도장", kind: "daily", glyph: "武", hue: 25, sub: "매일 00시 초기화", needsTable: true },
     ];
     const custom = tasks.map((task) => ({ key: task.id, name: task.name, kind: task.reset_kind, glyph: [...task.name.trim()][0] || "숙", hue: 295, sub: `직접 추가 · ${RESET_KINDS[task.reset_kind]?.label ?? ""}`, custom: true, needsTable: true }));
@@ -175,8 +185,21 @@ export async function render(root) {
 
   function isEligible(task, character) {
     if (task.boss) return Boolean(character[task.boss.columnEnabled]);
-    // sql/031 실행 전에는 예전처럼 모든 캐릭터
-    return !membersReady || members.has(`${character.id}:${task.key}`);
+    // sql/031 실행 전에는 예전처럼 모든 캐릭터. 자쿰 노말·카오스처럼 모드는 보스(parent) 기준으로 고른다.
+    return !membersReady || members.has(`${character.id}:${task.parent?.key ?? task.key}`);
+  }
+
+  // 체크 단위: 자쿰·혼테일·핑크빈은 모드마다(막아 둔 모드 제외), 그 밖은 숙제 그대로.
+  function unitsOf(task) {
+    if (!task.modes) return [task];
+    return task.modes
+      .filter((mode) => !mode.disabled)
+      .map((mode) => ({ key: mode.key, name: task.modes.length > 1 ? `${task.name} ${mode.label}` : task.name, kind: task.kind, needsTable: true, parent: task }));
+  }
+
+  function findUnit(key) {
+    for (const task of allTasks()) for (const unit of unitsOf(task)) if (unit.key === key) return unit;
+    return null;
   }
 
   function visibleTasks() {
@@ -189,6 +212,12 @@ export async function render(root) {
   }
 
   function stateOf(task, character, now) {
+    // 모드가 있는 보스: 할 수 있는 모드가 하나라도 있으면 가능, 다 했으면 가장 먼저 열리는 시각까지 대기.
+    if (task.modes) {
+      const states = unitsOf(task).map((unit) => stateOf(unit, character, now));
+      if (!states.length || states.some((item) => !item.done)) return { done: false, next: null };
+      return { done: true, next: Math.min(...states.map((item) => item.next)) };
+    }
     const state = homeworkState(task.kind, checkedAt(task, character), now);
     // 무릉은 오늘 3,500점을 채워도 끝낸 것으로 본다.
     if (task.key === "dojo" && !state.done && (dojoProgress(dojoLog.get(character.id), now).today ?? 0) >= DOJO_DAILY_GOAL) {
@@ -228,7 +257,7 @@ export async function render(root) {
   // 시안 숙제표 모양: 숙제마다 표 하나. 위 줄은 캐릭터(링 얼굴), 아래 줄은 그 숙제의 체크 칸.
   // 링은 끝낸 칸이 다시 열리기까지 지난 정도(다 차면 다시 가능).
   function periodOf(task) {
-    return task.kind === "after7d" ? 7 * 86_400_000 : 86_400_000;
+    return periodMs(task.kind);
   }
 
   function personHead(task, character, state, now, managingNow) {
@@ -327,11 +356,22 @@ export async function render(root) {
       return `<div class="hw-trow is-dojo"><div class="hw-tlabel"><span><strong>오늘 점수</strong><small>어제보다 ${formatCount(DOJO_DAILY_GOAL)}점이면 완료</small></span></div>${ids.map((id) => dojoTodayCell(id, now)).join("")}</div>
         <div class="hw-trow is-dojo"><div class="hw-tlabel"><span><strong>통합 점수</strong><small>게임에 보이는 점수 입력</small></span></div>${ids.map((id) => dojoTotalCell(id, now)).join("")}</div>`;
     };
+    // 자쿰·혼테일·핑크빈: 모드(노말·카오스)마다 체크 줄 하나. 막아 둔 모드는 "준비 중" 칸.
+    const modeRows = (columns) => task.modes
+      .map((mode) => {
+        const unit = unitsOf(task).find((item) => item.key === mode.key);
+        const label = `<div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(mode.label)}</strong><small>${mode.disabled ? "아직 없음" : `${RESET_KINDS[task.kind].short} 뒤 다시`}</small></span></div>`;
+        const cells = columns.map((item) => (unit
+          ? checkCell(unit, item.character, stateOf(unit, item.character, now), now)
+          : `<div class="hw-tcell is-off"><span class="hw-cell is-off" aria-label="${escapeHtml(`${task.name} ${mode.label} 준비 중`)}"><small>준비 중</small></span></div>`));
+        return `<div class="hw-trow${unit ? "" : " is-off"}${mode.key.endsWith("-chaos") ? " is-chaos" : ""}">${label}${cells.join("")}</div>`;
+      })
+      .join("");
     // 무릉은 통합 점수로 완료를 판단하므로 체크 칸 줄을 두지 않는다(sql/033 전에는 예전처럼 체크 칸).
     const scoreOnly = task.key === "dojo" && dojoReady && !isManaging;
     const table = (columns, headCell, rowCell) => `<div class="hw-tscroll"><div class="hw-table" style="--cols:${columns.length}">
         <div class="hw-trow is-head"><div class="hw-tlabel is-corner"></div>${columns.map(headCell).join("")}</div>
-        ${scoreOnly ? "" : `<div class="hw-trow"><div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(task.name)}</strong><small>${escapeHtml(RESET_KINDS[task.kind]?.label ?? "")}</small></span></div>${columns.map(rowCell).join("")}</div>`}
+        ${scoreOnly ? "" : task.modes && !isManaging ? modeRows(columns) : `<div class="hw-trow"><div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(task.name)}</strong><small>${escapeHtml(RESET_KINDS[task.kind]?.label ?? "")}</small></span></div>${columns.map(rowCell).join("")}</div>`}
         ${extraRows(columns)}
       </div></div>`;
     let body;
@@ -381,8 +421,10 @@ export async function render(root) {
       if (task.needsTable && !ready) continue;
       for (const character of characters) {
         if (!isEligible(task, character)) continue;
-        total += 1;
-        if (stateOf(task, character, now).done) done += 1;
+        for (const unit of unitsOf(task)) {
+          total += 1;
+          if (stateOf(unit, character, now).done) done += 1;
+        }
       }
     }
     root.querySelector("[data-total]").innerHTML = `전체 <strong>${done}</strong> / ${total}`;
@@ -407,7 +449,7 @@ export async function render(root) {
   function buildClocks() {
     root.querySelector("[data-clocks]").innerHTML = [
       ["day", "매일 00시 초기화까지"],
-      ["boss", "다음 24시간 숙제"],
+      ["boss", "다음 6·24시간 숙제"],
       ["week", "다음 7일 숙제"],
     ]
       .map(([tone, label], index) => `<div class="hw-clock is-${tone}" data-clock="${tone}" style="--i:${index}">
@@ -439,25 +481,28 @@ export async function render(root) {
 
   function paintClocks() {
     const now = Date.now();
-    const soonest = (kind) => {
+    const soonest = (kinds) => {
       let best = null;
       let open = 0;
-      for (const task of visibleTasks().filter((item) => item.kind === kind && !(item.needsTable && !ready))) {
+      for (const task of visibleTasks().filter((item) => kinds.includes(item.kind) && !(item.needsTable && !ready))) {
         for (const character of characters) {
           if (!isEligible(task, character)) continue;
-          const state = stateOf(task, character, now);
-          if (!state.done) open += 1;
-          else if (!best || state.next < best.next) best = { next: state.next, task, character };
+          for (const unit of unitsOf(task)) {
+            const state = stateOf(unit, character, now);
+            if (!state.done) open += 1;
+            else if (!best || state.next < best.next) best = { next: state.next, task: unit, character };
+          }
         }
       }
       return { best, open };
     };
     const midnight = nextMidnight(now);
     setClock("day", clockRemain(midnight - now), "무릉도장 · 매일 숙제", (midnight - now) / 86_400_000);
-    for (const [tone, kind, period] of [["boss", "after24h", 86_400_000], ["week", "after7d", 7 * 86_400_000]]) {
-      const info = soonest(kind);
+    // 6시간(웨딩 파퀘)은 24시간 시계에 함께 센다. 막대는 그 숙제의 주기 기준.
+    for (const [tone, kinds] of [["boss", ["after6h", "after24h"]], ["week", ["after7d"]]]) {
+      const info = soonest(kinds);
       if (!info.best) setClock(tone, info.open ? "지금 가능" : "—", info.open ? `할 수 있는 캐릭터 ${info.open}` : "해당 숙제가 없어요", info.open ? 1 : 0);
-      else setClock(tone, clockRemain(info.best.next - now), `${info.best.character.name} · ${info.best.task.name} · ${availableLabel(info.best.next, now)} 가능${info.open ? ` · 지금 가능 ${info.open}` : ""}`, (info.best.next - now) / period, info.best.character);
+      else setClock(tone, clockRemain(info.best.next - now), `${info.best.character.name} · ${info.best.task.name} · ${availableLabel(info.best.next, now)} 가능${info.open ? ` · 지금 가능 ${info.open}` : ""}`, (info.best.next - now) / periodMs(info.best.task.kind), info.best.character);
     }
   }
 
@@ -605,7 +650,7 @@ export async function render(root) {
   }
 
   async function undo(taskKey, characterId) {
-    const task = allTasks().find((item) => item.key === taskKey);
+    const task = findUnit(taskKey);
     const character = characters.find((item) => item.id === characterId);
     const slot = undoSlots.get(`${characterId}:${taskKey}`);
     if (!task || !character || !slot) return;
@@ -886,7 +931,7 @@ export async function render(root) {
     }
     const checkButton = event.target.closest("[data-check]");
     if (checkButton) {
-      const task = allTasks().find((item) => item.key === checkButton.dataset.check);
+      const task = findUnit(checkButton.dataset.check);
       const character = characters.find((item) => item.id === checkButton.dataset.character);
       if (task && character) await toggle(task, character, checkButton);
       return;
@@ -918,7 +963,7 @@ export async function render(root) {
     }
     const timeButton = event.target.closest("[data-set-time]");
     if (timeButton) {
-      const task = allTasks().find((item) => item.key === timeButton.dataset.setTime);
+      const task = findUnit(timeButton.dataset.setTime);
       const character = characters.find((item) => item.id === timeButton.dataset.character);
       if (task && character) openTime(task, character);
       return;
@@ -1012,7 +1057,7 @@ export async function render(root) {
 
   timeForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const task = allTasks().find((item) => item.key === timeDialog.dataset.task);
+    const task = findUnit(timeDialog.dataset.task);
     const character = characters.find((item) => item.id === timeDialog.dataset.character);
     if (!task || !character) return;
     const parsed = readBossTime(Object.fromEntries(["year", "month", "day", "hour", "minute"].map((name) => [name, timeForm.elements[name].value])));
@@ -1043,7 +1088,7 @@ export async function render(root) {
       addForm.elements.name.focus();
       return;
     }
-    if (!RESET_KINDS[kind]) return;
+    if (!RESET_KINDS[kind] || RESET_KINDS[kind].builtInOnly) return;
     const button = addForm.querySelector("[type=submit]");
     button.disabled = true;
     const supabase = await getSupabase();
