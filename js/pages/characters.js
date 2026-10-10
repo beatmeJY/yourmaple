@@ -87,6 +87,7 @@ export async function render(root) {
       </form>
       <form class="editor char-form" id="character-form" hidden>
         <div class="char-form-head"><h2 data-form-title>캐릭터 추가</h2><small class="char-autosave" data-autosave aria-live="polite"></small></div>
+        <div class="char-form-body">
         <label class="field"><span>계정</span><select name="account_id" required></select></label>
         <label class="field"><span>캐릭터명</span><input name="name" required /></label>
         <div class="field span-all face-field">
@@ -114,6 +115,7 @@ export async function render(root) {
             <label class="char-switch"><input type="checkbox" name="quests_hidden" /><span>퀘스트에 표시하지 않기</span><span class="char-switch-track" aria-hidden="true"></span></label>
           </div>
           <p class="field-note">켜면 이 캐릭터는 퀘스트 완료 표와 합계에서 빠집니다. 이미 체크한 완료 기록은 그대로 남습니다.</p>
+        </div>
         </div>
         <div class="button-row">
           <button class="primary-button" type="submit" data-save>저장</button>

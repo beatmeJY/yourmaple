@@ -1232,16 +1232,18 @@ export async function render(root) {
         const face = faceMarkup(characters.find((item) => item.id === row.character_id)?.face_url);
         const picked = selected ? `<span class="dojo-picked">선택됨</span>` : "";
         return `<article class="dojo-card${selected ? " is-selected" : ""}${popped}"${open}${selected ? ` aria-current="true"` : ""}>
-          <div class="dojo-card-head">
+          <div class="dojo-card-hero${face ? " has-face" : ""}">
+            <div class="dojo-card-title">
+              <h3>${escapeHtml(row.character_name)}</h3>
+              <span class="dojo-mode ${row.party ? "is-team" : "is-solo"}">${row.party ? "팀" : "개인"}</span>
+              ${picked}
+              <button class="dojo-card-delete" type="button" data-delete="${escapeHtml(row.id)}" aria-label="${escapeHtml(row.character_name)} ${row.party ? "팀" : "개인"} 기록 삭제" title="삭제">×</button>
+            </div>
             ${face}
-            <h3>${escapeHtml(row.character_name)}</h3>
-            ${picked}
-            <span class="dojo-mode ${row.party ? "is-team" : "is-solo"}">${row.party ? "팀" : "개인"}</span>
-            <button class="text-button is-danger" type="button" data-delete="${escapeHtml(row.id)}">삭제</button>
-          </div>
-          <div class="dojo-card-hero">
-            <span>검은 허리띠까지<em class="dojo-card-score">지금 ${escapeHtml(formatCount(row.score || 0))}점</em></span>
-            <strong>${escapeHtml(belt)}</strong>
+            <div class="dojo-card-hero-text">
+              <span>검은 허리띠까지<em class="dojo-card-score">지금 ${escapeHtml(formatCount(row.score || 0))}점</em></span>
+              <strong>${escapeHtml(belt)}</strong>
+            </div>
             <p class="dojo-card-meso"><span>시간당 메소</span><b>${escapeHtml(hour)}</b></p>
           </div>
           <ul class="dojo-card-extra">
