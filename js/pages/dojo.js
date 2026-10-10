@@ -1,3 +1,4 @@
+import { mountDojoScoreLog } from "../dojo-score-log.js";
 import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face.js";
 import { translateDbError } from "../db-error.js";
 import { burstAt, sfx } from "../effects.js";
@@ -155,6 +156,7 @@ export async function render(root) {
               <span>/ ${formatCount(GOAL_SCORE)}</span>
             </label>
             <span class="dj-plaque-who" data-who>캐릭터를 선택해 주세요</span>
+            <button type="button" class="dj-plaque-log" data-score-log-open>통합 점수 기록 보기</button>
           </div>
           <div class="dj-stats">
             <div class="dj-stat"><span>검은색 허리띠까지</span><strong data-stat-need>-</strong></div>
@@ -237,6 +239,9 @@ export async function render(root) {
       </div>
       <div data-belts></div>
     </section>
+    <dialog class="dj-log-dialog" data-score-log-dialog aria-label="통합 점수 기록">
+      <section class="dj-scorelog" data-score-log></section>
+    </dialog>
     <dialog class="belt-history-dialog" data-belt-history-dialog>
       <div class="belt-history-head">
         <h2 data-belt-history-title>시세 기록</h2>
@@ -1484,11 +1489,34 @@ export async function render(root) {
     if (sibling && sibling.id !== data.id && String(sibling.score ?? "") !== String(payload.score ?? "")) {
       await supabase.from("dojo_records").update({ score: payload.score }).eq("id", sibling.id);
     }
+    // 수련 점수 = 숙제 체크리스트의 통합 점수. 바뀌었으면 통합 점수 기록(sql/033)에도 한 줄 남긴다.
+    const previousRecord = [existing, sibling].filter((row) => row?.score != null).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+    if (payload.score != null) await logTotalScore(supabase, character.characterId, payload.score, previousRecord);
     if (!runsReady && draftRuns.size) {
       notify("구간 시간은 저장했습니다. 돌아본 시간은 sql/018_dojo_character_runs.sql 을 실행한 뒤에 저장됩니다.", "info");
     } else notify(doneMessage);
     await load();
     return true;
+  }
+
+  // previous: 이번 저장 전 수련 점수 기록({ score, updated_at }). 기록 표에 없던 값이면 그 시각으로 먼저 남겨 어제 기준을 지킨다.
+  async function logTotalScore(supabase, characterId, score, previous) {
+    const last = await supabase.from("dojo_score_log").select("total, recorded_at").eq("character_id", characterId).order("recorded_at", { ascending: false }).limit(1);
+    // sql/033 실행 전이면 기록하지 않는다(무릉 저장은 그대로).
+    if (last.error) return;
+    let latest = last.data?.[0] ?? null;
+    const previousIsNewer = previous && (!latest || new Date(previous.updated_at) > new Date(latest.recorded_at));
+    if (previousIsNewer && Number(previous.score) !== Number(latest?.total)) {
+      const baseline = await supabase.from("dojo_score_log").insert({ character_id: characterId, total: Number(previous.score), kind: "set", recorded_at: previous.updated_at });
+      if (baseline.error) {
+        notify(translateDbError(baseline.error), "error");
+        return;
+      }
+      latest = { total: previous.score };
+    }
+    if (latest && Number(latest.total) === Number(score)) return;
+    const { error } = await supabase.from("dojo_score_log").insert({ character_id: characterId, total: score, kind: "set", recorded_at: new Date().toISOString() });
+    if (error) notify(translateDbError(error), "error");
   }
 
   async function saveRoute(key) {
@@ -1845,5 +1873,12 @@ export async function render(root) {
   }
   hideBeltTip();
 
+  // 통합 점수 기록 창(수련 점수 옆 버튼). #/dojo?log 로 오면 바로 연다.
+  const scoreLog = mountDojoScoreLog(root.querySelector("[data-score-log]"));
+  root.querySelector("[data-score-log-open]").addEventListener("click", () => {
+    sfx("tick");
+    scoreLog.open(form.dataset.openCharacter || form.elements.character_id?.value || "");
+  });
   await load();
+  if (/[?&]log\b/.test(location.hash) && root.isConnected) scoreLog.open(form.dataset.openCharacter || "");
 }

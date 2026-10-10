@@ -1,4 +1,4 @@
-import { categories, categoryOf, homeRoute, routes } from "./routes.js";
+import { categories, categoryOf, homeRoute, isHiddenRoute, routes } from "./routes.js";
 
 const pages = {
   dashboard: () => import("./pages/dashboard.js"),
@@ -19,7 +19,7 @@ const pages = {
 export function getRouteId() {
   const id = location.hash.replace(/^#\/?/, "").split("?")[0];
   if (id === "items") return "trades";
-  return pages[id] ? id : "dashboard";
+  return pages[id] && !isHiddenRoute(id) ? id : "dashboard";
 }
 
 export function navigate(id) {

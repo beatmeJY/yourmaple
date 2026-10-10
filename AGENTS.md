@@ -26,6 +26,7 @@
 - 맥 로컬 실행: `python3 -m http.server 5500` → http://127.0.0.1:5500. Windows에서는 `py -3 -m http.server 5500`을 사용한다. `.claude/launch.json`은 현재 저장소에 없다(2026-10-02 Codex 확인 [실측]).
 - 라우팅: 해시 기반(`#/characters`).
   - `js/routes.js`: `homeRoute`와 7개 분류 `categories`(id·이름·아이콘 글자·hue·routes). 평평한 `routes`는 여기서 만든다. `quick: true`는 페이지 이동 대신 버튼으로 동작(예: 링크 패널).
+  - 개발 중인 화면·탭 숨기기: `routes.js`의 route에 `dev: true`(메이커 탭은 `TABS`의 `dev: true`)를 붙이면 운영 주소에서는 메뉴·검색·홈 타일에서 빠지고 주소로 열어도 홈으로 간다. 주소에 `?dev`(또는 `#/화면?dev`)를 붙이면 그 탭을 닫을 때까지 보이고 `?dev=0`이면 끈다. 로컬(127.0.0.1·localhost)에서는 늘 보인다(`js/dev-mode.js`). 2026-10-11 강화 계산·리버스 제작을 숨김 [실측]
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
 - 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
 - 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
@@ -62,10 +63,10 @@
 
 - 도메인: 2026-10-09 `https://yourmaple.kr`로 옮겼다(가비아 DNS, Custom domain, Enforce HTTPS, Supabase Site URL — 설정은 사용자 [진술]). HTTPS 접속·www 이동·인증서·`https_enforced: true` 확인. `http://` 주소와 예전 `github.io` 주소의 https 이동은 캐시 만료 전이라 재확인 필요 [실측]
 - 리디자인: 2026-10-10 1~4단계 모든 기존 화면 완료(공통 기반·메뉴·연출, 메모·링크·캐릭터·홈, 사냥·레벨업·퀘스트·몬스터·메이커·강화 공통 맞춤, 무릉 전용 테마, 거래 장부, 로그인) + 헤더 기능 검색·대표 캐릭터 프로필, 캐릭터 경험치·즉시 저장, 홈 EXP 막대. 2026-10-10 전부 커밋·배포(2332ed7, Pages 성공·공개 사이트 새 버전 확인) [실측]. `sql/029` 사용자 실행 완료 [진술]. 가짜 Supabase로 12개 화면 PC 1280·모바일 375 렌더·오류·가로 넘침 확인 [실측]. 남은 것: 5단계(숙제·직업 가이드·사냥터 추천), 6단계(모바일 성능·접근성), 화면 재방문 시 클릭 처리 중복은 2026-10-10 수정(`router.js`가 화면마다 `#main`을 새 요소로 교체) [실측]. 진행표 `docs/redesign.md`
-- 리디자인 2차: 2026-10-10 (Claude) 사냥 기록·레벨업·퀘스트·몬스터·메이커(보석 제작 탭)를 시안 구조로 다시 만듦, 무릉 순위표 클릭 수정. 강화·메이커 시뮬레이터 추가(`js/sim.js`, `js/enhance-sim.js`). 미커밋. 가짜 Supabase로 PC·모바일 확인 [실측]
-- 숙제: 2026-10-11 (Claude) 숙제 체크리스트 화면 추가(`js/pages/homework.js`, `js/homework-calc.js`, `sql/030_homework.sql`). sql/030은 사용자 실행 필요(실행 전에는 보스 숙제만 동작) [실측, 가짜 Supabase]
+- 리디자인 2차: 2026-10-10 (Claude) 사냥 기록·레벨업·퀘스트·몬스터·메이커(보석 제작 탭)를 시안 구조로 다시 만듦, 무릉 순위표 클릭 수정. 강화·메이커 시뮬레이터 추가(`js/sim.js`, `js/enhance-sim.js`). 2026-10-11 숙제와 함께 커밋 4689ad1·배포(Pages 성공, 공개 사이트 v=4689ad1 확인) [실측]. 가짜 Supabase로 PC·모바일 확인 [실측]
+- 숙제: 2026-10-11 (Claude) 숙제 체크리스트 화면 추가(`js/pages/homework.js`, `js/homework-calc.js`, `sql/030_homework.sql`). sql/030은 사용자 실행 필요(실행 전에는 보스 숙제만 동작) [실측, 가짜 Supabase]. 2026-10-11 숙제마다 카드(할 수 있는 캐릭터만·얼굴), 캐릭터 관리의 보스 숙제 기능을 숙제 체크리스트로 옮김(미커밋) [실측, 가짜 Supabase]. sql/030 사용자 실행 완료 [진술]. 숙제별 + 캐릭터 고르기·무릉 숨기기(`sql/031_homework_members.sql`), 숙제표 한 줄에 하나·가능 시각·오늘·곧·무릉 통합 점수 기록(`sql/033_dojo_score_log.sql`, 사용자 실행 필요 — 032는 실행했으나 더 쓰지 않음)·무릉 화면 기록 창(수련 점수 아래 버튼)·숙제 무릉 "오늘 초기화"(오늘 쌓은 점수만 0, `sql/034_dojo_score_clear.sql` 사용자 실행 필요) [실측, 가짜 Supabase]
 - 배포: GitHub Pages. 마지막 배포는 무릉 허리띠 변경(2026-10-08, Pages 실행 성공·공개 사이트 반영 확인). 그 뒤의 강화 계산 개편(보유 메소 vs 바로 구매, 노작 섞기 `bestAttemptMix`, 강화 지도, 같은 상태 비교)과 메이커·거래 UI 변경은 미배포다. 커밋 여부는 git으로 확인한다 [실측]
-- 검증: `node js/*.check.mjs` 11개, 구문·`git diff --check`. 화면은 가짜 Supabase 검증 페이지로 PC 1024·1280·1440px, 모바일 375px, 다크 모드를 확인한다 [실측]
+- 검증: `node js/*.check.mjs` 11개(homework-calc 무릉 점수 포함), 구문·`git diff --check`. 화면은 가짜 Supabase 검증 페이지로 PC 1024·1280·1440px, 모바일 375px, 다크 모드를 확인한다 [실측]
 - 미검증: 실제 로그인 DB 저장(강화 프로필 schemaVersion 2, 거래 저장, 무릉 점수), 사용자 간 접근 차단 [실측]
 - DB: `sql/027_maker.sql`, `sql/028_enhance_profiles.sql`은 사용자가 Supabase에서 실행 완료 [진술]
 - 강화 계산 규칙은 2026-10-04~09 사이 여러 번 바뀌었다. 현재 기준만 `docs/domain.md` 강화 절 "현재 기준"을 따른다 [문서]

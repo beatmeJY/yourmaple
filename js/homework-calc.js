@@ -64,3 +64,97 @@ export function clockRemain(ms) {
   const time = `${two(Math.floor((total % 86400) / 3600))}:${two(Math.floor((total % 3600) / 60))}:${two(total % 60)}`;
   return days ? `${days}일 ${time}` : time;
 }
+
+// ── 무릉도장 통합 점수 (2026-10-11 사용자 결정) ──────────────────────────
+// 사용자는 게임에 보이는 "현재 통합 점수"를 적는다. 오늘 번 점수 = 오늘 00시 전 마지막 기록부터 오른 만큼.
+// 오늘 3,500점을 벌면 그날 무릉 숙제 완료. 12,000점 초기화는 사용자가 누를 때 기록(kind: reset)한다.
+export const DOJO_DAILY_GOAL = 3500;
+export const DOJO_RESET_POINTS = 12000;
+
+/** 기기 시간 기준 날짜 "2026-10-11" */
+export function localDay(now) {
+  const date = new Date(now);
+  const two = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
+}
+
+/**
+ * 기록을 날짜별로 묶어 그날 번 점수를 센다. entries: [{ total, kind, recorded_at }] (순서 상관없음)
+ * - 이전 기록보다 오른 만큼이 그 기록의 변화(change).
+ * - reset 기록과 점수가 줄어든 기록은 게임에서 초기화한 것으로 보고 0으로 센다.
+ * - clear 기록(오늘 초기화)은 그날 쌓은 점수를 0으로 되돌린다. 통합 점수는 그대로.
+ * - 맨 처음 기록은 비교할 이전 기록이 없어 change 가 null(그날은 partial: 기준 없음).
+ * 결과: 날짜 오름차순 [{ day, earned, partial, last, entries: [{ ...entry, change }] }]
+ */
+export function dojoDays(entries) {
+  const sorted = [...(entries ?? [])].sort((left, right) => new Date(left.recorded_at) - new Date(right.recorded_at));
+  const days = [];
+  let ref = null;
+  for (const entry of sorted) {
+    const total = Number(entry.total) || 0;
+    const day = localDay(new Date(entry.recorded_at).getTime());
+    let change;
+    if (entry.kind === "reset" || entry.kind === "clear") change = 0;
+    else if (ref == null) change = null;
+    else change = Math.max(0, total - ref);
+    ref = total;
+    let bucket = days[days.length - 1];
+    if (!bucket || bucket.day !== day) {
+      bucket = { day, earned: 0, partial: false, last: total, entries: [] };
+      days.push(bucket);
+    }
+    // 오늘 초기화(clear): 그날 쌓은 점수를 0으로 되돌리고 이 점수부터 다시 센다.
+    if (entry.kind === "clear") {
+      bucket.earned = 0;
+      bucket.partial = false;
+    }
+    if (change == null) bucket.partial = true;
+    else bucket.earned += change;
+    bucket.last = total;
+    bucket.entries.push({ ...entry, change });
+  }
+  return days;
+}
+
+/** 지금 통합 점수와 오늘 번 점수. 기록이 없으면 total·today 가 null. */
+export function dojoProgress(entries, now) {
+  const days = dojoDays(entries);
+  if (!days.length) return { total: null, today: null, partial: false, lastAt: null };
+  const last = days[days.length - 1];
+  const lastEntry = last.entries[last.entries.length - 1];
+  const today = last.day === localDay(now) ? last : null;
+  return {
+    total: last.last,
+    today: today ? today.earned : 0,
+    partial: today ? today.partial : false,
+    lastAt: lastEntry.recorded_at,
+  };
+}
+
+/** 12,000점 초기화: 12,000점을 빼고 넘친 점수는 남긴다(0 아래로는 내려가지 않음). */
+export function resetDojoTotal(total) {
+  return Math.max(0, (Number(total) || 0) - DOJO_RESET_POINTS);
+}
+
+/** 다시 가능한 날: "오늘" · "내일" · "10.14" */
+export function availableDay(next, now) {
+  if (localDay(next) === localDay(now)) return "오늘";
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (localDay(next) === localDay(tomorrow.getTime())) return "내일";
+  const date = new Date(next);
+  return `${date.getMonth() + 1}.${date.getDate()}`;
+}
+
+/** 다시 가능한 시각 "01:13" */
+export function availableTime(next) {
+  const date = new Date(next);
+  const two = (value) => String(value).padStart(2, "0");
+  return `${two(date.getHours())}:${two(date.getMinutes())}`;
+}
+
+/** 한 줄로 쓸 때: 오늘이면 "14:30", 내일이면 "내일 14:30", 그 밖이면 "10.14 14:30" */
+export function availableLabel(next, now) {
+  const day = availableDay(next, now);
+  return day === "오늘" ? availableTime(next) : `${day} ${availableTime(next)}`;
+}

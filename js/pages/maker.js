@@ -1,4 +1,5 @@
 import { translateDbError } from "../db-error.js";
+import { devMode } from "../dev-mode.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
 import { rollRefine } from "../sim.js";
 import { escapeHtml, formatCount, readBig } from "../format.js";
@@ -48,11 +49,12 @@ function tierLabel(tierId) {
   return TIERS.find((tier) => tier.id === tierId)?.label ?? tierId;
 }
 
+// 리버스 제작은 개발 중이라 운영 주소에서는 탭을 숨긴다(주소에 ?dev, js/dev-mode.js).
 const TABS = [
   { id: "gem", label: "보석 제작", icon: "◆", description: "제련 원가와 거래 손익" },
-  { id: "craft", label: "리버스 제작", icon: "⚒", description: "재료비와 옵션 기대값" },
+  { id: "craft", label: "리버스 제작", icon: "⚒", description: "재료비와 옵션 기대값", dev: true },
   { id: "enchant", label: "장비 옵션 부여", icon: "✦", description: "보석 옵션 계산" },
-];
+].filter((tab) => devMode || !tab.dev);
 
 function formatWhen(value) {
   const date = new Date(value);
@@ -610,7 +612,7 @@ export async function render(root) {
           </button>
         </section>
       </header>
-      <div class="trade-segments maker-tabs" data-maker-tabs role="tablist" aria-label="메이커 기능">
+      <div class="trade-segments maker-tabs" data-maker-tabs role="tablist" aria-label="메이커 기능" style="--tabs:${TABS.length}">
         ${TABS.map((tab, index) => `<button type="button" class="maker-tab-button ${index === 0 ? "is-on" : ""}" data-tab="${tab.id}" role="tab" aria-selected="${index === 0}" aria-controls="maker-panel-${tab.id}"><span class="maker-tab-icon" aria-hidden="true">${tab.icon}</span><span class="maker-tab-copy"><strong>${escapeHtml(tab.label)}</strong><small>${escapeHtml(tab.description)}</small></span><i aria-hidden="true"></i></button>`).join("")}
       </div>
       <section id="maker-panel-gem" class="trade-board maker-tab-panel" data-tab-panel="gem" role="tabpanel">

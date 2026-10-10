@@ -1,4 +1,3 @@
-import { bosses, bossState, bossTimeParts, formatStamp, readBossTime } from "../boss-cooldown.js";
 import {
   attachFaceUrls,
   faceMarkup,
@@ -18,20 +17,13 @@ import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
 const baseColumns = "id, account_id, server, name, job, job_id, level, gear_memo, extra_memo";
-const bossSelect =
-  "pianus_enabled, pianus_at, papulatus_enabled, papulatus_at, rift_enabled, rift_at";
 const tailColumns = "updated_at, jobs(name, color, color_dark)";
 
-function characterSelect({ bosses: withBosses, questsHidden, face, progress }) {
-  return [baseColumns, withBosses ? bossSelect : "", questsHidden ? "quests_hidden" : "", face ? "face_path" : "", progress ? "exp, main_hunt_id" : "", tailColumns]
+function characterSelect({ questsHidden, face, progress }) {
+  return [baseColumns, questsHidden ? "quests_hidden" : "", face ? "face_path" : "", progress ? "exp, main_hunt_id" : "", tailColumns]
     .filter(Boolean)
     .join(", ");
 }
-const bossArt = {
-  pianus: "img/pianus.png",
-  papulatus: "img/papulatus.png",
-  rift: "img/rift.png",
-};
 const mapleland = "메이플랜드";
 
 const blank = {
@@ -77,33 +69,13 @@ export async function render(root) {
             <input data-level-max inputmode="numeric" placeholder="최대" aria-label="레벨 최대" />
           </label>
         </div>
-        <div class="boss-filters char-boss-filters" data-boss-filters>
-          ${bosses
-            .map(
-              (boss) => `<button class="boss-filter ym-chip" type="button" data-boss-filter="${boss.key}" aria-pressed="false" title="${escapeHtml(boss.label)} 활성화 캐릭터만 보기">
-            <img src="${bossArt[boss.key]}" alt="" width="24" height="24" />
-            <span>${escapeHtml(boss.label)}</span>
-          </button>`,
-            )
-            .join("")}
-          <label class="char-switch">
-            <input type="checkbox" data-boss-ready-only />
-            <span class="char-switch-track" aria-hidden="true"></span>
-            <span>도전 가능만</span>
-          </label>
-          <label class="char-switch">
-            <input type="checkbox" data-boss-soon-also />
-            <span class="char-switch-track" aria-hidden="true"></span>
-            <span>오늘·곧</span>
-          </label>
-        </div>
         <div data-list></div>
       </div>
       <aside class="char-side ym-glass">
         <div class="char-side-idle">
           <span class="char-side-orb" aria-hidden="true">캐</span>
           <strong>캐릭터 카드를 눌러 보세요</strong>
-          <p>이름·직업·레벨·얼굴·메모와 보스 활성화를 여기서 고칩니다.</p>
+          <p>이름·직업·레벨·얼굴·메모를 여기서 고칩니다. 보스 숙제는 숙제 체크리스트로 옮겼어요.</p>
         </div>
       <form class="editor char-form" id="account-form" hidden>
         <h2 data-account-title>계정 추가</h2>
@@ -143,17 +115,6 @@ export async function render(root) {
           </div>
           <p class="field-note">켜면 이 캐릭터는 퀘스트 완료 표와 합계에서 빠집니다. 이미 체크한 완료 기록은 그대로 남습니다.</p>
         </div>
-        <div class="boss-fields span-all" data-boss-fields>
-          <div class="boss-switches">
-            ${bosses
-              .map(
-                (boss) =>
-                  `<label class="char-switch"><input type="checkbox" name="${boss.columnEnabled}" /><img src="${bossArt[boss.key]}" alt="" width="24" height="24" /><span>${escapeHtml(boss.label)}</span><span class="char-switch-track" aria-hidden="true"></span></label>`,
-              )
-              .join("")}
-          </div>
-          <p class="field-note">레벨과 퀘스트를 맞춘 캐릭터만 켜 주세요. 켠 캐릭터만 카드에서 도전 시각을 남길 수 있습니다.</p>
-        </div>
         <div class="button-row">
           <button class="primary-button" type="submit" data-save>저장</button>
           <button class="secondary-button" type="button" data-cancel>취소</button>
@@ -161,23 +122,6 @@ export async function render(root) {
       </form>
       </aside>
     </div>
-    <dialog class="boss-time-dialog" data-boss-time-dialog>
-      <form id="boss-time-form">
-        <h2 data-boss-time-title>도전 시각</h2>
-        <p class="field-note" data-boss-time-note>실제로 도전한 시각을 적으면 그 시각부터 대기 시간이 시작됩니다.</p>
-        <div class="boss-time-fields">
-          <label class="field"><span>년</span><input name="year" inputmode="numeric" autocomplete="off" required /></label>
-          <label class="field"><span>월</span><input name="month" inputmode="numeric" autocomplete="off" required /></label>
-          <label class="field"><span>일</span><input name="day" inputmode="numeric" autocomplete="off" required /></label>
-          <label class="field"><span>시</span><input name="hour" inputmode="numeric" autocomplete="off" required /></label>
-          <label class="field"><span>분</span><input name="minute" inputmode="numeric" autocomplete="off" required /></label>
-        </div>
-        <div class="button-row">
-          <button class="primary-button" type="submit">기록</button>
-          <button class="secondary-button" type="button" data-boss-time-close>닫기</button>
-        </div>
-      </form>
-    </dialog>
     </div>
   `;
 
@@ -187,14 +131,11 @@ export async function render(root) {
   const actions = root.querySelector("[data-character-actions]");
   const form = root.querySelector("#character-form");
   const accountForm = root.querySelector("#account-form");
-  const bossTimeDialog = root.querySelector("[data-boss-time-dialog]");
-  const bossTimeForm = root.querySelector("#boss-time-form");
   const title = root.querySelector("[data-form-title]");
   let rows = [];
   let accounts = [];
   let jobs = [];
   let loadId = 0;
-  let bossReady = true;
   let questsHiddenReady = true;
   let faceReady = false;
   let progressReady = true;
@@ -204,14 +145,7 @@ export async function render(root) {
   const autosaveLabel = root.querySelector("[data-autosave]");
   let faceRemoved = false;
   let faceObjectUrl = "";
-  let readyKey = "";
-  const bossFilters = new Set();
-  const bossUndo = new Map();
-  const bossWrite = new Map();
-  let bossEpoch = 0;
-  const bossFields = root.querySelector("[data-boss-fields]");
   const questsHiddenFields = root.querySelector("[data-quests-hidden-fields]");
-  const bossFilterBar = root.querySelector("[data-boss-filters]");
   let selectedServer = "메이플랜드";
   const extraServers = new Set();
   const jobNote = root.querySelector("[data-job-note]");
@@ -292,10 +226,6 @@ export async function render(root) {
       ) {
         field.value = value ?? "";
       }
-    }
-    for (const boss of bosses) {
-      const field = form.elements.namedItem(boss.columnEnabled);
-      if (field) field.checked = Boolean(character[boss.columnEnabled]);
     }
     if (form.elements.quests_hidden) form.elements.quests_hidden.checked = Boolean(character.quests_hidden);
     faceRemoved = false;
@@ -436,55 +366,8 @@ export async function render(root) {
           <button class="text-button is-danger" type="button" data-delete="${row.id}">삭제</button>
         </span>
         ${noteHtml}
-        ${bossButtons(row)}
       </li>
     `;
-  }
-
-  function bossButtons(row) {
-    const now = Date.now();
-    const html = bosses
-      .filter((boss) => row[boss.columnEnabled])
-      .map((boss) => bossButton(row, boss, bossState(row[boss.columnAt], now, boss)))
-      .join("");
-    return html ? `<div class="boss-runs">${html}</div>` : "";
-  }
-
-  function bossButton(row, boss, state) {
-    const classes = ["boss-run", state.ready ? "is-ready" : "", state.soon ? "is-soon" : ""].filter(Boolean).join(" ");
-    const hour = (state.hints ?? []).includes("곧");
-    const time = state.last == null ? "" : `<span class="boss-run-time${hour ? " is-hour" : ""}">${formatStamp(state.last)}</span>`;
-    const undo = bossUndo.has(`${row.id}:${boss.key}`)
-      ? `<button class="text-button boss-undo" type="button" data-boss-undo="${boss.key}" data-character="${row.id}">취소</button>`
-      : "";
-    const marks = (state.hints ?? []).map((hint) => `<em data-boss-hint>${escapeHtml(hint)}</em>`).join("");
-    return `<div class="boss-run-line"><button class="${classes}" type="button" data-boss="${boss.key}" data-character="${row.id}" data-last="${state.last ?? ""}" title="${escapeHtml(bossTitle(boss, state))}" ${state.ready ? "" : "disabled"}><img class="boss-run-art" src="${bossArt[boss.key]}" alt="" width="36" height="36" /><span class="boss-run-copy"><span class="boss-run-name">${boss.label}${marks}</span>${time}</span></button><span class="boss-run-actions"><button class="boss-time" type="button" data-boss-time="${boss.key}" data-character="${row.id}" aria-label="${escapeHtml(boss.label)} 도전 시각" title="도전 시각을 직접 고릅니다."><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10 6.2V10l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${undo}</span></div>`;
-  }
-
-  function bossTitle(boss, state) {
-    if (state.ready) return `${boss.label}에 도전한 시각으로 기록합니다.`;
-    return `${formatStamp(state.next)}부터 다시 도전할 수 있습니다.`;
-  }
-
-  function paintBossButton(button, now) {
-    const boss = bosses.find((item) => item.key === button.dataset.boss);
-    if (!boss) return;
-    const state = bossState(button.dataset.last, now, boss);
-    button.disabled = !state.ready;
-    button.classList.toggle("is-ready", state.ready);
-    button.classList.toggle("is-soon", state.soon);
-    button.title = bossTitle(boss, state);
-    const name = button.querySelector(".boss-run-name");
-    if (!name) return;
-    name.querySelectorAll("[data-boss-hint]").forEach((node) => node.remove());
-    for (const hint of state.hints ?? []) {
-      const mark = document.createElement("em");
-      mark.dataset.bossHint = "";
-      mark.textContent = hint;
-      name.append(mark);
-    }
-    const time = button.querySelector(".boss-run-time");
-    if (time) time.classList.toggle("is-hour", (state.hints ?? []).includes("곧"));
   }
 
   function serverNames() {
@@ -566,21 +449,11 @@ export async function render(root) {
       list.innerHTML = `<p class="empty">${filtered.error}</p>`;
       return;
     }
-    const activeBosses = bosses.filter((boss) => bossFilters.has(boss.key));
-    const readyOnly = readyOnlyChecked();
-    const includeSoon = soonAlsoChecked();
-    const now = Date.now();
-    const visibleRows =
-      activeBosses.length || readyOnly || includeSoon
-        ? filtered.rows.filter((row) => matchesBossFilter(row, activeBosses, readyOnly, includeSoon, now))
-        : filtered.rows;
+    const visibleRows = filtered.rows;
     const searching = Boolean(
       root.querySelector("[data-search]").value.trim() ||
         root.querySelector("[data-level-min]").value.trim() ||
-        root.querySelector("[data-level-max]").value.trim() ||
-        activeBosses.length ||
-        readyOnly ||
-        includeSoon,
+        root.querySelector("[data-level-max]").value.trim(),
     );
     let cardIndex = 0;
     const blocks = accounts
@@ -612,73 +485,18 @@ export async function render(root) {
         `;
       })
       .join("");
-    const bossText = activeBosses.map((boss) => boss.label).join(", ");
-    const bossEmpty = bossEmptyMessage(bossText, readyOnly, includeSoon);
     list.innerHTML = blocks
       ? `<div class="character-accounts">${blocks}</div>`
       : `<p class="empty">${
-          activeBosses.length || readyOnly || includeSoon
-            ? bossEmpty
-            : searching
-              ? "검색 결과가 없습니다. 검색어나 레벨 범위를 바꿔 보세요."
-              : "이 서버에는 아직 캐릭터가 없습니다. 캐릭터 추가로 넣어 주세요."
+          searching
+            ? "검색 결과가 없습니다. 검색어나 레벨 범위를 바꿔 보세요."
+            : "이 서버에는 아직 캐릭터가 없습니다. 캐릭터 추가로 넣어 주세요."
         }</p>`;
-    readyKey = attentionIds();
-  }
-
-  function readyOnlyChecked() {
-    return Boolean(root.querySelector("[data-boss-ready-only]")?.checked);
-  }
-
-  function soonAlsoChecked() {
-    return Boolean(root.querySelector("[data-boss-soon-also]")?.checked);
-  }
-
-  function bossEmptyMessage(bossText, readyOnly, includeSoon) {
-    const named = bossText ? `${bossText} ` : "";
-    if (readyOnly && includeSoon) return `지금 도전하거나 오늘·곧인 ${named}캐릭터가 없습니다.`;
-    if (readyOnly) return `지금 ${bossText ? `${bossText}에 ` : ""}도전할 수 있는 캐릭터가 없습니다.`;
-    if (includeSoon) return `오늘·곧인 ${named}캐릭터가 없습니다.`;
-    return `${bossText} 활성화 캐릭터가 없습니다.`;
-  }
-
-  function canChallenge(row, boss, now = Date.now()) {
-    return Boolean(row[boss.columnEnabled]) && bossState(row[boss.columnAt], now, boss).ready;
-  }
-
-  function isSoon(row, boss, now = Date.now()) {
-    return Boolean(row[boss.columnEnabled]) && bossState(row[boss.columnAt], now, boss).soon;
-  }
-
-  function matchesBossFilter(row, activeBosses, readyOnly, includeSoon, now) {
-    const pool = activeBosses.length ? activeBosses : bosses;
-    return pool.some((boss) => {
-      if (!row[boss.columnEnabled]) return false;
-      if (!readyOnly && !includeSoon) return true;
-      if (readyOnly && canChallenge(row, boss, now)) return true;
-      return includeSoon && isSoon(row, boss, now);
-    });
-  }
-
-  function attentionIds(now = Date.now()) {
-    const readyOnly = readyOnlyChecked();
-    const includeSoon = soonAlsoChecked();
-    if ((!readyOnly && !includeSoon) || !selectedServer) return "";
-    const activeBosses = bosses.filter((boss) => bossFilters.has(boss.key));
-    return rows
-      .filter((row) => row.server === selectedServer && matchesBossFilter(row, activeBosses, readyOnly, includeSoon, now))
-      .map((row) => row.id)
-      .sort()
-      .join(",");
   }
 
   function columnMissing(error, pattern) {
     const raw = error?.message || "";
     return pattern.test(raw) && /could not find|schema cache|does not exist/i.test(raw);
-  }
-
-  function bossColumnMissing(error) {
-    return columnMissing(error, /pianus_|papulatus_|rift_/);
   }
 
   function questsHiddenMissing(error) {
@@ -707,37 +525,33 @@ export async function render(root) {
       supabase.from("level_exp").select("level, exp_to_next"),
     ]);
     if (current !== loadId || !list.isConnected) return;
-    let withBosses = true;
     let withQuestsHidden = true;
     let withFace = true;
     let withProgress = true;
     let columnWarning = null;
     let characters = await supabase
       .from("characters")
-      .select(characterSelect({ bosses: withBosses, questsHidden: withQuestsHidden, face: withFace, progress: withProgress }))
+      .select(characterSelect({ questsHidden: withQuestsHidden, face: withFace, progress: withProgress }))
       .order("updated_at", { ascending: false });
     while (
       characters.error &&
-      (bossColumnMissing(characters.error) ||
-        questsHiddenMissing(characters.error) ||
+      (questsHiddenMissing(characters.error) ||
         faceColumnMissing(characters.error) ||
         progressColumnMissing(characters.error))
     ) {
-      const nextBosses = withBosses && !bossColumnMissing(characters.error);
       const nextQuests = withQuestsHidden && !questsHiddenMissing(characters.error);
       const nextFace = withFace && !faceColumnMissing(characters.error);
       const nextProgress = withProgress && !progressColumnMissing(characters.error);
-      if (nextBosses === withBosses && nextQuests === withQuestsHidden && nextFace === withFace && nextProgress === withProgress) break;
-      if (bossColumnMissing(characters.error) || questsHiddenMissing(characters.error)) {
+      if (nextQuests === withQuestsHidden && nextFace === withFace && nextProgress === withProgress) break;
+      if (questsHiddenMissing(characters.error)) {
         columnWarning = columnWarning || characters.error;
       }
-      withBosses = nextBosses;
       withQuestsHidden = nextQuests;
       withFace = nextFace;
       withProgress = nextProgress;
       characters = await supabase
         .from("characters")
-        .select(characterSelect({ bosses: withBosses, questsHidden: withQuestsHidden, face: withFace, progress: withProgress }))
+        .select(characterSelect({ questsHidden: withQuestsHidden, face: withFace, progress: withProgress }))
         .order("updated_at", { ascending: false });
       if (current !== loadId || !list.isConnected) return;
     }
@@ -750,7 +564,6 @@ export async function render(root) {
       showStatus(translateDbError(error), "error");
       return;
     }
-    bossReady = withBosses;
     questsHiddenReady = withQuestsHidden;
     faceReady = withFace;
     progressReady = withProgress;
@@ -758,20 +571,7 @@ export async function render(root) {
     curve = new Map((curveResult.error ? [] : curveResult.data ?? []).map((row) => [row.level, row.exp_to_next]));
     for (const field of form.querySelectorAll("[data-progress-field]")) field.hidden = !progressReady;
     syncFaceField();
-    bossFields.hidden = !bossReady;
     questsHiddenFields.hidden = !questsHiddenReady;
-    bossFilterBar.hidden = !bossReady;
-    if (!bossReady) {
-      bossFilters.clear();
-      for (const button of bossFilterBar.querySelectorAll("[data-boss-filter]")) {
-        button.classList.remove("is-on");
-        button.setAttribute("aria-pressed", "false");
-      }
-      const readyOnly = root.querySelector("[data-boss-ready-only]");
-      if (readyOnly) readyOnly.checked = false;
-      const soonAlso = root.querySelector("[data-boss-soon-also]");
-      if (soonAlso) soonAlso.checked = false;
-    }
     accounts = sortByName(accountResult.data ?? []);
     jobs = jobResult.data ?? [];
     rows = characters.data ?? [];
@@ -807,9 +607,6 @@ export async function render(root) {
         level: level.value,
         gear_memo: form.elements.gear_memo.value.trim() || null,
         extra_memo: form.elements.extra_memo.value.trim() || null,
-        ...(bossReady
-          ? Object.fromEntries(bosses.map((boss) => [boss.columnEnabled, form.elements.namedItem(boss.columnEnabled).checked]))
-          : {}),
         ...(questsHiddenReady ? { quests_hidden: form.elements.quests_hidden.checked } : {}),
         ...(progressReady ? { exp: exp.value == null ? null : exp.value.toString(), main_hunt_id: form.elements.main_hunt_id.value || null } : {}),
       },
@@ -828,7 +625,7 @@ export async function render(root) {
 
   // ── 즉시 저장: 수정 중인 캐릭터의 레벨·경험치·대표 사냥터·메모·스위치(사용자 결정 2026-10-10) ──
   // 이름·직업·계정·얼굴은 실수로 바뀌면 되돌리기 어려우므로 저장 버튼으로만 바꾼다.
-  const instantFields = new Set(["level", "exp", "main_hunt_id", "gear_memo", "extra_memo", "quests_hidden", ...bosses.map((boss) => boss.columnEnabled)]);
+  const instantFields = new Set(["level", "exp", "main_hunt_id", "gear_memo", "extra_memo", "quests_hidden"]);
 
   function instantValue(name) {
     const field = form.elements.namedItem(name);
@@ -900,13 +697,6 @@ export async function render(root) {
     loadMainCharacter(true).then(paintProfileButton);
   }
 
-  root.addEventListener("change", (event) => {
-    if (event.target.closest("[data-boss-ready-only], [data-boss-soon-also]")) {
-      sfx(event.target.checked ? "check" : "uncheck");
-      paintList();
-    }
-  });
-
   root.addEventListener("submit", (event) => {
     const serverForm = event.target.closest("[data-new-server]");
     if (!serverForm) return;
@@ -920,18 +710,6 @@ export async function render(root) {
   });
 
   root.addEventListener("click", async (event) => {
-    const filterButton = event.target.closest("[data-boss-filter]");
-    if (filterButton) {
-      const key = filterButton.dataset.bossFilter;
-      if (bossFilters.has(key)) bossFilters.delete(key);
-      else bossFilters.add(key);
-      filterButton.classList.toggle("is-on", bossFilters.has(key));
-      filterButton.setAttribute("aria-pressed", String(bossFilters.has(key)));
-      sfx("tick");
-      paintList();
-      return;
-    }
-
     const openServerButton = event.target.closest("[data-open-server]");
     if (openServerButton) openServer(openServerButton.dataset.openServer);
     if (event.target.closest("[data-servers]")) paintGate();
@@ -983,33 +761,6 @@ export async function render(root) {
       }
       showStatus("계정을 삭제했습니다.", "info");
       await loadCharacters();
-    }
-
-    if (event.target.closest("[data-boss-time-dialog]")) {
-      if (event.target.closest("[data-boss-time-close]")) bossTimeDialog.close();
-      return;
-    }
-
-    const bossTimeButton = event.target.closest("[data-boss-time]");
-    if (bossTimeButton) {
-      openBossTime(bossTimeButton.dataset.character, bossTimeButton.dataset.bossTime);
-      return;
-    }
-
-    const bossUndoButton = event.target.closest("[data-boss-undo]");
-    if (bossUndoButton) {
-      await undoBoss(bossUndoButton.dataset.character, bossUndoButton.dataset.bossUndo);
-      return;
-    }
-
-    const bossRun = event.target.closest("[data-boss]");
-    if (bossRun) {
-      if (!bossRun.disabled) {
-        sfx("mid");
-        burstJuice(bossRun);
-      }
-      await recordBoss(bossRun);
-      return;
     }
 
     const editButton = event.target.closest("[data-edit]");
@@ -1065,199 +816,6 @@ export async function render(root) {
     showStatus(id ? "계정 이름을 수정했습니다." : "계정을 저장했습니다.", "info");
     await loadCharacters();
   });
-
-  function enqueueBossWrite(key, task) {
-    const tail = bossWrite.get(key) ?? Promise.resolve();
-    const run = tail.then(task, task);
-    bossWrite.set(key, run.catch(() => {}));
-    return run;
-  }
-
-  async function saveBossAt(row, boss, value) {
-    try {
-      const supabase = await getSupabase();
-      return await supabase.from("characters").update({ [boss.columnAt]: value }).eq("id", row.id);
-    } catch (error) {
-      return { error };
-    }
-  }
-
-  function burstJuice(button) {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const rect = button.getBoundingClientRect();
-    const layer = document.createElement("div");
-    layer.className = "juice-burst";
-    layer.style.left = `${rect.left}px`;
-    layer.style.top = `${rect.top}px`;
-    layer.style.width = `${rect.width}px`;
-    layer.style.height = `${rect.height}px`;
-    const palettes = {
-      rift: { drops: ["#7ecbff", "#3aa0ff", "#1d4ed8", "#67e8f9", "#dbeafe", "#2563eb", "#38bdf8", "#93c5fd"], ring: "#7dd3fc" },
-      pianus: { drops: ["#ff2d2d", "#e10600", "#ff5a5a", "#b91c1c", "#ff8a80", "#dc2626", "#fecaca", "#9f1239"], ring: "#f87171" },
-    };
-    const palette = palettes[button.dataset.boss] || { drops: ["#ff4d2e", "#ff8a1f", "#ffd000", "#ff5c8a", "#ff3d6e", "#ffb703", "#f94144", "#ffe066"], ring: "#ffb703" };
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    for (let i = 0; i < 40; i += 1) {
-      const drop = document.createElement("span");
-      const originX = 4 + Math.random() * Math.max(rect.width - 8, 1);
-      const originY = 3 + Math.random() * Math.max(rect.height - 6, 1);
-      const away = Math.atan2(originY - centerY, originX - centerX);
-      const angle = (Math.hypot(originX - centerX, originY - centerY) < 8 ? Math.random() * Math.PI * 2 : away) + (Math.random() - 0.5) * 0.5;
-      const distance = 56 + Math.random() * 84;
-      drop.style.setProperty("--ox", `${originX}px`);
-      drop.style.setProperty("--oy", `${originY}px`);
-      drop.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
-      drop.style.setProperty("--dy", `${Math.sin(angle) * distance}px`);
-      drop.style.setProperty("--rot", `${Math.round((Math.random() - 0.5) * 80)}deg`);
-      drop.style.background = palette.drops[i % palette.drops.length];
-      const size = 8 + Math.random() * 9;
-      drop.style.width = `${size}px`;
-      drop.style.height = `${size * (0.65 + Math.random() * 0.55)}px`;
-      drop.style.animationDelay = `${Math.random() * 90}ms`;
-      layer.appendChild(drop);
-    }
-    const ring = document.createElement("i");
-    ring.style.borderColor = palette.ring;
-    layer.appendChild(ring);
-    document.body.appendChild(layer);
-    window.setTimeout(() => layer.remove(), 1400);
-    button.classList.add("is-splashing");
-    window.setTimeout(() => button.classList.remove("is-splashing"), 280);
-  }
-
-  async function recordBoss(button) {
-    const boss = bosses.find((item) => item.key === button.dataset.boss);
-    const row = rows.find((item) => item.id === button.dataset.character);
-    if (!boss || !row || !row[boss.columnEnabled]) return;
-    const clickedAt = Date.now();
-    const state = bossState(row[boss.columnAt], clickedAt, boss);
-    if (!state.ready) return;
-    commitBossAt(row, boss, clickedAt);
-  }
-
-  function openBossTime(characterId, bossKeyName) {
-    const boss = bosses.find((item) => item.key === bossKeyName);
-    const row = rows.find((item) => item.id === characterId);
-    if (!boss || !row || !row[boss.columnEnabled]) return;
-    bossTimeDialog.dataset.character = characterId;
-    bossTimeDialog.dataset.boss = bossKeyName;
-    bossTimeDialog.querySelector("[data-boss-time-title]").textContent = `${row.name} · ${boss.label}`;
-    const parts = bossTimeParts(row[boss.columnAt] || Date.now());
-    bossTimeForm.elements.year.value = parts.year;
-    bossTimeForm.elements.month.value = parts.month;
-    bossTimeForm.elements.day.value = parts.day;
-    bossTimeForm.elements.hour.value = parts.hour;
-    bossTimeForm.elements.minute.value = parts.minute;
-    if (!bossTimeDialog.open) bossTimeDialog.showModal();
-    bossTimeForm.elements.year.focus();
-    bossTimeForm.elements.year.select();
-  }
-
-  bossTimeForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const boss = bosses.find((item) => item.key === bossTimeDialog.dataset.boss);
-    const row = rows.find((item) => item.id === bossTimeDialog.dataset.character);
-    if (!boss || !row) return;
-    const parsed = readBossTime({
-      year: bossTimeForm.elements.year.value,
-      month: bossTimeForm.elements.month.value,
-      day: bossTimeForm.elements.day.value,
-      hour: bossTimeForm.elements.hour.value,
-      minute: bossTimeForm.elements.minute.value,
-    });
-    if (parsed.error) {
-      showStatus(parsed.error, "error");
-      return;
-    }
-    const atMs = parsed.value;
-    const previousMs = row[boss.columnAt] == null ? null : new Date(row[boss.columnAt]).getTime();
-    if (previousMs != null && Math.floor(previousMs / 60000) === Math.floor(atMs / 60000)) {
-      bossTimeDialog.close();
-      showStatus("이미 그 시각으로 기록되어 있습니다.", "info");
-      return;
-    }
-    if (atMs > Date.now() + 1000) {
-      showStatus("아직 지나지 않은 시각은 기록할 수 없습니다.", "error");
-      return;
-    }
-    bossTimeDialog.close();
-    commitBossAt(row, boss, atMs);
-  });
-
-  function commitBossAt(row, boss, atMs) {
-    const key = `${row.id}:${boss.key}`;
-    const previous = row[boss.columnAt] ?? null;
-    const previousMs = previous == null ? null : new Date(previous).getTime();
-    if (previousMs != null && Math.abs(previousMs - atMs) < 1000) {
-      showStatus("이미 그 시각으로 기록되어 있습니다.", "info");
-      return;
-    }
-
-    const at = new Date(atMs).toISOString();
-    const generation = ++bossEpoch;
-    const persisted = new Set();
-    bossUndo.set(key, { previous, generation, persisted });
-    row[boss.columnAt] = at;
-    paintList();
-    notify(`${row.name} ${boss.label} 도전을 ${formatStamp(atMs)}으로 기록했습니다.`, "info", {
-      label: "취소",
-      onClick: () => undoBoss(row.id, boss.key),
-    });
-
-    enqueueBossWrite(key, async () => {
-      const slot = bossUndo.get(key);
-      if (!slot || slot.generation !== generation) return;
-      const { error } = await saveBossAt(row, boss, at);
-      const after = bossUndo.get(key);
-      if (!after || after.generation !== generation) {
-        if (!error) persisted.add(generation);
-        return;
-      }
-      if (error) {
-        bossUndo.delete(key);
-        const current = rows.find((item) => item.id === row.id);
-        if (current) current[boss.columnAt] = previous;
-        if (list.isConnected) {
-          paintList();
-          showStatus(translateDbError(error), "error");
-        }
-        return;
-      }
-      persisted.add(generation);
-    });
-  }
-
-  async function undoBoss(characterId, bossKeyName) {
-    const boss = bosses.find((item) => item.key === bossKeyName);
-    const row = rows.find((item) => item.id === characterId);
-    const key = `${characterId}:${bossKeyName}`;
-    const slot = bossUndo.get(key);
-    if (!boss || !row || !slot) return;
-    const { previous, generation, persisted } = slot;
-    const recordedAt = row[boss.columnAt] ?? null;
-    bossUndo.delete(key);
-    row[boss.columnAt] = previous;
-    paintList();
-    enqueueBossWrite(key, async () => {
-      const { error } = await saveBossAt(row, boss, previous);
-      if (!list.isConnected) return;
-      const current = rows.find((item) => item.id === row.id);
-      const newer = bossUndo.get(key);
-      if (error) {
-        if (persisted.has(generation) && current && !newer) {
-          bossUndo.set(key, slot);
-          current[boss.columnAt] = recordedAt;
-          paintList();
-        }
-        showStatus(translateDbError(error), "error");
-        return;
-      }
-      if (newer || !current || (current[boss.columnAt] ?? null) !== previous) return;
-      const when = previous ? formatStamp(previous) : "기록 없음";
-      showStatus(`${row.name} ${boss.label} 도전을 ${when}으로 되돌렸습니다.`, "info");
-    });
-  }
 
   form.elements.face.addEventListener("change", () => {
     const file = form.elements.face.files?.[0];
@@ -1357,20 +915,6 @@ export async function render(root) {
       saveButton.disabled = false;
     }
   });
-
-  const bossTimer = window.setInterval(() => {
-    if (!list.isConnected) {
-      window.clearInterval(bossTimer);
-      return;
-    }
-    const now = Date.now();
-    for (const button of list.querySelectorAll("[data-boss]")) paintBossButton(button, now);
-    if ((!readyOnlyChecked() && !soonAlsoChecked()) || !selectedServer) return;
-    const nextKey = attentionIds(now);
-    if (nextKey === readyKey) return;
-    readyKey = nextKey;
-    paintList();
-  }, 1000);
 
   await loadCharacters();
 }
