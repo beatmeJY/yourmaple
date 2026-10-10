@@ -14298,3 +14298,20 @@ button.dj-log-row:hover { background: rgba(0, 0, 0, 0.32); }
 .dojo-page .dj-chars .dojo-card-hero-text > span { display: block; color: #f3dcc0; font-size: 12px; font-weight: 700; }
 .dojo-page .dj-chars .dojo-card-hero.has-face .dojo-card-title { grid-column: 1 / -1; margin-bottom: 6px; }
 .dojo-page .dj-chars .dojo-card-title .dojo-card-delete { margin-left: auto; }
+/* 캐릭터 카드: 경험치 막대를 카드 폭만큼 크게, 숙제 칩(할 수 있으면 색, 했으면 회색) */
+.char-page .char-exp { gap: 8px; margin: 0; padding: 0 2px; font-size: 12px; color: #f3effb; }
+.char-page .char-exp-track { max-width: none; height: 8px; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); }
+.char-page .char-exp-track i { box-shadow: 0 0 8px oklch(0.8 0.15 295 / 0.6); animation: char-exp-fill 0.9s var(--spring) both; transform-origin: left; }
+@keyframes char-exp-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.char-hw { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 2px; text-decoration: none; }
+.char-hw-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: var(--radius-pill); border: 1px solid oklch(0.8 0.13 160 / 0.55); background: oklch(0.8 0.13 160 / 0.16); color: oklch(0.92 0.1 160); font-size: 11.5px; font-weight: 800; white-space: nowrap; transition: transform 0.45s var(--spring), filter 0.2s; }
+.char-hw-chip.is-done { border-color: rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); color: rgba(243, 239, 251, 0.5); font-weight: 700; filter: grayscale(1); }
+.char-hw:hover .char-hw-chip { transform: translateY(-1px); }
+@media (prefers-reduced-motion: reduce) { .char-page .char-exp-track i { animation: none; } .char-hw-chip { transition: none; } }
+/* 숙제 칩 색: 무릉 붉은 계열, 피아 보라, 파풀 파랑, 조각 초록, 직접 추가는 금색. 완료(is-done)는 회색이 우선한다 */
+.char-hw-chip { --chip-h: 85; border-color: oklch(0.78 0.14 var(--chip-h) / 0.6); background: oklch(0.7 0.14 var(--chip-h) / 0.2); color: oklch(0.9 0.1 var(--chip-h)); }
+.char-hw-chip.is-dojo { --chip-h: 25; }
+.char-hw-chip.is-pianus { --chip-h: 305; }
+.char-hw-chip.is-papulatus { --chip-h: 245; }
+.char-hw-chip.is-rift { --chip-h: 150; }
+.char-hw-chip.is-done { border-color: rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); color: rgba(243, 239, 251, 0.5); }

@@ -12,6 +12,8 @@ import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../form
 import { expProgress } from "../exp-progress.js";
 import { loadMainCharacter, paintProfileButton } from "../profile.js";
 import { filterRows, readLevelFilter } from "../filters.js";
+import { availableLabel } from "../homework-calc.js";
+import { loadHomeworkStatus } from "../homework-status.js";
 import { findJob, jobDisplayName, jobLabel, jobRecord, jobStyle } from "../job-label.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -143,6 +145,7 @@ export async function render(root) {
   let progressReady = true;
   let hunts = [];
   let curve = new Map();
+  let homeworkStatus = null; // 캐릭터 id → 숙제 요약 (숙제 체크리스트와 같은 기준, 읽기 전용)
   let autosaveTimer = 0;
   const autosaveLabel = root.querySelector("[data-autosave]");
   let faceRemoved = false;
@@ -338,6 +341,16 @@ export async function render(root) {
     return `<span class="char-exp" title="경험치 ${escapeHtml(formatCount(result.current))} / ${escapeHtml(formatCount(result.need))}"><span class="char-exp-track"><i style="--w:${Math.max(1, result.ratio * 100)}%"></i></span><span>${result.percent}%</span></span>`;
   }
 
+  // 카드 아래 숙제 칩: 할 수 있으면 색, 이미 했으면(다시 가능 전) 회색. 누르면 숙제 체크리스트로 간다.
+  function homeworkChips(row) {
+    const items = homeworkStatus ? homeworkStatus(row.id) : [];
+    if (!items.length) return "";
+    const now = Date.now();
+    return `<a class="char-hw" href="#/homework" aria-label="${escapeHtml(row.name)} 숙제: ${escapeHtml(items.map((item) => `${item.name} ${item.done ? "완료" : "가능"}`).join(", "))}">${items
+      .map((item) => `<span class="char-hw-chip${item.custom ? " is-custom" : ` is-${item.key}`}${item.done ? " is-done" : ""}" title="${escapeHtml(item.done ? `${item.name} 완료 · ${availableLabel(item.next, now)}부터 다시 가능` : `${item.name} 지금 가능`)}">${item.done ? "✓ " : ""}${escapeHtml(item.short)}</span>`)
+      .join("")}</a>`;
+  }
+
   function characterCard(row, index) {
     const job = jobRecord(row) || findJob(jobs, row.job);
     const style = [jobStyle(job), `--i:${Math.min(index, 12)}`].filter(Boolean).join(";");
@@ -360,13 +373,14 @@ export async function render(root) {
           <span class="character-copy">
             <span class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong><span class="character-level">Lv.${escapeHtml(formatCount(row.level))}</span></span>
             <span class="character-job">${jobText}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
-            ${expBar(row)}
           </span>
         </button>
+        ${expBar(row)}
         <span class="row-actions">
           <button class="text-button" type="button" data-edit="${row.id}">수정</button>
           <button class="text-button is-danger" type="button" data-delete="${row.id}">삭제</button>
         </span>
+        ${homeworkChips(row)}
         ${noteHtml}
       </li>
     `;
@@ -582,6 +596,11 @@ export async function render(root) {
     if (columnWarning) showStatus(translateDbError(columnWarning), "error");
     if (selectedServer) openServer(selectedServer);
     else paintGate();
+    // 숙제 요약은 카드를 먼저 그린 뒤 따로 불러와 붙인다.
+    const status = await loadHomeworkStatus(supabase);
+    if (current !== loadId || !list.isConnected) return;
+    homeworkStatus = status;
+    if (selectedServer) paintList();
   }
 
   function readForm() {
