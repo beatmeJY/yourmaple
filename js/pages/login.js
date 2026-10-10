@@ -6,7 +6,6 @@ export function renderSetup(root, message, title = "설정이 필요합니다") 
     <section class="auth-screen">
       <div class="auth-toolbar">
         <p class="brand-mark">Your Maple</p>
-        <button class="icon-button" type="button" data-theme-toggle>다크 모드</button>
       </div>
       <div class="auth-card">
         <h1></h1>
@@ -23,7 +22,6 @@ export function renderLogin(root) {
     <section class="auth-screen">
       <div class="auth-toolbar">
         <p class="brand-mark">Your Maple</p>
-        <button class="icon-button" type="button" data-theme-toggle>다크 모드</button>
       </div>
       <div class="auth-card">
         <h1>Your Maple</h1>

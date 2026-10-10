@@ -28,15 +28,36 @@ function syncNavChrome() {
 
 DESKTOP_NAV.addEventListener("change", syncNavChrome);
 
-export function getTheme() {
-  const saved = localStorage.getItem(THEME_KEY);
-  if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+// 2026-10 다크 글래스 리디자인부터 다크 전용이다. 예전에 저장한 라이트 설정은 지운다.
+export function applyDarkTheme() {
+  document.documentElement.dataset.theme = "dark";
+  localStorage.removeItem(THEME_KEY);
 }
 
-export function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  localStorage.setItem(THEME_KEY, theme);
+// 배경 색 구슬과 커서를 따라오는 빛. 로그인 화면과 앱 화면이 함께 쓰도록 body에 한 번만 붙인다.
+export function mountAmbient() {
+  if (document.querySelector(".ambient")) return;
+  const ambient = document.createElement("div");
+  ambient.className = "ambient";
+  ambient.setAttribute("aria-hidden", "true");
+  ambient.innerHTML = `<i class="ambient-orb is-violet"></i><i class="ambient-orb is-coral"></i><i class="ambient-orb is-blue"></i><i class="ambient-glow"></i>`;
+  document.body.prepend(ambient);
+  const glow = ambient.querySelector(".ambient-glow");
+  const quiet = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const finePointer = window.matchMedia("(pointer: fine)");
+  let frame = 0;
+  let point = null;
+  window.addEventListener("pointermove", (event) => {
+    if (quiet.matches || !finePointer.matches) return;
+    point = { x: event.clientX, y: event.clientY };
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      glow.style.transform = `translate(${point.x - 260}px, ${point.y - 260}px)`;
+      glow.classList.add("is-on");
+    });
+  }, { passive: true });
+  document.addEventListener("pointerleave", () => glow.classList.remove("is-on"));
 }
 
 const NAV_CHEVRON = `<svg class="nav-chevron" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -49,8 +70,9 @@ export function renderShell() {
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-panel">
         <div class="brand">
+          <img class="brand-logo" src="./apple-touch-icon.png" alt="" width="40" height="40" />
           <strong>Your Maple</strong>
-          <span>개인용 정보 메모</span>
+          <span>메이플 도우미</span>
           <button class="nav-toggle nav-close" type="button" data-close-nav aria-label="메뉴 닫기">${NAV_CHEVRON}</button>
         </div>
         <nav class="nav" id="nav" aria-label="주요 메뉴"></nav>
@@ -59,11 +81,11 @@ export function renderShell() {
       <div class="content">
         <header class="topbar">
           <button class="nav-toggle" type="button" data-open-nav aria-controls="sidebar" aria-expanded="true" aria-label="메뉴 닫기">${NAV_CHEVRON}</button>
-          <p class="topbar-title">Your Maple</p>
+          <nav class="topbar-crumb" data-crumb aria-label="현재 위치"></nav>
           <div class="topbar-actions">
+            <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><i aria-hidden="true"></i><span>효과음 켜짐</span></button>
             <p class="account-email" id="account-email"></p>
             <button class="icon-button" type="button" data-logout>로그아웃</button>
-            <button class="icon-button" type="button" data-theme-toggle>다크 모드</button>
           </div>
         </header>
         <main id="main" class="main"></main>
@@ -93,11 +115,4 @@ export function setNavCollapsed(collapsed) {
   document.body.classList.toggle("nav-collapsed", collapsed);
   localStorage.setItem(NAV_KEY, collapsed ? "collapsed" : "open");
   syncNavChrome();
-}
-
-export function syncThemeButton() {
-  const button = document.querySelector("[data-theme-toggle]");
-  if (!button) return;
-  const dark = document.documentElement.dataset.theme !== "light";
-  button.textContent = dark ? "라이트 모드" : "다크 모드";
 }

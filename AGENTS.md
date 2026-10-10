@@ -14,21 +14,21 @@
 - 새 기능을 기본 입력창이나 텍스트만 붙인 상태로 끝내지 않는다. 펼침·등장·클릭 피드백에 부드러운 전환(시간차 등장, 바운스 easing, 글로우, 확률 막대 차오름 등)을 넣는다.
 - 밋밋한 표보다 카드·아이콘·배지·막대 같은 시각적 구성을 먼저 고려한다. 단, 숫자와 계산 결과의 가독성, 키보드 조작, 모바일 사용성은 유지한다.
 - 애니메이션을 넣으면 `@media (prefers-reduced-motion: reduce)`에서 꺼지도록 함께 작성한다.
-- 메이플 도움 사이트 분위기와 기존 디자인(색상 토큰, 카드, 버튼, 여백, 타이포그래피)에 맞춘다.
+- 2026-10부터 다크 글래스 리디자인(`yourmaple_design/`, 로컬 전용) 기준이다. 진행 순서·결정·남은 일은 `docs/redesign.md`를 따르고, 새 화면은 `:root` 디자인 토큰과 공통 부품(`.ym-glass`, `.ym-chip`, `.ym-badge`, `.ym-gauge`, `ym-fade-up`)을 먼저 쓴다. 다크 전용이다.
 - 입력, 저장, 선택, 오류 상태를 명확하고 보기 좋게 표현한다.
 - 모바일(폭 375px 전후)과 PC 모두 확인한다.
 
 ## 3. 기술 구성
 
-- 빌드 도구 없는 순수 HTML/CSS/JavaScript(ES 모듈) SPA. GitHub Pages로 배포(`.github/workflows/pages.yml`).
+- 빌드 도구 없는 순수 HTML/CSS/JavaScript(ES 모듈) SPA. GitHub Pages로 배포(`.github/workflows/pages.yml`). 배포 때만 `tools/stamp_version.py`가 JS·CSS 주소와 상대 import에 커밋 번호(`?v=`)를 붙여 캐시를 깬다. 그래서 상대 import는 `./x.js`·`../x.js` 문자열 그대로 쓰고, 경로를 변수로 조립하지 않는다.
 - 배포 주소는 `https://yourmaple.kr`(가비아 DNS → GitHub Pages 커스텀 도메인, Enforce HTTPS). 예전 `beatmejy.github.io/yourmaple/`은 새 주소로 이동한다. DNS 레코드와 설정 위치는 README "도메인" 절에 있다. 코드에 배포 경로를 고정하지 않는다(상대 경로 유지).
 - 데이터·로그인: Supabase(Postgres + RLS). 설정은 `js/config.js`(커밋 안 함, `config.example.js` 참고).
 - 맥 로컬 실행: `python3 -m http.server 5500` → http://127.0.0.1:5500. Windows에서는 `py -3 -m http.server 5500`을 사용한다. `.claude/launch.json`은 현재 저장소에 없다(2026-10-02 Codex 확인 [실측]).
 - 라우팅: 해시 기반(`#/characters`).
-  - `js/routes.js`: 메뉴 목록. `pin: true`는 메뉴 아래쪽 고정, `quick: true`는 페이지 이동 대신 버튼으로 동작(예: 링크 패널).
+  - `js/routes.js`: `homeRoute`와 7개 분류 `categories`(id·이름·아이콘 글자·hue·routes). 평평한 `routes`는 여기서 만든다. `quick: true`는 페이지 이동 대신 버튼으로 동작(예: 링크 패널).
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
-- 레이아웃과 다크 모드는 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`.
-- 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--accent-soft`, `--gain`, `--danger`, `--shadow` 등)만 쓰고, 다크 모드 값도 토큰으로 정의한다.
+- 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
+- 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
 
 ## 4. 코드 규칙
 
@@ -60,6 +60,7 @@
 ## 7. 현재 상태 (2026-10-09 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
 
 - 도메인: 2026-10-09 `https://yourmaple.kr`로 옮겼다(가비아 DNS, Custom domain, Enforce HTTPS, Supabase Site URL — 설정은 사용자 [진술]). HTTPS 접속·www 이동·인증서·`https_enforced: true` 확인. `http://` 주소와 예전 `github.io` 주소의 https 이동은 캐시 만료 전이라 재확인 필요 [실측]
+- 리디자인: 2026-10-10 1단계 공통 기반(토큰·다크 고정·배경·공통 부품·모션), 2단계 레이아웃·메뉴(7개 분류 트리, 분류 경로 헤더), 3단계 공통 연출(`js/effects.js` 파티클·성공 오버레이·효과음, 헤더 효과음 토글) 완료, 미커밋. 기준 시안은 `yourmaple_design_2/`. 검증 페이지에서 로그인·12개 페이지 렌더와 밝은 배경 잔존 검사, PC·모바일 확인 [실측]. 4단계 메모·링크·캐릭터·홈 완료(가짜 Supabase로 추가·수정·삭제·필터·검색·보스 기록, PC 1024·1280·1440, 모바일 375 확인 [실측]). 다음은 사냥 기록. 숙제·직업 가이드는 데이터·SQL 결정 대기 (`docs/redesign.md`)
 - 배포: GitHub Pages. 마지막 배포는 무릉 허리띠 변경(2026-10-08, Pages 실행 성공·공개 사이트 반영 확인). 그 뒤의 강화 계산 개편(보유 메소 vs 바로 구매, 노작 섞기 `bestAttemptMix`, 강화 지도, 같은 상태 비교)과 메이커·거래 UI 변경은 미배포다. 커밋 여부는 git으로 확인한다 [실측]
 - 검증: `node js/*.check.mjs` 8개, 구문·`git diff --check`. 화면은 가짜 Supabase 검증 페이지로 PC 1024·1280·1440px, 모바일 375px, 다크 모드를 확인한다 [실측]
 - 미검증: 실제 로그인 DB 저장(강화 프로필 schemaVersion 2, 거래 저장, 무릉 점수), 사용자 간 접근 차단 [실측]

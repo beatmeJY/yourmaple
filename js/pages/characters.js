@@ -8,6 +8,7 @@ import {
   validateFaceFile,
 } from "../character-face.js";
 import { translateDbError } from "../db-error.js";
+import { BURST_COLORS, burstAt, sfx } from "../effects.js";
 import { escapeHtml, formatCount, readCount, sortByName } from "../format.js";
 import { filterRows, readLevelFilter } from "../filters.js";
 import { findJob, jobDisplayName, jobLabel, jobRecord, jobStyle } from "../job-label.js";
@@ -49,32 +50,68 @@ const blank = {
 
 export async function render(root) {
   root.innerHTML = `
-    <div class="studio-page character-page">
-    <header class="page-header">
-      <p class="studio-kicker">명부</p>
-      <div class="studio-hero-row">
+    <div class="char-page character-page">
+    <header class="ym-page-head char-head">
+      <div class="char-head-copy">
         <h1>캐릭터</h1>
-        <div class="button-row" data-character-actions hidden>
-          <button class="text-button" type="button" data-servers>서버 선택</button>
-          <button class="secondary-button" type="button" data-add-account>계정 추가</button>
-          <button class="primary-button" type="button" data-add>캐릭터 추가</button>
-        </div>
+        <p>계정마다 6명까지 둡니다. 보스 칸을 누르면 그 시각으로 도전 기록이 남습니다.</p>
+      </div>
+      <div class="char-head-actions" data-character-actions hidden>
+        <button class="ym-chip" type="button" data-servers>서버 선택</button>
+        <button class="ym-chip" type="button" data-add-account>+ 계정 추가</button>
+        <button class="ym-add" type="button" data-add>+ 캐릭터 추가</button>
       </div>
     </header>
     <div data-gate></div>
-    <section class="studio-board" data-workspace hidden>
-      <div class="character-board-head">
-        <h2 data-server-title></h2>
+    <div class="char-layout" data-workspace hidden>
+      <div class="char-main">
+        <div class="char-toolbar">
+          <div class="character-board-head char-server"><h2 data-server-title></h2></div>
+          <label class="ym-search"><span class="ym-search-icon" aria-hidden="true"></span><input data-search type="search" placeholder="캐릭터명·메모로 찾기" aria-label="캐릭터 검색" /></label>
+          <label class="char-level">
+            <span>Lv</span>
+            <input data-level-min inputmode="numeric" placeholder="최소" aria-label="레벨 최소" />
+            <i aria-hidden="true">~</i>
+            <input data-level-max inputmode="numeric" placeholder="최대" aria-label="레벨 최대" />
+          </label>
+        </div>
+        <div class="boss-filters char-boss-filters" data-boss-filters>
+          ${bosses
+            .map(
+              (boss) => `<button class="boss-filter ym-chip" type="button" data-boss-filter="${boss.key}" aria-pressed="false" title="${escapeHtml(boss.label)} 활성화 캐릭터만 보기">
+            <img src="${bossArt[boss.key]}" alt="" width="24" height="24" />
+            <span>${escapeHtml(boss.label)}</span>
+          </button>`,
+            )
+            .join("")}
+          <label class="char-switch">
+            <input type="checkbox" data-boss-ready-only />
+            <span class="char-switch-track" aria-hidden="true"></span>
+            <span>도전 가능만</span>
+          </label>
+          <label class="char-switch">
+            <input type="checkbox" data-boss-soon-also />
+            <span class="char-switch-track" aria-hidden="true"></span>
+            <span>오늘·곧</span>
+          </label>
+        </div>
+        <div data-list></div>
       </div>
-    <form class="editor" id="account-form" hidden>
-      <h2 data-account-title>계정 추가</h2>
-      <label class="field"><span>계정 이름</span><input name="name" required placeholder="예: 본계정" /></label>
-      <div class="button-row">
-        <button class="primary-button" type="submit">저장</button>
-        <button class="secondary-button" type="button" data-cancel-account>취소</button>
-      </div>
-    </form>
-      <form class="editor" id="character-form" hidden>
+      <aside class="char-side ym-glass">
+        <div class="char-side-idle">
+          <span class="char-side-orb" aria-hidden="true">캐</span>
+          <strong>캐릭터 카드를 눌러 보세요</strong>
+          <p>이름·직업·레벨·얼굴·메모와 보스 활성화를 여기서 고칩니다.</p>
+        </div>
+      <form class="editor char-form" id="account-form" hidden>
+        <h2 data-account-title>계정 추가</h2>
+        <label class="field"><span>계정 이름</span><input name="name" required placeholder="예: 본계정" /></label>
+        <div class="button-row">
+          <button class="primary-button" type="submit">저장</button>
+          <button class="secondary-button" type="button" data-cancel-account>취소</button>
+        </div>
+      </form>
+      <form class="editor char-form" id="character-form" hidden>
         <h2 data-form-title>캐릭터 추가</h2>
         <label class="field"><span>계정</span><select name="account_id" required></select></label>
         <label class="field"><span>캐릭터명</span><input name="name" required /></label>
@@ -98,7 +135,7 @@ export async function render(root) {
         <label class="field"><span>기타 메모</span><textarea name="extra_memo"></textarea></label>
         <div class="boss-fields span-all" data-quests-hidden-fields>
           <div class="boss-switches">
-            <label class="boss-switch"><input type="checkbox" name="quests_hidden" /><span>퀘스트에 표시하지 않기</span></label>
+            <label class="char-switch"><input type="checkbox" name="quests_hidden" /><span>퀘스트에 표시하지 않기</span><span class="char-switch-track" aria-hidden="true"></span></label>
           </div>
           <p class="field-note">켜면 이 캐릭터는 퀘스트 완료 표와 합계에서 빠집니다. 이미 체크한 완료 기록은 그대로 남습니다.</p>
         </div>
@@ -107,7 +144,7 @@ export async function render(root) {
             ${bosses
               .map(
                 (boss) =>
-                  `<label class="boss-switch"><input type="checkbox" name="${boss.columnEnabled}" /><span>${escapeHtml(boss.label)} 활성화</span></label>`,
+                  `<label class="char-switch"><input type="checkbox" name="${boss.columnEnabled}" /><img src="${bossArt[boss.key]}" alt="" width="24" height="24" /><span>${escapeHtml(boss.label)}</span><span class="char-switch-track" aria-hidden="true"></span></label>`,
               )
               .join("")}
           </div>
@@ -118,31 +155,8 @@ export async function render(root) {
           <button class="secondary-button" type="button" data-cancel>취소</button>
         </div>
       </form>
-      <div class="filters">
-        <label class="field"><span>캐릭터명</span><input data-search placeholder="이름·메모로 찾기" /></label>
-        <label class="field"><span>레벨 최소</span><input data-level-min inputmode="numeric" /></label>
-        <label class="field"><span>레벨 최대</span><input data-level-max inputmode="numeric" /></label>
-        <div class="boss-filters" data-boss-filters>
-          ${bosses
-            .map(
-              (boss) => `<button class="boss-filter" type="button" data-boss-filter="${boss.key}" aria-pressed="false" title="${escapeHtml(boss.label)} 활성화 캐릭터만 보기">
-            <img src="${bossArt[boss.key]}" alt="" width="32" height="32" />
-            <span>${escapeHtml(boss.label)}</span>
-          </button>`,
-            )
-            .join("")}
-          <label class="boss-switch boss-ready-only">
-            <input type="checkbox" data-boss-ready-only />
-            <span>도전할 수 있는 캐릭터만</span>
-          </label>
-          <label class="boss-switch boss-soon-also">
-            <input type="checkbox" data-boss-soon-also />
-            <span>오늘·곧 보기</span>
-          </label>
-        </div>
-      </div>
-      <div data-list></div>
-    </section>
+      </aside>
+    </div>
     <dialog class="boss-time-dialog" data-boss-time-dialog>
       <form id="boss-time-form">
         <h2 data-boss-time-title>도전 시각</h2>
@@ -279,7 +293,18 @@ export async function render(root) {
     form.dataset.facePath = character.face_path || "";
     syncFaceField();
     paintFacePreview(character.face_url || "");
-    form.elements.name.focus();
+    markEditing();
+    form.elements.name.focus({ preventScroll: true });
+    // 좁은 화면에서는 편집 칸이 목록 아래에 있으므로 그쪽으로 내려 준다.
+    if (window.matchMedia("(max-width: 979px)").matches) form.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  // 지금 고치는 캐릭터 카드를 강조한다.
+  function markEditing() {
+    const id = form.hidden ? "" : form.dataset.editingId;
+    for (const card of list.querySelectorAll(".character-row")) {
+      card.classList.toggle("is-editing", Boolean(id) && card.querySelector(`[data-edit="${CSS.escape(id)}"]`) !== null);
+    }
   }
 
   function closeForm() {
@@ -292,6 +317,7 @@ export async function render(root) {
     releaseFacePreview();
     form.reset();
     paintFacePreview("");
+    markEditing();
   }
 
   function syncFaceField() {
@@ -319,9 +345,15 @@ export async function render(root) {
     }
   }
 
-  function characterCard(row) {
+  // 얼굴 사진이 없으면 직업 색 테두리 안에 이름 첫 글자를 보여 준다.
+  function faceHtml(row) {
+    if (row.face_url) return faceMarkup(row.face_url);
+    return `<span class="char-face is-letter" aria-hidden="true">${escapeHtml([...String(row.name ?? "").trim()][0] || "?")}</span>`;
+  }
+
+  function characterCard(row, index) {
     const job = jobRecord(row) || findJob(jobs, row.job);
-    const style = jobStyle(job);
+    const style = [jobStyle(job), `--i:${Math.min(index, 12)}`].filter(Boolean).join(";");
     const jobText = job ? jobLabel(jobDisplayName(job), job) : escapeHtml(row.job || "직업 없음");
     const notes = [
       row.gear_memo ? ["장비", row.gear_memo] : null,
@@ -332,22 +364,21 @@ export async function render(root) {
           .map(([label, text]) => `<p class="character-note"><span>${label}</span>${escapeHtml(text)}</p>`)
           .join("")}</div>`
       : "";
+    const editing = form.dataset.editingId === row.id;
     return `
-      <li class="character-row"${style ? ` style="${style}"` : ""}>
-        <div class="character-row-main">
-          ${faceMarkup(row.face_url)}
-          <div class="character-copy">
-            <div class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong>${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</div>
-            <span class="character-job">${jobText}</span>
-          </div>
-        </div>
-        <div class="character-row-side">
-          <span class="character-level"><span>Lv</span>${escapeHtml(formatCount(row.level))}</span>
-          <div class="row-actions">
-            <button class="text-button" type="button" data-edit="${row.id}">수정</button>
-            <button class="text-button is-danger" type="button" data-delete="${row.id}">삭제</button>
-          </div>
-        </div>
+      <li class="character-row${editing ? " is-editing" : ""}" style="${style}">
+        <span class="char-card-bar" aria-hidden="true"></span>
+        <button class="character-row-main" type="button" data-edit="${row.id}" aria-label="${escapeHtml(row.name)} 고치기">
+          ${faceHtml(row)}
+          <span class="character-copy">
+            <span class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong><span class="character-level">Lv.${escapeHtml(formatCount(row.level))}</span></span>
+            <span class="character-job">${jobText}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
+          </span>
+        </button>
+        <span class="row-actions">
+          <button class="text-button" type="button" data-edit="${row.id}">수정</button>
+          <button class="text-button is-danger" type="button" data-delete="${row.id}">삭제</button>
+        </span>
         ${noteHtml}
         ${bossButtons(row)}
       </li>
@@ -426,9 +457,10 @@ export async function render(root) {
     const names = serverNames();
     const picks = `<div class="server-picks">${names.map((name) => serverPick(name)).join("")}</div>`;
     gate.innerHTML = `
-      <div class="server-gate studio-board">
+      <div class="server-gate ym-glass">
         <div class="character-board-head">
           <h2>서버 선택</h2>
+          <p>캐릭터는 서버별로 따로 모아 봅니다.</p>
         </div>
         ${picks}
         <form class="server-new" data-new-server>
@@ -494,28 +526,32 @@ export async function render(root) {
         readyOnly ||
         includeSoon,
     );
+    let cardIndex = 0;
     const blocks = accounts
-      .map((account) => {
+      .map((account, accountIndex) => {
         const members = visibleRows
           .filter((row) => row.account_id === account.id)
           .sort((a, b) => (b.level ?? -1) - (a.level ?? -1) || a.name.localeCompare(b.name, "ko"));
         if (!members.length && (searching || countFor(account.id) > 0)) return "";
         const count = countFor(account.id);
         const full = count >= 6;
-        const body = members.length
-          ? `<ul class="character-rows">${members.map(characterCard).join("")}</ul>`
-          : `<p class="character-empty">이 서버에는 아직 캐릭터가 없습니다.</p>`;
+        const pips = Array.from({ length: 6 }, (_, slot) => `<i class="${slot < count ? "is-on" : ""}"></i>`).join("");
+        // 검색 중이 아니면 남은 칸을 점선 카드로 보여 주고, 누르면 이 계정에 캐릭터를 추가한다.
+        const slot = !full && !searching
+          ? `<li class="char-slot"><button type="button" data-add-character="${account.id}">+ 캐릭터 추가 <span>빈 칸 ${6 - count}</span></button></li>`
+          : "";
         return `
-          <section class="account-block">
+          <section class="account-block ym-glass" style="--g:${Math.min(accountIndex, 6)}">
             <div class="account-head">
-              <h2 title="${escapeHtml(account.name)}">${escapeHtml(account.name)} <span class="count-pill${full ? " is-full" : ""}">${count}/6</span></h2>
+              <h2 title="${escapeHtml(account.name)}">${escapeHtml(account.name)}</h2>
+              <span class="char-pips" aria-hidden="true">${pips}</span>
+              <span class="char-pips-count${full ? " is-full" : ""}">${count}/6</span>
               <div class="account-tools">
-                <button class="text-button" type="button" data-add-character="${account.id}" ${full ? "disabled" : ""}>추가</button>
-                <button class="text-button" type="button" data-edit-account="${account.id}">이름</button>
+                <button class="text-button" type="button" data-edit-account="${account.id}">이름 변경</button>
                 <button class="text-button is-danger" type="button" data-delete-account="${account.id}">삭제</button>
               </div>
             </div>
-            ${body}
+            <ul class="character-rows">${members.map((row) => characterCard(row, cardIndex++)).join("")}${slot}</ul>
           </section>
         `;
       })
@@ -708,7 +744,10 @@ export async function render(root) {
   });
 
   root.addEventListener("change", (event) => {
-    if (event.target.closest("[data-boss-ready-only], [data-boss-soon-also]")) paintList();
+    if (event.target.closest("[data-boss-ready-only], [data-boss-soon-also]")) {
+      sfx(event.target.checked ? "check" : "uncheck");
+      paintList();
+    }
   });
 
   root.addEventListener("submit", (event) => {
@@ -731,6 +770,7 @@ export async function render(root) {
       else bossFilters.add(key);
       filterButton.classList.toggle("is-on", bossFilters.has(key));
       filterButton.setAttribute("aria-pressed", String(bossFilters.has(key)));
+      sfx("tick");
       paintList();
       return;
     }
@@ -807,7 +847,10 @@ export async function render(root) {
 
     const bossRun = event.target.closest("[data-boss]");
     if (bossRun) {
-      if (!bossRun.disabled) burstJuice(bossRun);
+      if (!bossRun.disabled) {
+        sfx("mid");
+        burstJuice(bossRun);
+      }
       await recordBoss(bossRun);
       return;
     }
@@ -834,6 +877,7 @@ export async function render(root) {
       return;
     }
     await removeCharacterFace(supabase, row.face_path);
+    sfx("fail");
     if (form.dataset.editingId === row.id) closeForm();
     showStatus("캐릭터를 삭제했습니다.", "info");
     await loadCharacters();
@@ -856,6 +900,8 @@ export async function render(root) {
       showStatus(translateDbError(error), "error");
       return;
     }
+    sfx("check");
+    burstAt(accountForm.querySelector("button[type='submit']"), BURST_COLORS.mid, 22, 1);
     accountForm.hidden = true;
     accountForm.dataset.editingId = "";
     showStatus(id ? "계정 이름을 수정했습니다." : "계정을 저장했습니다.", "info");
@@ -1141,6 +1187,8 @@ export async function render(root) {
           }
         }
       }
+      sfx("check");
+      burstAt(saveButton, BURST_COLORS.mid, 22, 1);
       closeForm();
       showStatus(creating ? "캐릭터를 저장했습니다." : "캐릭터를 수정했습니다.", "info");
       await loadCharacters();

@@ -1,4 +1,5 @@
 import { translateDbError } from "../db-error.js";
+import { BURST_COLORS, burstAt, paletteHue as hueOf, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
 import { matchesText } from "../filters.js";
 import { getSupabase } from "../supabase-client.js";
@@ -29,82 +30,68 @@ function formatWhen(value) {
   }).format(date);
 }
 
-function noteCard(row) {
-  const title = escapeHtml(row.title);
-  const content = String(row.content ?? "").trim();
-  const body = content ? `<p class="note-card-body">${escapeHtml(row.content)}</p>` : "";
-  const when = formatWhen(row.updated_at);
-  const time = when ? `<span class="note-card-when">${escapeHtml(when)}</span>` : "";
+function noteCard(row, index, selectedId, poppedId) {
   const category = categoryOf(row);
-  const chip = category ? `<span class="link-chip">${escapeHtml(category)}</span>` : "";
-  const tags = tagsOf(row)
-    .map((tag) => `<span class="note-tag">${escapeHtml(tag)}</span>`)
-    .join("");
-  const tagRow = tags ? `<span class="note-tags">${tags}</span>` : "";
+  const content = String(row.content ?? "").trim();
+  const when = formatWhen(row.updated_at);
+  const tags = tagsOf(row).map((tag) => `<span class="memo-tag">#${escapeHtml(tag)}</span>`).join("");
+  const classes = ["memo-card", row.id === selectedId ? "is-selected" : "", row.id === poppedId ? "is-new" : ""].filter(Boolean).join(" ");
   return `
-    <article class="note-card">
-      <header class="note-card-head">
-        <h3 title="${title}">${title}</h3>
-        ${time}
-      </header>
-      ${body}
-      <footer class="note-card-foot">
-        ${chip}
-        ${tagRow}
-        <div class="row-actions">
-          <button class="text-button" type="button" data-edit="${row.id}">수정</button>
-          <button class="text-button is-danger" type="button" data-delete="${row.id}">삭제</button>
-        </div>
-      </footer>
-    </article>
+    <button type="button" class="${classes}" data-pick="${row.id}" style="--hue:${hueOf(category)};--i:${Math.min(index, 12)}" aria-pressed="${row.id === selectedId}">
+      <span class="memo-card-bar" aria-hidden="true"></span>
+      <strong class="memo-card-title">${escapeHtml(row.title || "제목 없음")}</strong>
+      <span class="memo-card-body">${content ? escapeHtml(content) : "내용 없음"}</span>
+      ${tags ? `<span class="memo-card-tags">${tags}</span>` : ""}
+      <span class="memo-card-foot">${category ? `<span class="memo-card-cat">${escapeHtml(category)}</span>` : ""}<span>${escapeHtml(when)}</span></span>
+    </button>
   `;
 }
 
 export async function render(root) {
   root.innerHTML = `
-    <div class="note-page">
-      <header class="page-header">
-        <p class="trade-kicker">수첩</p>
-        <div class="trade-hero-row">
-          <h1>메모</h1>
-          <button class="primary-button" type="button" data-add>메모 추가</button>
+    <div class="memo-page">
+      <header class="ym-page-head"><h1>메모</h1><p>카드를 누르면 편집 칸에서 고칠 수 있습니다.</p></header>
+      <div class="memo-layout">
+        <div class="memo-main">
+          <div class="ym-toolbar">
+            <label class="ym-search"><span class="ym-search-icon" aria-hidden="true"></span><input data-search type="search" placeholder="제목, 내용, 태그로 찾기" aria-label="메모 검색" /></label>
+            <span class="ym-count" data-count></span>
+            <button class="ym-add" type="button" data-add>+ 새 메모</button>
+          </div>
+          <div class="ym-filters" data-categories role="group" aria-label="카테고리"></div>
+          <div data-list></div>
         </div>
-      </header>
-      <div class="trade-kpi-grid link-kpis" data-summary></div>
-      <section class="trade-board">
-        <div class="trade-board-bar">
-          <div class="trade-segments" data-categories role="group" aria-label="카테고리"></div>
-          <label class="field trade-search"><span>메모 검색</span><input data-search placeholder="제목, 내용, 태그로 찾기" /></label>
-        </div>
-        <form class="editor" hidden>
-          <h2 data-form-title>메모 추가</h2>
-          <label class="field span-all"><span>제목</span><input name="title" required autocomplete="off" /></label>
-          <label class="field"><span>내용</span><textarea name="content"></textarea></label>
-          <label class="field"><span>카테고리</span><input name="category" autocomplete="off" /></label>
-          <label class="field"><span>태그</span><input name="tags" placeholder="쉼표로 구분" autocomplete="off" /></label>
-          <div class="button-row">
+        <form class="memo-editor ym-glass" data-editor>
+          <div class="memo-editor-head"><span class="memo-editor-dot" aria-hidden="true"></span><strong data-form-title>새 메모</strong><small>저장을 눌러야 반영됩니다</small></div>
+          <input class="memo-editor-title" name="title" placeholder="제목" autocomplete="off" aria-label="제목" />
+          <textarea class="memo-editor-body" name="content" rows="9" placeholder="내용을 적어 보세요" aria-label="내용"></textarea>
+          <div class="memo-editor-meta">
+            <label class="field"><span>카테고리</span><input name="category" autocomplete="off" placeholder="예: 보스" /></label>
+            <label class="field"><span>태그</span><input name="tags" placeholder="쉼표로 구분" autocomplete="off" /></label>
+          </div>
+          <div class="memo-editor-actions">
             <button class="primary-button" type="submit">저장</button>
-            <button class="secondary-button" type="button" data-cancel>취소</button>
+            <button class="secondary-button" type="button" data-new>새로 쓰기</button>
+            <button class="danger-button" type="button" data-delete hidden>삭제</button>
           </div>
         </form>
-        <div data-list></div>
-      </section>
+      </div>
     </div>
   `;
 
   const list = root.querySelector("[data-list]");
-  const summary = root.querySelector("[data-summary]");
+  const count = root.querySelector("[data-count]");
   const segments = root.querySelector("[data-categories]");
-  const form = root.querySelector("form");
+  const form = root.querySelector("[data-editor]");
   const title = root.querySelector("[data-form-title]");
   const search = root.querySelector("[data-search]");
+  const deleteButton = root.querySelector("[data-delete]");
   let rows = [];
   let category = "";
+  let selectedId = "";
+  let poppedId = "";
+  let dirty = false;
   let loadId = 0;
-
-  function showStatus(text, kind) {
-    notify(text, kind);
-  }
 
   function categories() {
     return [...new Set(rows.map(categoryOf).filter(Boolean))].sort(compareName);
@@ -119,46 +106,43 @@ export async function render(root) {
     });
   }
 
+  function paintEditorColor() {
+    form.style.setProperty("--hue", hueOf(form.elements.category.value.trim()));
+  }
+
   function fillForm(row) {
-    form.hidden = false;
-    form.dataset.editingId = row.id || "";
-    title.textContent = row.id ? "수정" : "메모 추가";
+    selectedId = row.id || "";
+    title.textContent = row.id ? "메모 편집" : "새 메모";
     form.elements.title.value = row.title ?? "";
     form.elements.content.value = row.content ?? "";
     form.elements.category.value = row.category ?? "";
     form.elements.tags.value = row.tags ?? "";
-    form.elements.title.focus();
-    form.scrollIntoView({ block: "nearest" });
+    deleteButton.hidden = !row.id;
+    dirty = false;
+    paintEditorColor();
   }
 
-  function closeForm() {
-    form.hidden = true;
-    form.dataset.editingId = "";
-    form.reset();
+  // 고치던 내용이 있으면 다른 메모로 옮기기 전에 확인한다.
+  function canLeaveEditor() {
+    return !dirty || window.confirm("저장하지 않은 내용이 있습니다. 버리고 다른 메모로 옮길까요?");
   }
 
-  function paintSummary() {
-    summary.innerHTML = `
-      <article class="trade-kpi is-focus"><span>작성한 메모</span><strong>${formatCount(rows.length)}</strong></article>
-      <article class="trade-kpi"><span>카테고리</span><strong>${formatCount(categories().length)}</strong></article>
-    `;
+  function paintCount() {
+    count.textContent = `${formatCount(rows.length)}개`;
   }
 
   function paintSegments() {
     const names = categories();
     const hasBlank = rows.some((row) => !categoryOf(row));
     const items = [{ id: "", label: "전체", count: rows.length }];
-    for (const name of names) {
-      items.push({ id: name, label: name, count: rows.filter((row) => categoryOf(row) === name).length });
-    }
-    if (hasBlank && names.length) {
-      items.push({ id: NONE, label: "미분류", count: rows.filter((row) => !categoryOf(row)).length });
-    }
+    for (const name of names) items.push({ id: name, label: name, count: rows.filter((row) => categoryOf(row) === name).length, hue: hueOf(name) });
+    if (hasBlank && names.length) items.push({ id: NONE, label: "미분류", count: rows.filter((row) => !categoryOf(row)).length });
     if (!items.some((item) => item.id === category)) category = "";
+    segments.hidden = items.length < 2;
     segments.innerHTML = items
       .map((item) => {
         const on = item.id === category;
-        return `<button type="button" data-category="${escapeHtml(item.id)}" class="${on ? "is-on" : ""}" aria-pressed="${on ? "true" : "false"}">${escapeHtml(item.label)}<span class="count-pill${on ? " is-full" : ""}">${formatCount(item.count)}</span></button>`;
+        return `<button type="button" class="ym-chip" data-category="${escapeHtml(item.id)}" aria-pressed="${on}"${item.hue ? ` style="--hue:${item.hue}"` : ""}>${item.hue ? `<i class="ym-chip-dot" aria-hidden="true"></i>` : ""}${escapeHtml(item.label)}<span class="ym-chip-count">${formatCount(item.count)}</span></button>`;
       })
       .join("");
   }
@@ -166,76 +150,106 @@ export async function render(root) {
   function paintList() {
     const visible = visibleRows();
     if (!rows.length) {
-      list.innerHTML = `<p class="empty">작성한 메모가 없습니다. 메모 추가로 첫 메모를 남겨 보세요.</p>`;
+      list.innerHTML = `<p class="ym-empty">작성한 메모가 없습니다. 새 메모로 첫 메모를 남겨 보세요.</p>`;
       return;
     }
     if (!visible.length) {
-      list.innerHTML = `<p class="empty">이 조건에 맞는 메모가 없습니다.</p>`;
+      list.innerHTML = `<p class="ym-empty">이 조건에 맞는 메모가 없습니다.</p>`;
       return;
     }
-    list.innerHTML = `<div class="note-cards">${visible.map(noteCard).join("")}</div>`;
+    list.innerHTML = `<div class="memo-grid">${visible.map((row, index) => noteCard(row, index, selectedId, poppedId)).join("")}</div>`;
+    poppedId = "";
   }
 
   function paint() {
-    paintSummary();
+    paintCount();
     paintSegments();
     paintList();
   }
 
   async function loadRows() {
     const current = ++loadId;
-    list.innerHTML = `<p class="empty">불러오는 중입니다.</p>`;
+    list.innerHTML = `<p class="ym-empty">불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
     const { data, error } = await supabase.from("notes").select(columns).order("updated_at", { ascending: false });
     if (current !== loadId || !list.isConnected) return;
     if (error) {
       rows = [];
       list.innerHTML = "";
-      showStatus(translateDbError(error), "error");
-      paintSummary();
+      notify(translateDbError(error), "error");
+      paintCount();
       segments.innerHTML = "";
       return;
     }
     rows = data ?? [];
+    if (selectedId && !rows.some((row) => row.id === selectedId)) fillForm({ id: "" });
     paint();
   }
 
   root.addEventListener("input", (event) => {
-    if (event.target === search) paintList();
+    if (event.target === search) {
+      paintList();
+      return;
+    }
+    if (form.contains(event.target)) {
+      dirty = true;
+      if (event.target === form.elements.category) paintEditorColor();
+    }
   });
 
   root.addEventListener("click", async (event) => {
     const categoryButton = event.target.closest("[data-category]");
     if (categoryButton && segments.contains(categoryButton)) {
+      sfx("tick");
       category = categoryButton.dataset.category ?? "";
       paintSegments();
       paintList();
       return;
     }
-    if (event.target.closest("[data-add]")) fillForm({ id: "" });
-    if (event.target.closest("[data-cancel]")) closeForm();
 
-    const editButton = event.target.closest("[data-edit]");
-    if (editButton) {
-      const row = rows.find((item) => item.id === editButton.dataset.edit);
-      if (row) fillForm(row);
+    if (event.target.closest("[data-add], [data-new]")) {
+      if (!canLeaveEditor()) return;
+      sfx("tick");
+      fillForm({ id: "" });
+      paintList();
+      form.elements.title.focus({ preventScroll: true });
+      form.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
     }
 
-    const deleteButton = event.target.closest("[data-delete]");
-    if (!deleteButton) return;
-    const row = rows.find((item) => item.id === deleteButton.dataset.delete);
+    const pick = event.target.closest("[data-pick]");
+    if (pick) {
+      if (pick.dataset.pick === selectedId) return;
+      if (!canLeaveEditor()) return;
+      const row = rows.find((item) => item.id === pick.dataset.pick);
+      if (!row) return;
+      sfx("tick");
+      fillForm(row);
+      for (const card of list.querySelectorAll("[data-pick]")) {
+        const on = card.dataset.pick === selectedId;
+        card.classList.toggle("is-selected", on);
+        card.setAttribute("aria-pressed", String(on));
+      }
+      // 좁은 화면에서는 편집 칸이 목록 아래에 있으므로 그쪽으로 내려 준다.
+      if (window.matchMedia("(max-width: 979px)").matches) form.scrollIntoView({ block: "start", behavior: "smooth" });
+      return;
+    }
+
+    if (!event.target.closest("[data-delete]")) return;
+    const row = rows.find((item) => item.id === selectedId);
     if (!row) return;
     if (!window.confirm(`${row.title} 메모를 삭제할까요? 삭제한 내용은 되돌릴 수 없습니다.`)) return;
     deleteButton.disabled = true;
     const supabase = await getSupabase();
     const { error } = await supabase.from("notes").delete().eq("id", row.id);
+    deleteButton.disabled = false;
     if (error) {
-      deleteButton.disabled = false;
-      showStatus(translateDbError(error), "error");
+      notify(translateDbError(error), "error");
       return;
     }
-    if (form.dataset.editingId === row.id) closeForm();
-    showStatus("삭제했습니다.", "info");
+    sfx("fail");
+    fillForm({ id: "" });
+    notify("삭제했습니다.", "info");
     await loadRows();
   });
 
@@ -248,26 +262,36 @@ export async function render(root) {
       tags: form.elements.tags.value.trim() || null,
     };
     if (!payload.title) {
-      showStatus("제목 항목을 입력해 주세요.", "error");
+      notify("제목 항목을 입력해 주세요.", "error");
+      form.elements.title.focus();
       return;
     }
     const saveButton = form.querySelector("button[type='submit']");
     saveButton.disabled = true;
-    showStatus("저장하는 중입니다.", "info");
     const supabase = await getSupabase();
-    const id = form.dataset.editingId;
+    const id = selectedId;
     const result = id
       ? await supabase.from("notes").update(payload).eq("id", id)
-      : await supabase.from("notes").insert(payload);
+      : await supabase.from("notes").insert(payload).select("id").single();
     saveButton.disabled = false;
     if (result.error) {
-      showStatus(translateDbError(result.error), "error");
+      notify(translateDbError(result.error), "error");
       return;
     }
-    closeForm();
-    showStatus(id ? "수정했습니다." : "저장했습니다.", "info");
+    sfx("check");
+    burstAt(saveButton, BURST_COLORS.mid, 22, 1);
+    dirty = false;
+    // 새 메모는 저장 뒤 바로 선택해 이어서 고칠 수 있게 한다.
+    if (!id && result.data?.id) {
+      selectedId = result.data.id;
+      poppedId = result.data.id;
+      title.textContent = "메모 편집";
+      deleteButton.hidden = false;
+    }
+    notify(id ? "수정했습니다." : "저장했습니다.", "info");
     await loadRows();
   });
 
+  fillForm({ id: "" });
   await loadRows();
 }

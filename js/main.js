@@ -1,11 +1,13 @@
 import { signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
-import { renderNav, renderRoute } from "./router.js";
+import { renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
+import { isSoundOn, setSoundOn, sfx } from "./effects.js";
 import { clearToasts, notify } from "./toast.js";
-import { applyNavPreference, applyTheme, getTheme, isDesktopNav, renderShell, setNavCollapsed, setNavOpen, syncThemeButton } from "./ui.js";
+import { applyDarkTheme, applyNavPreference, isDesktopNav, mountAmbient, renderShell, setNavCollapsed, setNavOpen } from "./ui.js";
 
-applyTheme(getTheme());
+applyDarkTheme();
+mountAmbient();
 applyNavPreference();
 
 const app = document.querySelector("#app");
@@ -23,8 +25,17 @@ async function showPage() {
   const activeId = await renderRoute(main);
   main.dataset.page = activeId;
   renderNav(nav, activeId);
+  renderCrumb(document.querySelector("[data-crumb]"), activeId);
   setNavOpen(false);
   closeLinkPanel();
+}
+
+function syncSoundToggle() {
+  const button = document.querySelector("[data-sound-toggle]");
+  if (!button) return;
+  const on = isSoundOn();
+  button.setAttribute("aria-pressed", String(on));
+  button.querySelector("span").textContent = on ? "효과음 켜짐" : "효과음 꺼짐";
 }
 
 function showApp(session) {
@@ -32,18 +43,17 @@ function showApp(session) {
   if (entered) {
     clearToasts();
     renderShell();
+    syncSoundToggle();
     mode = "app";
   }
   const email = document.querySelector("#account-email");
   if (email) email.textContent = session?.user?.email ?? "";
-  syncThemeButton();
   if (entered) showPage();
 }
 
 function showLogin() {
   renderLogin(app);
   mode = "login";
-  syncThemeButton();
 }
 
 function showSetup(error) {
@@ -51,10 +61,23 @@ function showSetup(error) {
   const title = message.includes("라이브러리") ? "연결할 수 없습니다" : "설정이 필요합니다";
   renderSetup(app, message, title);
   mode = "setup";
-  syncThemeButton();
 }
 
 document.body.addEventListener("click", async (event) => {
+  const navCategory = event.target.closest("[data-nav-cat]");
+  if (navCategory) {
+    sfx("tick");
+    toggleNavCategory(navCategory);
+    return;
+  }
+  if (event.target.closest(".nav-sub, .nav-home")) sfx("tick");
+  if (event.target.closest("[data-sound-toggle]")) {
+    const on = !isSoundOn();
+    setSoundOn(on);
+    syncSoundToggle();
+    if (on) sfx("check");
+    return;
+  }
   if (event.target.closest("[data-open-nav]")) {
     if (isDesktopNav()) setNavCollapsed(!document.body.classList.contains("nav-collapsed"));
     else setNavOpen(true);
@@ -76,11 +99,6 @@ document.body.addEventListener("click", async (event) => {
     closeLinkPanel();
     window.open(openLinkButton.dataset.openLink, "_blank", "noopener,noreferrer");
     return;
-  }
-  if (event.target.closest("[data-theme-toggle]")) {
-    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-    applyTheme(next);
-    syncThemeButton();
   }
   if (event.target.closest("[data-logout]")) {
     const button = event.target.closest("[data-logout]");
