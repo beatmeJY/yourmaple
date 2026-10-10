@@ -52,6 +52,10 @@ jobs:
           cp index.html .nojekyll favicon.ico favicon-32x32.png apple-touch-icon.png _site/
           cp -r css js img _site/
 
+      - name: 파일 주소에 버전 붙이기
+        # 배포마다 커밋 번호를 JS·CSS 주소에 붙여 브라우저가 옛 파일과 새 파일을 섞지 않게 한다.
+        run: python3 tools/stamp_version.py _site "${GITHUB_SHA::7}"
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
