@@ -20,10 +20,8 @@ export function renderSetup(root, message, title = "설정이 필요합니다") 
 export function renderLogin(root) {
   root.innerHTML = `
     <section class="auth-screen">
-      <div class="auth-toolbar">
-        <p class="brand-mark">Your Maple</p>
-      </div>
       <div class="auth-card">
+        <img class="auth-logo" src="./apple-touch-icon.png" alt="" width="64" height="64" />
         <h1>Your Maple</h1>
         <p>로그인한 계정만 내 데이터를 볼 수 있습니다.</p>
         <form id="auth-form">

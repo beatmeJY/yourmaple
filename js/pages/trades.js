@@ -1,4 +1,5 @@
 import { translateDbError } from "../db-error.js";
+import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
 import { escapeHtml, formatCount, readCount } from "../format.js";
 import { matchesText } from "../filters.js";
 import { getSupabase } from "../supabase-client.js";
@@ -46,11 +47,12 @@ export async function render(root) {
       <header class="page-header">
         <p class="trade-kicker">장부</p>
         <div class="trade-hero-row">
-          <h1>거래</h1>
+          <h1>거래 장부</h1>
           <button class="primary-button" type="button" data-add>거래 추가</button>
         </div>
       </header>
       <div data-summary></div>
+      <div class="trade-layout">
       <section class="trade-board">
         <div class="trade-board-bar">
           <div class="trade-segments" data-views role="group" aria-label="거래 상태">
@@ -66,7 +68,10 @@ export async function render(root) {
             <option value="updated-desc">수정일 최신 순</option><option value="updated-asc">수정일 오래된 순</option>
           </select></label>
         </div>
-        <form class="editor trade-editor" id="trade-form">
+        <div data-list></div>
+      </section>
+      <aside class="trade-side">
+        <form class="editor trade-editor ym-glass" id="trade-form">
           <h2 data-form-title>거래 추가</h2>
           <label class="field span-all"><span>아이템명</span><input name="name" required autocomplete="off" /></label>
           <div class="trade-form-sides span-all">
@@ -89,8 +94,8 @@ export async function render(root) {
             <button class="secondary-button" type="button" data-cancel>입력 초기화</button>
           </div>
         </form>
-        <div data-list></div>
-      </section>
+      </aside>
+      </div>
     </div>
   `;
 
@@ -607,6 +612,27 @@ export async function render(root) {
     await loadRows();
   });
 
+  // 저장 연출: 판매분이 이익이면 초록 파티클, 손해면 실패음, 이익으로 모두 팔면 "흑자 완판!"(시안).
+  function cheer(mode, value) {
+    const button = form.querySelector(mode === "buy" ? "[data-save-buy]" : mode === "sell" ? "[data-save-sell]" : "[data-save]");
+    const profit = value.sell_qty > 0 ? profitOf(value) : null;
+    if (profit == null) {
+      sfx("check");
+      burstAt(button, BURST_COLORS.mid, 20, 0.9);
+      return;
+    }
+    if (profit < 0) {
+      sfx("fail");
+      return;
+    }
+    if (profit > 0 && remainingOf(value) === 0) {
+      celebrate("흑자 완판!", `${value.name} · ${signedMoney(profit)}`);
+      return;
+    }
+    sfx(profit > 0 ? "mid" : "check");
+    burstAt(button, BURST_COLORS.success, profit > 0 ? 28 : 16, profit > 0 ? 1.1 : 0.8);
+  }
+
   let formSaving = false;
   async function saveForm(mode = "all") {
     if (formSaving) return;
@@ -628,6 +654,7 @@ export async function render(root) {
       }
       form.dataset.editingId = "";
       title.textContent = "거래 추가";
+      cheer(mode, parsed.value);
       showStatus(
         saved.merged ? "이름이 같은 거래를 한 줄로 합쳤습니다." : mode === "sell" ? "이번 판매분을 저장했습니다." : id ? "거래를 수정했습니다." : "거래를 저장했습니다.",
         "info",

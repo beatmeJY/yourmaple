@@ -76,7 +76,7 @@ export async function render(root) {
     <header class="page-header">
       <p class="studio-kicker">사냥터</p>
       <div class="studio-hero-row">
-        <h1>사냥</h1>
+        <h1>사냥 기록</h1>
       </div>
     </header>
     <section class="hunt-panel is-log">

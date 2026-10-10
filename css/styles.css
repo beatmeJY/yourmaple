@@ -11358,7 +11358,8 @@ body {
 .field select {
   border: 1px solid var(--glass-line);
   border-radius: 14px;
-  background: var(--well);
+  /* background 묶음으로 쓰면 검색칸 돋보기·선택칸 화살표(배경 이미지)가 지워진다. 색만 바꾼다. */
+  background-color: var(--well);
   color: var(--text);
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
@@ -11919,6 +11920,16 @@ body {
 .char-page .char-form input[type="file"] { flex: 1; min-width: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--muted); font-size: 12px; }
 .char-page .char-form input[type="file"]::file-selector-button { height: 34px; margin-right: 8px; padding: 0 14px; border: 1px solid var(--glass-line); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.08); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .char-page .char-form h2 { margin: 0; font-size: 19px; font-weight: 800; }
+.char-form-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.char-autosave { color: var(--faint); font-size: 12px; font-weight: 600; transition: color 0.2s; }
+.char-autosave.is-saving { color: var(--muted); }
+.char-autosave.is-saved { color: oklch(0.88 0.12 160); animation: ym-pop-in 0.35s var(--spring) both; }
+.char-autosave.is-error { color: oklch(0.82 0.13 25); }
+.char-exp-hint { margin-left: 6px; color: oklch(0.9 0.12 85); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.char-exp-hint.is-error { color: oklch(0.82 0.13 25); }
+.char-page .char-exp { display: flex; align-items: center; gap: 6px; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.char-exp-track { position: relative; flex: 1; max-width: 120px; height: 5px; overflow: hidden; border-radius: var(--radius-pill); background: rgba(0, 0, 0, 0.35); }
+.char-exp-track i { position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: inherit; background: linear-gradient(90deg, oklch(0.72 0.17 295), oklch(0.88 0.15 85)); }
 .char-page .char-form .button-row .primary-button { flex: 1; }
 .char-page .char-form .boss-fields { display: grid; gap: 8px; }
 .char-page .char-form .boss-switches { display: grid; gap: 8px; }
@@ -11993,6 +12004,22 @@ body {
 .ym-hero-level { padding: 3px 10px; border-radius: var(--radius-pill); background: oklch(0.86 0.15 85 / 0.16); color: oklch(0.9 0.12 85); font-size: 13px; font-weight: 800; }
 .ym-hero-meta { color: #b9b1cf; font-size: 15px; }
 .ym-home .ym-hero-meta .job-label { color: var(--job-color); }
+.ym-hero-exp { display: flex; flex-direction: column; gap: 8px; margin-top: 22px; }
+.ym-hero-exp-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.ym-hero-exp-label { color: oklch(0.9 0.12 85); font: 700 12px ui-monospace, Menlo, monospace; letter-spacing: 0.12em; }
+.ym-hero-exp-value { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ym-hero-exp-value span { color: var(--muted); font-weight: 500; }
+.ym-hero-exp-track { position: relative; height: 16px; overflow: hidden; border-radius: var(--radius-pill); background: rgba(0, 0, 0, 0.35); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4); }
+.ym-hero-exp-fill { position: absolute; inset: 0 auto 0 0; width: var(--w); overflow: hidden; border-radius: inherit; background: linear-gradient(90deg, oklch(0.72 0.17 295), oklch(0.78 0.16 40) 70%, oklch(0.88 0.15 85)); box-shadow: 0 0 18px oklch(0.78 0.16 40 / 0.6); animation: ym-exp-fill 1.6s var(--ease-out) both; }
+.ym-hero-exp-fill i { position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent); animation: ym-exp-shimmer 2.6s ease-in-out infinite; }
+@keyframes ym-exp-fill { from { width: 0; } }
+@keyframes ym-exp-shimmer { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.ym-hero-exp-time { color: #cfc8e2; font-size: 13px; text-decoration: none; }
+.ym-hero-exp-time strong { color: oklch(0.9 0.12 85); }
+a.ym-hero-exp-time,
+.ym-hero-exp-hint { color: oklch(0.86 0.1 295); }
+.ym-hero-exp-hint { display: block; margin-top: 18px; padding: 12px 14px; border: 1px dashed rgba(255, 255, 255, 0.16); border-radius: 16px; font-size: 13px; text-decoration: none; transition: background-color 0.2s; }
+.ym-hero-exp-hint:hover { background: rgba(255, 255, 255, 0.05); }
 .ym-hero-alts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .ym-hero-alt { --tint: oklch(0.8 0.13 295); display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; cursor: pointer; transition: transform 0.45s var(--spring), background-color 0.25s; }
 .ym-hero-alt:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.1); }
@@ -12078,6 +12105,8 @@ body {
   .ym-feature-tile,
   .ym-home .home-lane,
   .ym-hero-face::before,
+  .ym-hero-exp-fill,
+  .ym-hero-exp-fill i,
   .ym-home .home-ready { animation: none; }
   .ym-hero-alt,
   .ym-feature-tile,
@@ -12085,4 +12114,300 @@ body {
   .ym-home .home-char,
   .ym-home .home-note,
   .ym-home-more { transition: none; }
+}
+
+/* ==========================================================================
+   헤더: 기능 검색 + 대표 캐릭터 프로필 (사용자 결정 2026-10-10)
+   ========================================================================== */
+.feature-search { position: relative; flex: 0 1 280px; min-width: 0; }
+.feature-search-field { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 12px; border: 1px solid var(--glass-line); border-radius: 14px; background: rgba(255, 255, 255, 0.06); transition: border-color 0.2s, box-shadow 0.2s; }
+.feature-search-field:focus-within { border-color: oklch(0.8 0.13 295 / 0.7); box-shadow: 0 0 0 4px oklch(0.8 0.13 295 / 0.16); }
+.feature-search-field input { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--text); font: inherit; font-size: 14px; outline: none; }
+.feature-search-field input::placeholder { color: var(--faint); }
+.feature-search-field kbd { flex: none; padding: 1px 7px; border: 1px solid var(--glass-line); border-radius: 6px; color: var(--faint); font: 700 11px ui-monospace, Menlo, monospace; }
+.feature-search-results { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; display: none; gap: 2px; width: max(100%, 280px); max-height: min(60vh, 460px); overflow: auto; padding: 6px; border: 1px solid var(--glass-line); border-radius: 18px; background: rgba(20, 14, 38, 0.96); box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.6); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.feature-search.is-open .feature-search-results { display: grid; animation: ym-pop-in 0.25s var(--spring) both; }
+.feature-search-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.feature-search-item:hover,
+.feature-search-item.is-active { background: rgba(255, 255, 255, 0.08); }
+.feature-search-item.is-active { box-shadow: inset 3px 0 0 oklch(0.8 0.13 var(--hue)); }
+.feature-search-glyph { display: grid; flex: none; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: oklch(0.8 0.13 var(--hue)); color: #120c22; font-size: 13px; font-weight: 800; }
+.feature-search-glyph.is-small { font-size: 9px; }
+.feature-search-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.feature-search-copy strong { font-size: 14px; font-weight: 700; }
+.feature-search-copy span { color: var(--muted); font-size: 12px; }
+.feature-search-empty { margin: 0; padding: 12px; color: var(--muted); font-size: 13px; }
+.feature-search-open { display: none; }
+
+.topbar-profile-wrap { position: relative; flex: none; }
+.topbar-profile { --tint: oklch(0.8 0.13 295); display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 4px; border: 1px solid var(--glass-line); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.06); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform 0.45s var(--spring), background-color 0.2s; }
+.topbar-profile:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.1); }
+.topbar-profile:active { transform: scale(0.94); }
+.topbar-profile:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.topbar-profile .char-face,
+.profile-menu-item .char-face { flex: none; width: 32px; height: 32px; border: 2px solid var(--tint, oklch(0.8 0.13 295)); border-radius: 50%; background: #1a1430; box-shadow: 0 0 10px -2px var(--tint, oklch(0.8 0.13 295)); object-fit: cover; }
+.topbar-profile .char-face.is-letter,
+.profile-menu-item .char-face.is-letter { display: grid; place-items: center; color: var(--tint, oklch(0.8 0.13 295)); font-size: 13px; font-weight: 900; }
+.topbar-profile-name { max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.profile-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: min(300px, calc(100vw - 24px)); max-height: 70vh; overflow: auto; padding: 12px; background: rgba(20, 14, 38, 0.96); animation: ym-pop-in 0.25s var(--spring) both; }
+.profile-menu[hidden] { display: none; }
+.profile-menu-title { margin: 0 4px 8px; color: var(--muted); font-size: 12px; font-weight: 800; }
+.profile-menu-list { display: grid; gap: 4px; }
+.profile-menu-item { --tint: oklch(0.8 0.13 295); display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 1px solid transparent; border-radius: 14px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color 0.2s, transform 0.4s var(--spring); }
+.profile-menu-item:hover,
+.profile-menu-item:focus-visible { background: rgba(255, 255, 255, 0.08); outline: none; }
+.profile-menu-item:active { transform: scale(0.96); }
+.profile-menu-item.is-on { border-color: oklch(0.86 0.15 85 / 0.45); background: oklch(0.86 0.15 85 / 0.1); }
+.profile-menu-item .char-face { width: 36px; height: 36px; }
+.profile-menu-copy { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.profile-menu-copy strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.profile-menu-copy span { color: var(--muted); font-size: 12px; }
+.profile-menu-mark { flex: none; padding: 2px 8px; border-radius: var(--radius-pill); background: oklch(0.86 0.15 85 / 0.18); color: oklch(0.9 0.12 85); font-size: 11px; font-weight: 800; }
+.profile-menu-note,
+.profile-menu-empty { margin: 8px 4px 0; color: var(--faint); font-size: 11px; line-height: 1.5; }
+.profile-menu-empty { color: var(--muted); font-size: 13px; }
+.profile-menu-link { display: inline-flex; margin: 8px 4px 0; color: oklch(0.86 0.12 295); font-size: 13px; font-weight: 700; }
+
+/* PC에서 헤더가 좁으면 이메일을 뺀다(로그인 계정은 로그아웃 버튼 옆 프로필로 충분) */
+@media (min-width: 801px) and (max-width: 1279px) {
+  .account-email { display: none; }
+}
+@media (max-width: 800px) {
+  .feature-search { display: none; }
+  .topbar.is-searching .feature-search { position: absolute; top: 10px; right: 16px; left: 16px; z-index: 70; display: block; }
+  .topbar.is-searching .feature-search-field { background: rgb(24, 17, 44); }
+  .feature-search-results { width: 100%; }
+  .feature-search-open { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border: 1px solid var(--glass-line); border-radius: 14px; background: rgba(255, 255, 255, 0.06); cursor: pointer; }
+  .feature-search-field kbd { display: none; }
+  .topbar-profile { padding: 3px; }
+  .topbar-profile-name { display: none; }
+  /* 모바일에서는 프로필 버튼이 왼쪽에 있어 오른쪽 맞춤 메뉴가 화면 밖으로 나간다. 헤더(약 107px) 아래 화면 폭에 맞춘다. */
+  .profile-menu { position: fixed; top: 114px; right: 12px; left: 12px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feature-search.is-open .feature-search-results,
+  .profile-menu { animation: none; }
+  .topbar-profile,
+  .profile-menu-item { transition: none; }
+}
+
+/* ==========================================================================
+   리디자인 4단계: 기존 화면 공통 (사냥 기록 · 레벨업 · 퀘스트 · 몬스터 · 메이커 · 강화)
+   기능·마크업은 그대로 두고 머리글·판·필터 입력칸·카드를 새 디자인으로 맞춘다.
+   ========================================================================== */
+/* 머리글: 작은 머리말은 헤더 경로(분류 › 화면)와 겹치므로 숨기고 제목을 크게 */
+.page-header .studio-kicker,
+.page-header .trade-kicker { display: none; }
+.page-header h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.025em; }
+.page-header { animation: ym-fade-up 0.5s var(--ease-out) both; }
+
+/* 판: 유리 카드 */
+.studio-board {
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-card);
+  background: var(--glass);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  animation: ym-fade-up 0.6s 0.06s var(--ease-out) both;
+}
+.studio-board .editor,
+.editor { border-color: rgba(255, 255, 255, 0.08); border-radius: 20px; background: rgba(0, 0, 0, 0.2); }
+.studio-board .empty,
+.empty { color: var(--muted); }
+
+/* 필터 입력칸: 예전 규칙이 더 구체적이라 밝은 회색으로 남던 것을 어두운 우물로 */
+.filters .field input,
+.filters .field select { border: 1px solid var(--glass-line); border-radius: 14px; background-color: var(--well); color: var(--text); box-shadow: none; }
+.filters .field input:hover { border-color: rgba(255, 255, 255, 0.18); }
+.filters .field input:focus-visible { border-color: oklch(0.78 0.16 40 / 0.7); box-shadow: 0 0 0 4px oklch(0.78 0.16 40 / 0.16); outline: none; }
+.filters .field input::placeholder { color: var(--faint); }
+
+/* 카드 목록: 살짝 떠오르는 등장과 마우스 반응 */
+.studio-board .card-list > * { animation: ym-fade-up 0.5s var(--ease-out) both; }
+.studio-board .card-list > :nth-child(2) { animation-delay: 0.04s; }
+.studio-board .card-list > :nth-child(3) { animation-delay: 0.08s; }
+.studio-board .card-list > :nth-child(4) { animation-delay: 0.12s; }
+.studio-board .card-list > :nth-child(n + 5) { animation-delay: 0.16s; }
+.card { transition: transform 0.45s var(--spring), box-shadow 0.3s, border-color 0.3s; }
+.card:hover { transform: translateY(-3px); border-color: rgba(255, 255, 255, 0.18); }
+.count-pill { border-color: var(--glass-line); background: rgba(255, 255, 255, 0.08); color: var(--text-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-header,
+  .studio-board,
+  .studio-board .card-list > * { animation: none; }
+  .card { transition: none; }
+  .card:hover { transform: none; }
+}
+
+/* 메이커: 보석 시세 보관함이 접혀 있어도 자리를 차지해 제목 위가 크게 비던 것을 없앤다.
+   접히면 자리를 비우고, 펼칠 때 아래에서 떠오르며 나타난다. */
+.maker-price-board [data-price-body] { display: none; border-color: var(--glass-line); border-radius: 18px 18px 0 0; background: rgba(20, 14, 38, 0.92); }
+.maker-price-board.is-open [data-price-body] { display: grid; animation: maker-vault-open 0.32s var(--ease-out) both; }
+@keyframes maker-vault-open { from { opacity: 0; transform: translateY(8px) scale(0.985); } }
+.maker-price-board-head { padding: 10px 14px; border-color: var(--glass-line); border-radius: 16px; background: linear-gradient(90deg, oklch(0.78 0.16 40 / 0.18), rgba(255, 255, 255, 0.04)); transition: transform 0.45s var(--spring), background-color 0.2s; }
+.maker-price-board-head:hover { transform: translateY(-1px); }
+.maker-price-board.is-open .maker-price-board-head { border-radius: 0 0 16px 16px; }
+.maker-price-board-head strong { color: oklch(0.86 0.13 45); font-size: 13px; }
+.maker-price-board-head small { font-size: 12px; }
+@media (max-width: 1100px) {
+  .maker-price-board-head strong { font-size: 13px; }
+  .maker-price-board-head small { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .maker-price-board.is-open [data-price-body] { animation: none; }
+}
+
+/* ==========================================================================
+   리디자인 4단계 화면: 무릉도장 전용 테마 (시안: 붉은 옻칠 패널 + 금테, 한지, 초록 게임 버튼, 등롱)
+   무릉 화면에서만 쓴다. 기존 무릉 규칙(사진 배경·한지 카드) 위에 덮는다.
+   ========================================================================== */
+.dojo-page { --dojo-gold: oklch(0.78 0.12 80); --dojo-gold-strong: oklch(0.82 0.13 85); --dojo-ink: #fff4dc; --dojo-sub: #d9c49c; position: relative; }
+.dojo-page .dojo-hero h1 { font-family: "Gowun Batang", serif; font-size: clamp(30px, 3.4vw, 40px); font-weight: 700; letter-spacing: -0.01em; color: var(--dojo-ink); text-shadow: 0 0 24px oklch(0.8 0.15 70 / 0.35); }
+.dojo-page .dojo-hero .dojo-kicker { color: var(--dojo-gold-strong); }
+
+/* 패널: 붉은 옻칠 그라데이션 + 금테 이중 테두리 */
+.dojo-page .dojo-frame {
+  border: 1px solid oklch(0.78 0.12 80 / 0.6);
+  border-radius: 14px;
+  background: linear-gradient(180deg, oklch(0.3 0.09 25 / 0.94), oklch(0.21 0.06 25 / 0.96));
+  box-shadow: inset 0 0 0 4px oklch(0.24 0.07 25), inset 0 0 0 5px oklch(0.78 0.12 80 / 0.3), 0 24px 48px -16px rgba(0, 0, 0, 0.65);
+  animation: ym-fade-up 0.6s var(--ease-out) both;
+}
+.dojo-page .dojo-frame > .page-toolbar h2,
+.dojo-page .dojo-who h2,
+.dojo-page .dojo-belts-head > span:first-child { font-family: "Gowun Batang", serif; font-size: 22px; font-weight: 700; letter-spacing: 0; color: #f6e7c8; }
+.dojo-page .dojo-frame > .page-toolbar h2::before,
+.dojo-page .dojo-belts-head > span:first-child::before { content: "◆"; margin-right: 10px; color: var(--dojo-gold-strong); font-size: 12px; vertical-align: 3px; }
+.dojo-page .dojo-frame > .page-toolbar,
+.dojo-page .dojo-frame > .dojo-belts-head { border-bottom-color: oklch(0.78 0.12 80 / 0.25); }
+.dojo-page .dojo-belts-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.dojo-page .dojo-belts-hint { color: var(--dojo-sub); font-size: 13px; }
+.dojo-page .dojo-who-kicker { color: var(--dojo-gold-strong); }
+
+/* 초록 게임 버튼(저장) */
+.dojo-page .dojo-game-button {
+  min-height: 48px;
+  padding: 0 32px;
+  border: 2px solid #2f6e14;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, #d4f79a 0%, #9fe05a 45%, #5fb52a 55%, #7fd045 100%);
+  color: #173d05;
+  font-size: 17px;
+  font-weight: 900;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 0 #2f6e14, 0 10px 20px -6px rgba(0, 0, 0, 0.6);
+  transition: transform 0.45s var(--spring), box-shadow 0.15s;
+}
+.dojo-page .dojo-game-button:hover:not(:disabled) { transform: translateY(-2px); }
+.dojo-page .dojo-game-button:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 0 #2f6e14; }
+.dojo-page .dojo-game-button:disabled { filter: grayscale(0.4) brightness(0.85); }
+
+/* 흔들리는 등롱 두 개(배경 장식) */
+.dojo-lanterns { position: absolute; top: -24px; right: 8%; z-index: 0; display: flex; gap: 46px; pointer-events: none; }
+.dojo-lanterns i { position: relative; display: block; width: 36px; height: 42px; margin-top: 30px; border-radius: 50%; background: repeating-linear-gradient(90deg, transparent 0 8px, rgba(80, 10, 0, 0.35) 8px 9px), radial-gradient(circle at 40% 35%, #ffb27a, oklch(0.6 0.22 30) 55%, oklch(0.42 0.17 27)); box-shadow: 0 0 28px 4px oklch(0.65 0.2 40 / 0.5); transform-origin: 50% -30px; animation: dojo-swing 4s 0.8s ease-in-out infinite; }
+.dojo-lanterns i.is-big { width: 44px; height: 52px; margin-top: 16px; transform-origin: 50% -16px; animation-delay: 0s; }
+.dojo-lanterns i::before { content: ""; position: absolute; bottom: 100%; left: 50%; width: 2px; height: 30px; background: oklch(0.8 0.13 85); transform: translateX(-50%); }
+.dojo-lanterns i.is-big::before { height: 16px; }
+.dojo-lanterns i::after { content: ""; position: absolute; top: 100%; left: 50%; width: 6px; height: 16px; border-radius: 0 0 3px 3px; background: oklch(0.82 0.13 85); transform: translateX(-50%); }
+@keyframes dojo-swing { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+.dojo-page > :not(.dojo-lanterns):not(dialog) { position: relative; z-index: 1; }
+
+/* 저장 루트 판(스톱워치 + 루트 순위)도 같은 옻칠 패널 */
+.dojo-page .dojo-board {
+  border: 1px solid oklch(0.78 0.12 80 / 0.6);
+  border-radius: 14px;
+  background: linear-gradient(180deg, oklch(0.3 0.09 25 / 0.94), oklch(0.21 0.06 25 / 0.96));
+  box-shadow: inset 0 0 0 4px oklch(0.24 0.07 25), inset 0 0 0 5px oklch(0.78 0.12 80 / 0.3), 0 24px 48px -16px rgba(0, 0, 0, 0.65);
+}
+
+/* 기와 지붕이 양옆으로 24px 튀어나와 모바일에서 가로 스크롤이 생기던 것: 화면 밖으로 나간 부분만 자른다 */
+.main[data-page="dojo"] { overflow-x: clip; }
+
+@media (max-width: 800px) {
+  .dojo-lanterns { right: 4%; gap: 28px; transform: scale(0.8); transform-origin: top right; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dojo-page .dojo-frame,
+  .dojo-lanterns i { animation: none; }
+  .dojo-page .dojo-game-button { transition: none; }
+}
+
+/* ==========================================================================
+   리디자인 4단계 화면: 거래 장부 (시안: 청록 요약 판 · 매수 파랑 / 매도 주황 카드 · 오른쪽 입력 칸)
+   ========================================================================== */
+.trade-page { --buy: oklch(0.78 0.11 245); --sell: oklch(0.8 0.13 50); }
+.trade-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+.trade-layout > .trade-board { min-width: 0; animation: ym-fade-up 0.6s 0.05s var(--ease-out) both; }
+.trade-side { position: sticky; top: 84px; min-width: 0; }
+.trade-page .trade-side .trade-editor { margin: 0; padding: 22px; border-radius: var(--radius-card); background: var(--glass); animation: ym-fade-up 0.6s 0.1s var(--ease-out) both; }
+.trade-page .trade-side .trade-form-sides { grid-template-columns: minmax(0, 1fr); }
+.trade-page .trade-side .button-row .primary-button { flex: 1; }
+
+/* 위 요약: 청록 톤 판, KPI 4개, 보유중/판매 완료 원가 */
+.trade-page .trade-kpis { display: grid; gap: 12px; margin-bottom: 20px; padding: 20px; border: 1px solid var(--glass-line); border-radius: var(--radius-card); background: linear-gradient(150deg, oklch(0.5 0.1 180 / 0.24), rgba(255, 255, 255, 0.035)); box-shadow: var(--shadow); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); animation: ym-fade-up 0.6s var(--ease-out) both; }
+.trade-page .trade-kpi { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; background: rgba(0, 0, 0, 0.2); }
+.trade-page .trade-kpi.is-focus { border-color: oklch(0.82 0.14 160 / 0.45); background: oklch(0.82 0.14 160 / 0.12); box-shadow: 0 0 22px -8px oklch(0.82 0.14 160 / 0.7); }
+.trade-page .trade-kpi strong { font-size: 23px; font-weight: 900; letter-spacing: -0.02em; }
+.trade-page .trade-booklet { border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 16px; background: rgba(0, 0, 0, 0.2); }
+.trade-page .is-gain { color: oklch(0.88 0.13 160); }
+.trade-page .is-loss { color: oklch(0.8 0.15 25); }
+
+/* 카드: 매수 파랑, 매도 주황 */
+.trade-page .trade-card { border-color: rgba(255, 255, 255, 0.08); border-radius: 18px; background: rgba(255, 255, 255, 0.04); }
+.trade-page .trade-card:hover { background: rgba(255, 255, 255, 0.07); }
+.trade-page .trade-card.is-selected { border-color: oklch(0.82 0.14 160 / 0.6); background: oklch(0.82 0.14 160 / 0.08); }
+.trade-page .trade-lane.is-buy .trade-lane-kicker,
+.trade-page .trade-form-side.is-buy legend { color: var(--buy); }
+.trade-page .trade-lane.is-sell .trade-lane-kicker,
+.trade-page .trade-form-side.is-sell legend { color: var(--sell); }
+.trade-page .trade-lane.is-buy { box-shadow: inset 3px 0 0 oklch(0.78 0.11 245 / 0.55); }
+.trade-page .trade-lane.is-sell { box-shadow: inset 3px 0 0 oklch(0.8 0.13 50 / 0.55); }
+.trade-page .trade-form-side.is-buy { border-color: oklch(0.78 0.11 245 / 0.35); background: oklch(0.78 0.11 245 / 0.07); }
+.trade-page .trade-form-side.is-sell { border-color: oklch(0.8 0.13 50 / 0.35); background: oklch(0.8 0.13 50 / 0.07); }
+.trade-page .trade-profit-sticker { animation: ym-pop-in 0.45s var(--spring) both; }
+
+/* 폰 폭: 카드 한 줄에 매수·매도·결과가 끼어 가격이 잘리던 것을 세로로 쌓는다 */
+@container trade-board (max-width: 560px) {
+  .trade-page .trade-card { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; padding: 10px 12px; }
+  .trade-page .trade-card-id { grid-column: 1; grid-row: 1; }
+  .trade-page .trade-card .row-actions { display: flex; gap: 8px; grid-column: 2; grid-row: 1; }
+  .trade-page .trade-lane.is-buy { grid-column: 1 / -1; grid-row: 2; }
+  .trade-page .trade-lane.is-sell { grid-column: 1 / -1; grid-row: 3; }
+  .trade-page .trade-lane.is-result { grid-column: 1 / -1; grid-row: 4; }
+  .trade-page .trade-dates { grid-column: 1 / -1; grid-row: 5; }
+}
+
+@media (max-width: 1279px) {
+  .trade-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+@media (max-width: 1099px) {
+  /* 카드가 한 줄 5칸이라 좁으면 입력 칸을 목록 아래로 내린다 */
+  .trade-layout { grid-template-columns: minmax(0, 1fr); }
+  .trade-side { position: static; }
+  .trade-page .trade-side .trade-form-sides { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .trade-page .trade-side .trade-form-sides { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trade-layout > .trade-board,
+  .trade-page .trade-side .trade-editor,
+  .trade-page .trade-kpis,
+  .trade-page .trade-profit-sticker { animation: none; }
+}
+
+/* ==========================================================================
+   리디자인 4단계 화면: 로그인 (앱 로고 + 유리 카드 팝 등장)
+   ========================================================================== */
+.auth-card { display: grid; justify-items: stretch; animation: ym-pop-in 0.6s var(--spring) both; }
+.auth-logo { justify-self: center; width: 64px; height: 64px; margin-bottom: 4px; border-radius: 18px; box-shadow: 0 12px 30px -10px oklch(0.78 0.16 40 / 0.7); animation: auth-float 4s ease-in-out infinite; }
+.auth-card h1 { text-align: center; font-size: 26px; font-weight: 800; letter-spacing: -0.025em; }
+.auth-card > p { text-align: center; color: var(--muted); }
+@keyframes auth-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) {
+  .auth-card,
+  .auth-logo { animation: none; }
 }

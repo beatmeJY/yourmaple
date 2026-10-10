@@ -87,7 +87,7 @@ export function render(root) {
   let myLevel = null;
 
   return renderRecords(root, {
-    title: "몬스터",
+    title: "몬스터 도감",
     kicker: "도감",
     shell: true,
     addLabel: "몬스터 추가",

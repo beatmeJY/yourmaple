@@ -127,14 +127,11 @@ const dojoChain = `<svg viewBox="0 0 20 52" width="18" height="48" focusable="fa
 export async function render(root) {
   root.innerHTML = `
     <div class="dojo-page">
+    <div class="dojo-lanterns" aria-hidden="true"><i class="is-big"></i><i></i></div>
     <header class="page-header dojo-hero">
       <p class="dojo-kicker">MU LUNG</p>
       <h1>무릉도장</h1>
     </header>
-    <section class="dojo-frame dojo-belts">
-      <div class="dojo-belts-head"><span>허리띠 시세</span><span class="dojo-belts-hint">공용 시세입니다. 가격을 적으면 아래에 쌓입니다.</span></div>
-      <div data-belts></div>
-    </section>
     <section class="dojo-cast">
       <img class="dojo-roof" src="img/dojo-roof.png" alt="" />
       <section class="dojo-frame">
@@ -186,7 +183,7 @@ export async function render(root) {
               <p class="dojo-best-empty">구간 초를 모두 입력하면 여기에 정리됩니다.</p>
             </div>
             <div class="button-row">
-              <button class="primary-button" type="submit" data-save>이 캐릭터 저장</button>
+              <button class="primary-button dojo-game-button" type="submit" data-save>이 캐릭터 저장</button>
               <button class="secondary-button" type="button" data-clear>입력 지우기</button>
             </div>
           </div>
@@ -198,6 +195,11 @@ export async function render(root) {
         <div data-plan></div>
       </section>
     </form>
+    <div class="dojo-link" aria-hidden="true">${dojoChain}${dojoChain}</div>
+    <section class="dojo-frame dojo-belts">
+      <div class="dojo-belts-head"><span>허리띠 시세</span><span class="dojo-belts-hint">공용 시세입니다. 가격을 적으면 아래에 쌓입니다.</span></div>
+      <div data-belts></div>
+    </section>
     <dialog class="belt-history-dialog" data-belt-history-dialog>
       <div class="belt-history-head">
         <h2 data-belt-history-title>시세 기록</h2>
