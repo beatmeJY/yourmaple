@@ -3,12 +3,14 @@ import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face
 import { translateDbError } from "../db-error.js";
 import { burstAt, paletteHue, sfx } from "../effects.js";
 import { escapeHtml, formatCount } from "../format.js";
+import { expProgress } from "../exp-progress.js";
+import { formatMinutes } from "../hunt-calc.js";
 import { jobLabel, jobRecord } from "../job-label.js";
+import { loadMainCharacter, mainCharacterId, setMainCharacter } from "../profile.js";
 import { categories, routes } from "../routes.js";
 import { getSupabase } from "../supabase-client.js";
 
-// 대표 캐릭터는 DB에 없으므로 이 브라우저에만 기억한다. 없으면 가장 높은 레벨 캐릭터.
-const HERO_KEY = "maple-note-hero";
+// 대표 캐릭터는 js/profile.js 가 profiles.main_character_id 로 저장한다(헤더 프로필과 같다).
 const NOTE_LIMIT = 4;
 
 const art = {
@@ -43,19 +45,24 @@ const sections = [
 
 const bossColumns = "pianus_enabled, pianus_at, papulatus_enabled, papulatus_at, rift_enabled, rift_at";
 
-function readHero() {
-  try {
-    return localStorage.getItem(HERO_KEY) || "";
-  } catch {
-    return "";
-  }
+// sql/029 를 실행하기 전이면 exp·main_hunt_id 칸이 없으므로 빼고 다시 읽는다. 얼굴 칸도 같다.
+function progressMissing(error) {
+  const raw = `${error?.message || ""} ${error?.details || ""}`;
+  return /\bexp\b|main_hunt_id/i.test(raw) && /could not find|schema cache|does not exist/i.test(raw);
 }
 
-function saveHero(id) {
-  try {
-    localStorage.setItem(HERO_KEY, id);
-  } catch {
-    // 저장이 막힌 브라우저에서는 이번 방문 동안만 바꾼다.
+async function loadCharacters(supabase) {
+  let withFace = true;
+  let withProgress = true;
+  for (;;) {
+    const columns = ["id, name, job, level", withFace ? "face_path" : "", withProgress ? "exp, main_hunt_id" : "", bossColumns, "jobs(name, color, color_dark), accounts(name)"]
+      .filter(Boolean)
+      .join(", ");
+    const result = await supabase.from("characters").select(columns);
+    if (!result.error) return result;
+    if (withFace && missingFaceColumn(result.error)) withFace = false;
+    else if (withProgress && progressMissing(result.error)) withProgress = false;
+    else return result;
   }
 }
 
@@ -93,14 +100,16 @@ export async function render(root) {
   const hero = root.querySelector("[data-hero]");
   const readyCount = root.querySelector("[data-ready-count]");
   let rows = [];
+  let progress = { curve: new Map(), hunts: [] };
 
   root.addEventListener("click", (event) => {
     const pick = event.target.closest("[data-hero-pick]");
     if (pick) {
-      saveHero(pick.dataset.heroPick);
       sfx("tick");
-      paintHero(hero, rows, pick.dataset.heroPick);
-      burstAt(hero.querySelector(".ym-hero-face"), ["#ffe28a", "#c9a6ff", "#ffffff"], 18, 0.8);
+      setMainCharacter(pick.dataset.heroPick).then((ok) => {
+        if (!ok || !hero.isConnected) return;
+        burstAt(hero.querySelector(".ym-hero-face"), ["#ffe28a", "#c9a6ff", "#ffffff"], 18, 0.8);
+      });
       return;
     }
     if (event.target.closest(".ym-feature-tile a, .ym-feature-tile button, .ym-home-more")) sfx("tick");
@@ -113,15 +122,17 @@ export async function render(root) {
     .select("id, title, content, category")
     .order("updated_at", { ascending: false })
     .limit(NOTE_LIMIT);
-  let result = await supabase
-    .from("characters")
-    .select(`id, name, job, level, face_path, ${bossColumns}, jobs(name, color, color_dark), accounts(name)`);
-  if (result.error && missingFaceColumn(result.error)) {
-    result = await supabase
-      .from("characters")
-      .select(`id, name, job, level, ${bossColumns}, jobs(name, color, color_dark), accounts(name)`);
-  }
+  const [result, curveResult, huntResult] = await Promise.all([
+    loadCharacters(supabase),
+    supabase.from("level_exp").select("level, exp_to_next"),
+    supabase.from("hunts").select("id, title, character_id, level, exp_per_hour"),
+    loadMainCharacter(),
+  ]);
   if (!glance.isConnected) return;
+  progress = {
+    curve: new Map((curveResult.data ?? []).map((row) => [row.level, row.exp_to_next])),
+    hunts: huntResult.data ?? [],
+  };
   paintNotes(notes, noteResult);
   if (result.error) {
     glance.innerHTML = `<p class="form-message is-error"></p>`;
@@ -133,7 +144,16 @@ export async function render(root) {
   rows = result.data ?? [];
   await attachFaceUrls(supabase, rows);
   if (!glance.isConnected) return;
-  paintHero(hero, rows, readHero());
+  paintHero(hero, rows, mainCharacterId(), progress);
+  // 헤더 프로필에서 대표를 바꿔도 홈이 따라 바뀐다. 화면을 떠나면 리스너를 뗀다.
+  const onMainChange = (event) => {
+    if (!hero.isConnected) {
+      window.removeEventListener("main-character-change", onMainChange);
+      return;
+    }
+    paintHero(hero, rows, event.detail.id, progress);
+  };
+  window.addEventListener("main-character-change", onMainChange);
   let signature = "";
   const timer = window.setInterval(tick, 1000);
 
@@ -174,7 +194,43 @@ function accountName(row) {
   return account?.name || "";
 }
 
-function paintHero(hero, rows, heroId) {
+// 경험치 막대: 입력이 없으면 입력 안내, 레벨 표가 없으면 레벨업 계산 안내.
+function expHtml(main, progress) {
+  const result = expProgress({
+    level: main.level,
+    exp: main.exp,
+    curve: progress.curve,
+    hunts: progress.hunts,
+    characterId: main.id,
+    mainHuntId: main.main_hunt_id,
+  });
+  if (result.state === "no-exp") {
+    return `<a class="ym-hero-exp-hint" href="#/characters">경험치를 입력하면 다음 레벨까지 남은 양과 사냥 시간이 보입니다 ›</a>`;
+  }
+  if (result.state === "no-curve") {
+    return `<a class="ym-hero-exp-hint" href="#/level-plan">레벨업 계산에 ${escapeHtml(formatCount(main.level))}레벨 경험치 표를 넣으면 진행률이 보입니다 ›</a>`;
+  }
+  if (result.state === "over") {
+    return `<a class="ym-hero-exp-hint" href="#/characters">입력한 경험치가 이 레벨의 필요 경험치보다 큽니다. 레벨을 확인해 주세요 ›</a>`;
+  }
+  const hunt = result.hunt
+    ? `<span class="ym-hero-exp-time">사냥 약 <strong>${escapeHtml(formatMinutes(result.minutes))}</strong> · ${escapeHtml(result.hunt.title || "이름 없는 기록")} ${result.mainHunt ? "(대표 사냥터)" : "(가장 좋은 기록)"}</span>`
+    : `<a class="ym-hero-exp-time" href="#/hunts">사냥 기록을 남기면 남은 시간이 보입니다 ›</a>`;
+  return `
+    <div class="ym-hero-exp">
+      <div class="ym-hero-exp-head">
+        <span class="ym-hero-exp-label">EXP</span>
+        <span class="ym-hero-exp-value">${result.percent}% <span>· 다음 레벨까지 ${escapeHtml(formatCount(result.remaining))}</span></span>
+      </div>
+      <div class="ym-hero-exp-track" role="progressbar" aria-label="경험치 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${result.percent}">
+        <div class="ym-hero-exp-fill" style="--w:${Math.max(0.5, result.ratio * 100)}%"><i></i></div>
+      </div>
+      ${hunt}
+    </div>
+  `;
+}
+
+function paintHero(hero, rows, heroId, progress) {
   if (!rows.length) {
     hero.innerHTML = `
       <div class="ym-hero-empty">
@@ -215,6 +271,7 @@ function paintHero(hero, rows, heroId) {
         <span class="ym-hero-meta">${meta}</span>
       </div>
     </div>
+    ${expHtml(main, progress)}
     ${alts ? `<div class="ym-hero-alts" role="group" aria-label="대표 캐릭터 바꾸기">${alts}</div>` : ""}
   `;
 }

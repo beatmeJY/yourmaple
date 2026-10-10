@@ -82,7 +82,20 @@ export function renderShell() {
         <header class="topbar">
           <button class="nav-toggle" type="button" data-open-nav aria-controls="sidebar" aria-expanded="true" aria-label="메뉴 닫기">${NAV_CHEVRON}</button>
           <nav class="topbar-crumb" data-crumb aria-label="현재 위치"></nav>
+          <div class="feature-search" data-feature-search>
+            <label class="feature-search-field">
+              <span class="ym-search-icon" aria-hidden="true"></span>
+              <input type="search" placeholder="기능 찾기" aria-label="기능 찾기" autocomplete="off" role="combobox" aria-controls="feature-results" aria-expanded="false" />
+              <kbd aria-hidden="true">/</kbd>
+            </label>
+            <div class="feature-search-results" id="feature-results" data-feature-results role="listbox" aria-label="기능 목록"></div>
+          </div>
           <div class="topbar-actions">
+            <button class="feature-search-open" type="button" data-feature-search-open aria-label="기능 찾기"><span class="ym-search-icon" aria-hidden="true"></span></button>
+            <div class="topbar-profile-wrap">
+              <button class="topbar-profile" type="button" data-profile-toggle aria-haspopup="menu" aria-expanded="false" aria-label="대표 캐릭터 고르기"></button>
+              <div class="profile-menu ym-glass" data-profile-menu hidden></div>
+            </div>
             <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><i aria-hidden="true"></i><span>효과음 켜짐</span></button>
             <p class="account-email" id="account-email"></p>
             <button class="icon-button" type="button" data-logout>로그아웃</button>

@@ -9,7 +9,9 @@ import {
 } from "../character-face.js";
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, sfx } from "../effects.js";
-import { escapeHtml, formatCount, readCount, sortByName } from "../format.js";
+import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
+import { expProgress } from "../exp-progress.js";
+import { loadMainCharacter, paintProfileButton } from "../profile.js";
 import { filterRows, readLevelFilter } from "../filters.js";
 import { findJob, jobDisplayName, jobLabel, jobRecord, jobStyle } from "../job-label.js";
 import { getSupabase } from "../supabase-client.js";
@@ -20,8 +22,8 @@ const bossSelect =
   "pianus_enabled, pianus_at, papulatus_enabled, papulatus_at, rift_enabled, rift_at";
 const tailColumns = "updated_at, jobs(name, color, color_dark)";
 
-function characterSelect({ bosses: withBosses, questsHidden, face }) {
-  return [baseColumns, withBosses ? bossSelect : "", questsHidden ? "quests_hidden" : "", face ? "face_path" : "", tailColumns]
+function characterSelect({ bosses: withBosses, questsHidden, face, progress }) {
+  return [baseColumns, withBosses ? bossSelect : "", questsHidden ? "quests_hidden" : "", face ? "face_path" : "", progress ? "exp, main_hunt_id" : "", tailColumns]
     .filter(Boolean)
     .join(", ");
 }
@@ -112,7 +114,7 @@ export async function render(root) {
         </div>
       </form>
       <form class="editor char-form" id="character-form" hidden>
-        <h2 data-form-title>캐릭터 추가</h2>
+        <div class="char-form-head"><h2 data-form-title>캐릭터 추가</h2><small class="char-autosave" data-autosave aria-live="polite"></small></div>
         <label class="field"><span>계정</span><select name="account_id" required></select></label>
         <label class="field"><span>캐릭터명</span><input name="name" required /></label>
         <div class="field span-all face-field">
@@ -131,6 +133,8 @@ export async function render(root) {
           <small class="field-note" data-job-note hidden></small>
         </label>
         <label class="field"><span>레벨</span><input name="level" inputmode="numeric" /></label>
+        <label class="field" data-progress-field><span>경험치 <small class="char-exp-hint" data-exp-hint></small></span><input name="exp" inputmode="numeric" placeholder="현재 레벨에서 쌓은 경험치" autocomplete="off" /></label>
+        <label class="field" data-progress-field><span>대표 사냥터</span><select name="main_hunt_id"></select><small class="field-note">홈의 "다음 레벨까지 남은 시간"에 씁니다.</small></label>
         <label class="field"><span>장비/스펙 메모</span><textarea name="gear_memo"></textarea></label>
         <label class="field"><span>기타 메모</span><textarea name="extra_memo"></textarea></label>
         <div class="boss-fields span-all" data-quests-hidden-fields>
@@ -193,6 +197,11 @@ export async function render(root) {
   let bossReady = true;
   let questsHiddenReady = true;
   let faceReady = false;
+  let progressReady = true;
+  let hunts = [];
+  let curve = new Map();
+  let autosaveTimer = 0;
+  const autosaveLabel = root.querySelector("[data-autosave]");
   let faceRemoved = false;
   let faceObjectUrl = "";
   let readyKey = "";
@@ -262,6 +271,7 @@ export async function render(root) {
     title.textContent = character.id ? "캐릭터 수정" : "캐릭터 추가";
     fillAccountOptions(character.account_id || accounts[0].id);
     fillJobOptions(character.job_id || "");
+    fillHuntOptions(character.id || "", character.main_hunt_id || "");
     const linked = Boolean(character.job_id && jobs.some((job) => job.id === character.job_id));
     form.dataset.legacyJob = linked ? "" : character.job || "";
     jobNote.hidden = !form.dataset.legacyJob;
@@ -277,6 +287,7 @@ export async function render(root) {
         key !== "job_id" &&
         key !== "jobs" &&
         key !== "quests_hidden" &&
+        key !== "main_hunt_id" &&
         !key.endsWith("_enabled")
       ) {
         field.value = value ?? "";
@@ -293,10 +304,46 @@ export async function render(root) {
     form.dataset.facePath = character.face_path || "";
     syncFaceField();
     paintFacePreview(character.face_url || "");
+    clearTimeout(autosaveTimer);
+    paintExpHint();
+    autosaveLabel.textContent = character.id ? "레벨·경험치·메모·스위치는 바로 저장됩니다" : "";
+    autosaveLabel.className = "char-autosave";
+    form.querySelector("[data-save]").textContent = character.id ? "이름·직업·얼굴 저장" : "저장";
     markEditing();
     form.elements.name.focus({ preventScroll: true });
     // 좁은 화면에서는 편집 칸이 목록 아래에 있으므로 그쪽으로 내려 준다.
     if (window.matchMedia("(max-width: 979px)").matches) form.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  // 대표 사냥터 후보: 이 캐릭터의 사냥 기록. 비워 두면 가장 좋은 기록을 쓴다.
+  function fillHuntOptions(characterId, selectedId) {
+    const select = form.elements.main_hunt_id;
+    const own = hunts.filter((hunt) => hunt.character_id === characterId);
+    select.innerHTML = [
+      `<option value="">${own.length ? "자동 · 가장 좋은 기록" : "사냥 기록 없음"}</option>`,
+      ...own.map(
+        (hunt) =>
+          `<option value="${escapeHtml(hunt.id)}">${escapeHtml(hunt.title || "이름 없는 기록")} · Lv.${escapeHtml(formatCount(hunt.level))} · 시간당 ${escapeHtml(formatCount(hunt.exp_per_hour))}</option>`,
+      ),
+    ].join("");
+    select.value = own.some((hunt) => hunt.id === selectedId) ? selectedId : "";
+    select.disabled = !own.length;
+  }
+
+  // 경험치 칸 옆에 이번 레벨 진행률을 보여 준다(레벨업 계산의 경험치 표 기준).
+  function paintExpHint() {
+    const hint = form.querySelector("[data-exp-hint]");
+    if (!hint) return;
+    const level = Number(form.elements.level.value);
+    const exp = readBig(form.elements.exp.value, "경험치");
+    if (exp.error || exp.value == null) {
+      hint.textContent = curve.has(level) ? `/ ${formatCount(curve.get(level))}` : "";
+      return;
+    }
+    const result = expProgress({ level, exp: exp.value, curve });
+    hint.textContent =
+      result.state === "ok" ? `${result.percent}% / ${formatCount(result.need)}` : result.state === "over" ? "이 레벨 필요 경험치보다 큽니다" : "";
+    hint.classList.toggle("is-error", result.state === "over");
   }
 
   // 지금 고치는 캐릭터 카드를 강조한다.
@@ -308,6 +355,7 @@ export async function render(root) {
   }
 
   function closeForm() {
+    clearTimeout(autosaveTimer);
     form.hidden = true;
     form.dataset.editingId = "";
     form.dataset.legacyJob = "";
@@ -351,6 +399,13 @@ export async function render(root) {
     return `<span class="char-face is-letter" aria-hidden="true">${escapeHtml([...String(row.name ?? "").trim()][0] || "?")}</span>`;
   }
 
+  function expBar(row) {
+    if (!progressReady) return "";
+    const result = expProgress({ level: row.level, exp: row.exp, curve });
+    if (result.state !== "ok") return "";
+    return `<span class="char-exp" title="경험치 ${escapeHtml(formatCount(result.current))} / ${escapeHtml(formatCount(result.need))}"><span class="char-exp-track"><i style="--w:${Math.max(1, result.ratio * 100)}%"></i></span><span>${result.percent}%</span></span>`;
+  }
+
   function characterCard(row, index) {
     const job = jobRecord(row) || findJob(jobs, row.job);
     const style = [jobStyle(job), `--i:${Math.min(index, 12)}`].filter(Boolean).join(";");
@@ -373,6 +428,7 @@ export async function render(root) {
           <span class="character-copy">
             <span class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong><span class="character-level">Lv.${escapeHtml(formatCount(row.level))}</span></span>
             <span class="character-job">${jobText}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
+            ${expBar(row)}
           </span>
         </button>
         <span class="row-actions">
@@ -629,6 +685,12 @@ export async function render(root) {
     return columnMissing(error, /quests_hidden/);
   }
 
+  // sql/029 실행 전이면 exp·main_hunt_id 칸이 없다. 경고 없이 빼고 읽는다(새 기능이라 안내는 폼에서).
+  function progressColumnMissing(error) {
+    const raw = `${error?.message || ""} ${error?.details || ""}`;
+    return /\bexp\b|main_hunt_id/i.test(raw) && /could not find|schema cache|does not exist/i.test(raw);
+  }
+
   function faceColumnMissing(error) {
     const raw = `${error?.message || ""} ${error?.details || ""}`;
     return /face_path/i.test(raw) && /could not find|schema cache|does not exist/i.test(raw);
@@ -638,36 +700,44 @@ export async function render(root) {
     const current = ++loadId;
     list.innerHTML = `<p class="empty">캐릭터를 불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
-    const [accountResult, jobResult] = await Promise.all([
+    const [accountResult, jobResult, huntResult, curveResult] = await Promise.all([
       supabase.from("accounts").select("id, name").order("name"),
       supabase.from("jobs").select("id, family, rank, name, color, color_dark, sort_order").order("sort_order"),
+      supabase.from("hunts").select("id, title, character_id, level, exp_per_hour, created_at").order("created_at", { ascending: false }),
+      supabase.from("level_exp").select("level, exp_to_next"),
     ]);
     if (current !== loadId || !list.isConnected) return;
     let withBosses = true;
     let withQuestsHidden = true;
     let withFace = true;
+    let withProgress = true;
     let columnWarning = null;
     let characters = await supabase
       .from("characters")
-      .select(characterSelect({ bosses: withBosses, questsHidden: withQuestsHidden, face: withFace }))
+      .select(characterSelect({ bosses: withBosses, questsHidden: withQuestsHidden, face: withFace, progress: withProgress }))
       .order("updated_at", { ascending: false });
     while (
       characters.error &&
-      (bossColumnMissing(characters.error) || questsHiddenMissing(characters.error) || faceColumnMissing(characters.error))
+      (bossColumnMissing(characters.error) ||
+        questsHiddenMissing(characters.error) ||
+        faceColumnMissing(characters.error) ||
+        progressColumnMissing(characters.error))
     ) {
       const nextBosses = withBosses && !bossColumnMissing(characters.error);
       const nextQuests = withQuestsHidden && !questsHiddenMissing(characters.error);
       const nextFace = withFace && !faceColumnMissing(characters.error);
-      if (nextBosses === withBosses && nextQuests === withQuestsHidden && nextFace === withFace) break;
+      const nextProgress = withProgress && !progressColumnMissing(characters.error);
+      if (nextBosses === withBosses && nextQuests === withQuestsHidden && nextFace === withFace && nextProgress === withProgress) break;
       if (bossColumnMissing(characters.error) || questsHiddenMissing(characters.error)) {
         columnWarning = columnWarning || characters.error;
       }
       withBosses = nextBosses;
       withQuestsHidden = nextQuests;
       withFace = nextFace;
+      withProgress = nextProgress;
       characters = await supabase
         .from("characters")
-        .select(characterSelect({ bosses: withBosses, questsHidden: withQuestsHidden, face: withFace }))
+        .select(characterSelect({ bosses: withBosses, questsHidden: withQuestsHidden, face: withFace, progress: withProgress }))
         .order("updated_at", { ascending: false });
       if (current !== loadId || !list.isConnected) return;
     }
@@ -683,6 +753,10 @@ export async function render(root) {
     bossReady = withBosses;
     questsHiddenReady = withQuestsHidden;
     faceReady = withFace;
+    progressReady = withProgress;
+    hunts = huntResult.error ? [] : huntResult.data ?? [];
+    curve = new Map((curveResult.error ? [] : curveResult.data ?? []).map((row) => [row.level, row.exp_to_next]));
+    for (const field of form.querySelectorAll("[data-progress-field]")) field.hidden = !progressReady;
     syncFaceField();
     bossFields.hidden = !bossReady;
     questsHiddenFields.hidden = !questsHiddenReady;
@@ -721,6 +795,8 @@ export async function render(root) {
     }
     const level = readCount(form.elements.level.value, "레벨", 1);
     if (level.error) return level;
+    const exp = progressReady ? readBig(form.elements.exp.value, "경험치") : { value: null };
+    if (exp.error) return exp;
     return {
       value: {
         account_id: accountId,
@@ -735,13 +811,94 @@ export async function render(root) {
           ? Object.fromEntries(bosses.map((boss) => [boss.columnEnabled, form.elements.namedItem(boss.columnEnabled).checked]))
           : {}),
         ...(questsHiddenReady ? { quests_hidden: form.elements.quests_hidden.checked } : {}),
+        ...(progressReady ? { exp: exp.value == null ? null : exp.value.toString(), main_hunt_id: form.elements.main_hunt_id.value || null } : {}),
       },
     };
   }
 
   root.addEventListener("input", (event) => {
     if (event.target.closest("[data-search], [data-level-min], [data-level-max]")) paintList();
+    if (event.target === form.elements.level || event.target === form.elements.exp) paintExpHint();
+    if (event.target === form.elements.gear_memo || event.target === form.elements.extra_memo) {
+      clearTimeout(autosaveTimer);
+      const name = event.target.name;
+      autosaveTimer = setTimeout(() => saveInstant(name), 800);
+    }
   });
+
+  // ── 즉시 저장: 수정 중인 캐릭터의 레벨·경험치·대표 사냥터·메모·스위치(사용자 결정 2026-10-10) ──
+  // 이름·직업·계정·얼굴은 실수로 바뀌면 되돌리기 어려우므로 저장 버튼으로만 바꾼다.
+  const instantFields = new Set(["level", "exp", "main_hunt_id", "gear_memo", "extra_memo", "quests_hidden", ...bosses.map((boss) => boss.columnEnabled)]);
+
+  function instantValue(name) {
+    const field = form.elements.namedItem(name);
+    if (name === "level") {
+      const level = readCount(field.value, "레벨", 1);
+      if (level.error) return level;
+      return level.value == null ? { error: "레벨을 입력해 주세요." } : level;
+    }
+    if (name === "exp") {
+      const exp = readBig(field.value, "경험치");
+      return exp.error ? exp : { value: exp.value == null ? null : exp.value.toString() };
+    }
+    if (name === "main_hunt_id") return { value: field.value || null };
+    if (name === "gear_memo" || name === "extra_memo") return { value: field.value.trim() || null };
+    return { value: field.checked };
+  }
+
+  function showAutosave(text, kind) {
+    autosaveLabel.textContent = text;
+    autosaveLabel.className = `char-autosave${kind ? ` is-${kind}` : ""}`;
+  }
+
+  async function saveInstant(name) {
+    const id = form.dataset.editingId;
+    if (!id || form.hidden || !instantFields.has(name)) return;
+    if ((name === "exp" || name === "main_hunt_id") && !progressReady) return;
+    const row = rows.find((item) => item.id === id);
+    if (!row) return;
+    const parsed = instantValue(name);
+    if (parsed.error) {
+      showAutosave(parsed.error, "error");
+      return;
+    }
+    if (String(row[name] ?? "") === String(parsed.value ?? "")) return;
+    showAutosave("저장 중…", "saving");
+    const supabase = await getSupabase();
+    const { error } = await supabase.from("characters").update({ [name]: parsed.value }).eq("id", id);
+    if (!list.isConnected) return;
+    if (error) {
+      sfx("fail");
+      showAutosave(translateDbError(error), "error");
+      return;
+    }
+    row[name] = parsed.value;
+    if (typeof parsed.value === "boolean") sfx(parsed.value ? "check" : "uncheck");
+    else sfx("tick");
+    showAutosave("저장됨 ✓", "saved");
+    if (form.dataset.editingId === id) paintList();
+    if (name === "level") refreshProfile();
+  }
+
+  form.addEventListener("change", (event) => {
+    const name = event.target.name;
+    if (!name || !instantFields.has(name)) return;
+    if (name === "gear_memo" || name === "extra_memo") clearTimeout(autosaveTimer);
+    saveInstant(name);
+  });
+
+  // 수정 중 숫자 칸에서 Enter는 폼 전체 저장(폼 닫힘) 대신 그 칸만 저장한다.
+  form.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !form.dataset.editingId) return;
+    if (event.target !== form.elements.level && event.target !== form.elements.exp) return;
+    event.preventDefault();
+    event.target.blur();
+  });
+
+  // 헤더 프로필(대표 캐릭터 목록)도 이름·레벨·얼굴 변경을 따라가게 한다.
+  function refreshProfile() {
+    loadMainCharacter(true).then(paintProfileButton);
+  }
 
   root.addEventListener("change", (event) => {
     if (event.target.closest("[data-boss-ready-only], [data-boss-soon-also]")) {
@@ -881,6 +1038,7 @@ export async function render(root) {
     if (form.dataset.editingId === row.id) closeForm();
     showStatus("캐릭터를 삭제했습니다.", "info");
     await loadCharacters();
+    refreshProfile();
   });
 
   accountForm.addEventListener("submit", async (event) => {
@@ -1192,6 +1350,7 @@ export async function render(root) {
       closeForm();
       showStatus(creating ? "캐릭터를 저장했습니다." : "캐릭터를 수정했습니다.", "info");
       await loadCharacters();
+      refreshProfile();
     } catch (error) {
       showStatus(translateFaceError(error), "error");
     } finally {

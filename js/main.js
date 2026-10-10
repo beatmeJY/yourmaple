@@ -3,6 +3,8 @@ import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js"
 import { renderLogin, renderSetup } from "./pages/login.js";
 import { renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
 import { isSoundOn, setSoundOn, sfx } from "./effects.js";
+import { mountFeatureSearch } from "./feature-search.js";
+import { mountProfile } from "./profile.js";
 import { clearToasts, notify } from "./toast.js";
 import { applyDarkTheme, applyNavPreference, isDesktopNav, mountAmbient, renderShell, setNavCollapsed, setNavOpen } from "./ui.js";
 
@@ -45,6 +47,8 @@ function showApp(session) {
     clearToasts();
     renderShell();
     syncSoundToggle();
+    mountFeatureSearch();
+    mountProfile();
     mode = "app";
   }
   const email = document.querySelector("#account-email");
