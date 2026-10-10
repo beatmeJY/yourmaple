@@ -25,10 +25,20 @@ export function navigate(id) {
   location.hash = `#/${id}`;
 }
 
+// 화면마다 빈 새 영역에 그린다. 화면 모듈이 root 에 단 클릭·입력 처리가 같은 #main 에 쌓이면
+// 화면을 다시 열 때 처리가 여러 번 실행된다(예: 메이커 보관함이 열렸다 바로 닫힘). 복제본으로 바꾸면 예전 처리는 함께 버려지고,
+// 늦게 도착한 응답은 각 화면의 isConnected 검사로 버려진다. 바뀐 요소는 document.querySelector("#main")로 찾는다.
 export async function renderRoute(root) {
   const id = getRouteId();
   const page = await pages[id]();
-  await page.render(root);
+  // 불러오는 사이 주소가 바뀌었으면 그리지 않는다(늦게 온 앞 화면이 새 화면을 덮지 않게). 새 주소는 hashchange 가 그린다.
+  if (getRouteId() !== id) return null;
+  // 화면 모듈을 불러오는 사이 다른 이동이 #main 을 이미 바꿨을 수 있으므로 지금 문서에 있는 것을 다시 찾는다.
+  const current = document.querySelector("#main") ?? root;
+  const fresh = current.cloneNode(false);
+  fresh.dataset.page = id;
+  current.replaceWith(fresh);
+  await page.render(fresh);
   return id;
 }
 

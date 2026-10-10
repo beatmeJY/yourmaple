@@ -22,8 +22,9 @@ async function showPage() {
   const main = document.querySelector("#main");
   const nav = document.querySelector("#nav");
   if (!main || !nav) return;
+  // renderRoute 가 #main 을 새 요소로 바꾸므로(이전 화면의 처리기 정리) 화면 이름은 그 안에서 적는다.
   const activeId = await renderRoute(main);
-  main.dataset.page = activeId;
+  if (!activeId) return;
   renderNav(nav, activeId);
   renderCrumb(document.querySelector("[data-crumb]"), activeId);
   setNavOpen(false);
