@@ -193,3 +193,37 @@ export function applyExpCoupons(remaining, expPerHour, counts) {
   );
   return { minutes, saved: normal - minutes, capped: false, cover: "" };
 }
+
+// 큰 숫자를 짧게: 1억 2,000만 · 520만 · 3.4만 · 9,800. 조 단위도 같은 방식(시안 short()).
+export function shortCount(value) {
+  const amount = asBig(value);
+  const negative = amount < 0n;
+  const abs = negative ? -amount : amount;
+  const sign = negative ? "-" : "";
+  const jo = 1000000000000n;
+  const eok = 100000000n;
+  const man = 10000n;
+  if (abs >= jo) {
+    const rest = (abs % jo) / eok;
+    return `${sign}${(abs / jo).toLocaleString("ko-KR")}조${rest ? ` ${rest.toLocaleString("ko-KR")}억` : ""}`;
+  }
+  if (abs >= eok) {
+    const rest = roundDiv(abs % eok, man);
+    if (rest >= 10000n) return `${sign}${(abs / eok + 1n).toLocaleString("ko-KR")}억`;
+    return `${sign}${(abs / eok).toLocaleString("ko-KR")}억${rest ? ` ${rest.toLocaleString("ko-KR")}만` : ""}`;
+  }
+  if (abs >= man) {
+    // 100만 이상은 정수 만, 그 아래는 소수 한 자리(반올림)
+    if (abs >= 1000000n) return `${sign}${roundDiv(abs, man).toLocaleString("ko-KR")}만`;
+    const tenth = roundDiv(abs, 1000n);
+    const whole = tenth / 10n;
+    const rest = tenth % 10n;
+    return `${sign}${whole.toString()}${rest ? `.${rest}` : ""}만`;
+  }
+  return `${sign}${abs.toLocaleString("ko-KR")}`;
+}
+
+// 타이머로 잰 획득량을 1시간 기준으로 바꾼다(반올림). seconds 는 1 이상.
+export function perHour(amount, seconds) {
+  return mulDivRound(amount, 3600n, BigInt(Math.max(1, Math.round(Number(seconds)))));
+}

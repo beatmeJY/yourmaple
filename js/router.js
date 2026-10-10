@@ -3,6 +3,7 @@ import { categories, categoryOf, homeRoute, routes } from "./routes.js";
 const pages = {
   dashboard: () => import("./pages/dashboard.js"),
   characters: () => import("./pages/characters.js"),
+  homework: () => import("./pages/homework.js"),
   hunts: () => import("./pages/hunts.js"),
   "level-plan": () => import("./pages/level-plan.js"),
   dojo: () => import("./pages/dojo.js"),

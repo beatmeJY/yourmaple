@@ -61,7 +61,10 @@ export async function renderRecords(root, options) {
       ? `<div class="filter-shell"><div class="filters${filterClass}">${filtersInner}</div></div>`
       : `<div class="filters${filterClass}">${filtersInner}</div>`;
   const listHtml = `${formHtml}${filtersHtml}${options.extraHtml || ""}<div data-list></div>`;
-  root.innerHTML = options.shell
+  // layout: 화면이 배치를 직접 정할 때(시안 배치). 조각을 받아 data-list 를 포함한 전체 HTML을 돌려준다.
+  root.innerHTML = options.layout
+    ? options.layout({ formHtml, filtersHtml, extraHtml: options.extraHtml || "" })
+    : options.shell
     ? `
     <div class="studio-page">
       <header class="page-header">
@@ -134,6 +137,7 @@ export async function renderRecords(root, options) {
         : null;
     if (!rows.length) {
       list.innerHTML = `<p class="empty">${options.emptyText}</p>`;
+      options.afterPaint?.([]);
       return;
     }
     const filtered = filterRows(rows, {
@@ -152,6 +156,14 @@ export async function renderRecords(root, options) {
     if (options.match) filtered.rows = filtered.rows.filter((row) => options.match(row, root));
     if (!filtered.rows.length) {
       list.innerHTML = `<p class="empty">${options.emptyFilterText || "검색 결과가 없습니다. 검색어나 레벨 범위를 바꿔 보세요."}</p>`;
+      options.afterPaint?.([]);
+      return;
+    }
+    if (options.sortRows) filtered.rows = options.sortRows(filtered.rows, root);
+    if (options.renderList) {
+      // renderList: 카드 목록 대신 화면이 목록 전체를 그린다. afterPaint 로 상세 칸 같은 곁 요소를 맞춘다.
+      list.innerHTML = options.renderList(filtered.rows, rows);
+      options.afterPaint?.(filtered.rows);
       return;
     }
     if (options.sheet) {
@@ -316,6 +328,6 @@ export async function renderRecords(root, options) {
     await loadRows();
   });
 
-  if (options.bind) options.bind({ root, reload: loadRows, showStatus });
+  if (options.bind) options.bind({ root, reload: loadRows, showStatus, repaint: paintList, rows: () => rows, fillForm });
   await loadRows();
 }

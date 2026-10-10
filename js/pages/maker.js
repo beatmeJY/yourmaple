@@ -1,4 +1,6 @@
 import { translateDbError } from "../db-error.js";
+import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
+import { rollRefine } from "../sim.js";
 import { escapeHtml, formatCount, readBig } from "../format.js";
 import {
   ENCHANT_BASE_FEE,
@@ -37,6 +39,10 @@ const TIERS = [
   { id: "mid", label: "중급" },
   { id: "high", label: "상급" },
 ];
+
+function GEMS_FIRST() {
+  return MAKER_ITEMS.find((item) => item.category === "gem")?.id ?? MAKER_ITEMS[0].id;
+}
 
 function tierLabel(tierId) {
   return TIERS.find((tier) => tier.id === tierId)?.label ?? tierId;
@@ -608,13 +614,7 @@ export async function render(root) {
         ${TABS.map((tab, index) => `<button type="button" class="maker-tab-button ${index === 0 ? "is-on" : ""}" data-tab="${tab.id}" role="tab" aria-selected="${index === 0}" aria-controls="maker-panel-${tab.id}"><span class="maker-tab-icon" aria-hidden="true">${tab.icon}</span><span class="maker-tab-copy"><strong>${escapeHtml(tab.label)}</strong><small>${escapeHtml(tab.description)}</small></span><i aria-hidden="true"></i></button>`).join("")}
       </div>
       <section id="maker-panel-gem" class="trade-board maker-tab-panel" data-tab-panel="gem" role="tabpanel">
-        <div class="maker-gem-tables">
-          <div>
-            <p class="maker-section-title">등급별 예상 가격</p>
-            <p class="hint">큰 숫자는 부산물 가치까지 반영한 적정가, 작은 숫자는 기록한 실거래가입니다. 각 등급을 누르면 연립 계산과 확률을 확인할 수 있습니다.</p>
-            <div class="maker-craft-grid" data-craft-body></div>
-          </div>
-        </div>
+        <div class="mk-gem" data-craft-body></div>
       </section>
       <section id="maker-panel-craft" class="trade-board maker-tab-panel" data-tab-panel="craft" role="tabpanel" hidden>
         ${reverseCalculatorHtml()}
@@ -649,7 +649,12 @@ export async function render(root) {
   let priceRows = [];
   let loadId = 0;
   const openExplain = new Set();
-  const openCraftCards = new Set();
+  // 시안 배치: 왼쪽에서 고른 재료 하나의 체인을 오른쪽에 크게 보여 준다.
+  let pickedItemId = GEMS_FIRST();
+  let explainStage = "";
+  // 제련 시뮬레이터(시안): 고른 재료가 바뀌면 처음부터.
+  let refineSim = { itemId: pickedItemId, tries: 0, low: 0, mid: 0, high: 0, last: "" };
+  let refineTimer = 0;
   const reverseHighSelections = [null, null, null];
   let reverseActiveSlot = null;
   const enchantSelections = [
@@ -808,103 +813,251 @@ export async function render(root) {
     root.querySelector("[data-price-board-summary]").textContent = `${registered}/${MAKER_ITEMS.length * TIERS.length} 입력 · 모든 계산에 공용`;
   }
 
-  function craftTierRow(item, stageId, label, prices, estimate, extra) {
-    const key = `${item.id}:${stageId}`;
-    const open = openExplain.has(key);
-    const market = latestPrice(item.id, stageId);
-    const meaningless = stageId === "low" && prices?.lowMeaningless;
-    return `
-      <div class="maker-tier-block${open ? " is-open" : ""}${meaningless ? " is-meaningless" : ""}" data-explain="${key}">
-        <button type="button" class="maker-craft-tier" data-explain-toggle="${key}" aria-expanded="${open}">
-          ${stageIcon(item.id, stageId, label)}
-          <span class="maker-tier-label">${escapeHtml(label)}</span>
-          <span class="maker-tier-values">
-            <b>${meaningless ? "가격·재고 의미 없음" : meso(estimate)}</b>
-            ${market ? `<small>실거래 ${meso(market.price)}</small>` : ""}
-          </span>
-          <i class="maker-tier-chevron" aria-hidden="true"></i>
-        </button>
-        <div class="maker-explain">
-          <div class="maker-explain-inner">${explainHtml(item, stageId, prices, extra)}</div>
-        </div>
-      </div>
-    `;
+  function craftExtra(item) {
+    const ore = latestPrice(item.id, "ore");
+    const high = latestPrice(item.id, "high");
+    const prices = ore ? tierPrices(item.category, BigInt(ore.price), item.id) : null;
+    const buyCost = high ? BigInt(high.price) : null;
+    const midMarket = latestPrice(item.id, "mid");
+    const midMarketPrice = midMarket ? BigInt(midMarket.price) : null;
+    const lowMarket = latestPrice(item.id, "low");
+    const lowMarketPrice = lowMarket ? BigInt(lowMarket.price) : null;
+    const marketPrices = { ore: ore ? BigInt(ore.price) : null, low: lowMarketPrice, mid: midMarketPrice, high: buyCost };
+    const marketProfits = marketCraftProfits(item.category, marketPrices, item.id);
+    const routes = highRoutes(prices?.high ?? null, midMarketPrice, buyCost);
+    const others = routes.routes.filter((route) => route.id !== "mid" && route.cost != null);
+    const basis = others.length ? others.reduce((a, b) => (b.cost < a.cost ? b : a)) : null;
+    const breakEven = { value: midBreakEven(basis?.cost ?? null), basis };
+    const midOptions = [
+      { id: "ore", label: "원석부터 제련", cost: prices?.mid ?? null },
+      { id: "buy", label: "중급 바로 구매", cost: midMarketPrice },
+    ].filter((route) => route.cost != null);
+    const lowBasis = midOptions.length ? midOptions.reduce((a, b) => (b.cost < a.cost ? b : a)) : null;
+    const lowBuyBreakEven = { value: lowBreakEven(lowBasis?.cost ?? null), basis: lowBasis };
+    return { ore, prices, marketProfits, extra: { routes, breakEven, midMarket: midMarketPrice, lowBuyBreakEven, lowMarket: lowMarketPrice } };
   }
 
-  function toggleExplain(key) {
-    const block = craftBody.querySelector(`[data-explain="${key}"]`);
-    if (!block) return;
-    const card = block.closest(".maker-craft-card");
-    const willOpen = !block.classList.contains("is-open");
-    for (const other of card.querySelectorAll(".maker-tier-block.is-open")) {
-      if (other === block) continue;
-      other.classList.remove("is-open");
-      other.querySelector("[data-explain-toggle]").setAttribute("aria-expanded", "false");
-      openExplain.delete(other.dataset.explain);
+  // 시세와 적정가 차이(%)를 0.1% 단위로. 시세가 낮으면 사기 좋고, 높으면 만들어 팔기 좋다.
+  function verdict(market, fair) {
+    if (market == null || fair == null || fair <= 0n) return null;
+    const diff = market - fair;
+    const tenth = Number((diff * 1000n) / fair) / 10;
+    if (diff === 0n) return { text: "적정가", tone: "is-even" };
+    return diff < 0n
+      ? { text: `−${Math.abs(tenth).toFixed(1)}% · 사기 좋음`, tone: "is-buy", title: "시세가 적정가보다 낮아요. 사는 쪽이 이득이에요." }
+      : { text: `+${tenth.toFixed(1)}% · 팔기 좋음`, tone: "is-sell", title: "시세가 적정가보다 높아요. 만들어 파는 쪽이 이득이에요." };
+  }
+
+  // 결과 1개의 값: 실거래가가 있으면 그것, 없으면 적정가(하급 가치 없음이면 0).
+  function stageValue(item, stageId, prices) {
+    const market = latestPrice(item.id, stageId);
+    if (market) return BigInt(market.price);
+    return prices?.[stageId] ?? null;
+  }
+
+  function refineSimHtml(item, prices) {
+    const sim = refineSim;
+    const attempt = prices?.refineAttempt ?? null;
+    const last = sim.last;
+    const lastLabel = last ? `${tierLabel(last)}${last === "high" ? "!" : ""}` : "준비";
+    const tally = ["low", "mid", "high"]
+      .map((stageId) => `<div class="mk-tally is-${stageId}">${stageIcon(item.id, stageId, tierLabel(stageId))}<span><small>${tierLabel(stageId)}</small><strong>${formatCount(sim[stageId])}</strong></span></div>`)
+      .join("");
+    let profit = "";
+    if (sim.tries) {
+      if (attempt == null) profit = `<span class="mk-sim-profit">원석 시세를 적으면 손익을 계산해요</span>`;
+      else {
+        const values = ["low", "mid", "high"].map((stageId) => stageValue(item, stageId, prices));
+        const earned = ["low", "mid", "high"].reduce((sum, stageId, index) => sum + BigInt(sim[stageId]) * (values[index] ?? 0n), 0n);
+        const spent = attempt * BigInt(sim.tries);
+        const diff = earned - spent;
+        profit = `<span class="mk-sim-profit ${diff >= 0n ? "is-gain" : "is-loss"}" title="결과 가치 ${formatCount(earned)} − 제련비 ${formatCount(spent)} (실거래가가 없으면 적정가)">${diff >= 0n ? "+" : ""}${formatCount(diff)}메소</span>`;
+      }
     }
-    block.classList.toggle("is-open", willOpen);
-    block.querySelector("[data-explain-toggle]").setAttribute("aria-expanded", String(willOpen));
-    if (willOpen) openExplain.add(key);
-    else openExplain.delete(key);
+    return `
+      <div class="mk-sim-head"><h2>제련 시뮬레이터</h2><button type="button" class="mk-ghost" data-refine-reset>초기화</button></div>
+      <div class="mk-sim-row">
+        <div class="mk-ped is-${last || "none"}">
+          <i class="mk-ped-glow" aria-hidden="true"></i><i class="mk-ped-ring" aria-hidden="true"></i>
+          <span class="mk-ped-item" data-refine-item>${stageIcon(item.id, last || "normal", last ? tierLabel(last) : item.name)}</span>
+        </div>
+        <div class="mk-sim-copy">
+          <span>${sim.tries ? "마지막 결과" : `일반 ${escapeHtml(item.name)} 1개로 제련해 보세요`}</span>
+          <strong class="is-${last || "none"}">${lastLabel}</strong>
+          <small>1회 ${attempt != null ? `${escapeHtml(compactMeso(attempt))}메소` : "비용은 원석 시세 입력 후"} · 일반 1개 소모</small>
+        </div>
+      </div>
+      <div class="mk-sim-actions">
+        <button type="button" class="mk-refine-1" data-refine="1"${refineTimer ? " disabled" : ""}>1회 제련</button>
+        <button type="button" class="mk-refine-10" data-refine="10"${refineTimer ? " disabled" : ""}>10회 연속</button>
+      </div>
+      <div class="mk-tallies">${tally}</div>
+      <div class="mk-sim-foot"><span>${sim.tries ? `${formatCount(sim.tries)}회 제련` : "아직 제련하지 않았어요"}</span>${profit}</div>`;
+  }
+
+  function paintRefineSim(fresh = false) {
+    const box = craftBody.querySelector("[data-refine-sim]");
+    const item = makerItemById(pickedItemId) ?? MAKER_ITEMS[0];
+    if (!box) return;
+    const ore = latestPrice(item.id, "ore");
+    const prices = ore ? tierPrices(item.category, BigInt(ore.price), item.id) : null;
+    box.innerHTML = refineSimHtml(item, prices);
+    if (fresh) box.querySelector(".mk-ped")?.classList.add("is-fresh");
+  }
+
+  function refineOnce() {
+    const item = makerItemById(pickedItemId) ?? MAKER_ITEMS[0];
+    const stage = rollRefine(normalRefineOdds(item.category));
+    refineSim = { ...refineSim, tries: refineSim.tries + 1, [stage]: refineSim[stage] + 1, last: stage };
+    paintRefineSim(true);
+    const target = craftBody.querySelector(".mk-ped");
+    if (stage === "high") {
+      sfx("fanfare");
+      burstAt(target, ["#ffe28a", "#fff4c2", "#ffffff"], 40, 1.3);
+      celebrate("상급 획득!", `상급 ${item.name}`);
+    } else if (stage === "mid") {
+      sfx("mid");
+      burstAt(target, BURST_COLORS.mid, 20, 0.9);
+    } else {
+      sfx("low");
+    }
+    return stage;
+  }
+
+  function refine(count) {
+    if (refineTimer) return;
+    if (count === 1) {
+      refineOnce();
+      return;
+    }
+    let left = count;
+    refineTimer = setInterval(() => {
+      if (!craftBody.isConnected) {
+        clearInterval(refineTimer);
+        refineTimer = 0;
+        return;
+      }
+      left -= 1;
+      const stage = refineOnce();
+      // 상급이 나오면 연출을 볼 수 있게 멈춘다.
+      if (left <= 0 || stage === "high") {
+        clearInterval(refineTimer);
+        refineTimer = 0;
+        paintRefineSim();
+      }
+    }, 160);
+    paintRefineSim();
   }
 
   function paintCraft() {
-    craftBody.innerHTML = MAKER_ITEMS.map((item) => {
-      const ore = latestPrice(item.id, "ore");
-      const high = latestPrice(item.id, "high");
-      const prices = ore ? tierPrices(item.category, BigInt(ore.price), item.id) : null;
-      const buyCost = high ? BigInt(high.price) : null;
-      const midMarket = latestPrice(item.id, "mid");
-      const midMarketPrice = midMarket ? BigInt(midMarket.price) : null;
-      const lowMarket = latestPrice(item.id, "low");
-      const lowMarketPrice = lowMarket ? BigInt(lowMarket.price) : null;
-      const marketPrices = {
-        ore: ore ? BigInt(ore.price) : null,
-        low: lowMarketPrice,
-        mid: midMarketPrice,
-        high: buyCost,
-      };
-      const marketProfits = marketCraftProfits(item.category, marketPrices, item.id);
-      const routes = highRoutes(prices?.high ?? null, midMarketPrice, buyCost);
-      const others = routes.routes.filter((route) => route.id !== "mid" && route.cost != null);
-      const basis = others.length ? others.reduce((a, b) => (b.cost < a.cost ? b : a)) : null;
-      const breakEven = { value: midBreakEven(basis?.cost ?? null), basis };
-      const midOptions = [
-        { id: "ore", label: "원석부터 제련", cost: prices?.mid ?? null },
-        { id: "buy", label: "중급 바로 구매", cost: midMarketPrice },
-      ].filter((route) => route.cost != null);
-      const lowBasis = midOptions.length ? midOptions.reduce((a, b) => (b.cost < a.cost ? b : a)) : null;
-      const lowBuyBreakEven = { value: lowBreakEven(lowBasis?.cost ?? null), basis: lowBasis };
-      const extra = { routes, breakEven, midMarket: midMarketPrice, lowBuyBreakEven, lowMarket: lowMarketPrice };
-      return `
-        <article class="maker-craft-card">
-          <button type="button" class="maker-craft-head" data-craft-toggle="${item.id}" aria-expanded="${openCraftCards.has(item.id)}" aria-controls="maker-craft-detail-${item.id}">${stageIcon(item.id, "normal", item.name)}<strong>${escapeHtml(item.name)}</strong><span class="maker-craft-head-hint">${openCraftCards.has(item.id) ? "접기" : "펼치기"}</span><i class="maker-tier-chevron" aria-hidden="true"></i></button>
-          <div class="maker-craft-detail" id="maker-craft-detail-${item.id}"${openCraftCards.has(item.id) ? "" : " hidden"}>
-          <div class="maker-craft-tiers">
-            ${craftTierRow(item, "low", "하급", prices, prices?.low, extra)}
-            ${craftTierRow(item, "mid", "중급", prices, prices?.mid, extra)}
-            ${craftTierRow(item, "high", "상급", prices, prices?.high, extra)}
-          </div>
-          <div class="maker-craft-compare">
-            <p class="maker-compare-title">상급을 가장 싸게 얻는 방법</p>
-            ${routes.routes
-              .map(
-                (route) => `
-                  <div class="maker-compare-row${routes.best?.id === route.id ? " is-best" : ""}">
-                    <span>${escapeHtml(route.label)}${routes.best?.id === route.id ? `<em>최저</em>` : ""}</span>
-                    <b>${meso(route.cost)}</b>
-                  </div>
-                `,
-              )
-              .join("")}
-            ${breakEven.value != null ? `<div class="maker-compare-row maker-compare-hint"><span>중급이 이 가격 이하면 사서 가공 이득</span><b>${meso(breakEven.value)}</b></div>` : ""}
-            ${lowBuyBreakEven.value != null ? `<div class="maker-compare-row maker-compare-hint${lowBuyBreakEven.value === 0n ? " is-muted" : ""}"><span>${lowBuyBreakEven.value === 0n ? "하급 구매·재고 의미 없음" : "하급이 이 가격 이하면 중급 제련 이득"}</span><b>${lowBuyBreakEven.value === 0n ? "가치 없음" : meso(lowBuyBreakEven.value)}</b></div>` : ""}
-          </div>
-          ${marketProfitBlock(item, marketProfits)}
-          </div>
-        </article>
-      `;
+    const item = makerItemById(pickedItemId) ?? MAKER_ITEMS[0];
+    if (refineSim.itemId !== item.id) {
+      clearInterval(refineTimer);
+      refineTimer = 0;
+      refineSim = { itemId: item.id, tries: 0, low: 0, mid: 0, high: 0, last: "" };
+    }
+    const { ore, prices, marketProfits, extra } = craftExtra(item);
+    const { routes, breakEven, lowBuyBreakEven } = extra;
+    const picker = (category, title) => `
+      <span class="mk-pick-label">${title}</span>
+      <div class="mk-pick-grid">${MAKER_ITEMS.filter((entry) => entry.category === category)
+        .map((entry) => {
+          const on = entry.id === item.id;
+          const hasOre = Boolean(latestPrice(entry.id, "ore"));
+          return `<button type="button" class="mk-pick${on ? " is-on" : ""}" data-pick-item="${entry.id}" aria-pressed="${on}">${stageIcon(entry.id, "normal", entry.name)}<span>${escapeHtml(entry.name)}</span>${hasOre ? "" : `<small>시세 없음</small>`}</button>`;
+        })
+        .join("")}</div>`;
+    const nodes = STAGES.map((stage, index) => {
+      const market = latestPrice(item.id, stage.id);
+      const fair = stage.id === "ore" ? null : stage.id === "normal" ? prices?.normal ?? null : prices?.[stage.id] ?? null;
+      const meaningless = stage.id === "low" && prices?.lowMeaningless;
+      const value = stage.id === "ore" ? (market ? meso(market.price) : "입력 필요") : meaningless ? "가치 없음" : fair != null ? meso(fair) : "-";
+      const note = stage.id === "ore"
+        ? "개당 시세"
+        : stage.id === "normal"
+          ? "원석 10개 + 제작비"
+          : market
+            ? `실거래 ${escapeHtml(compactMeso(market.price))}`
+            : "실거래 기록 없음";
+      const clickable = ["low", "mid", "high"].includes(stage.id) && prices;
+      const tag = clickable ? "button" : "div";
+      const next = index < STAGES.length - 1
+        ? `<span class="mk-link" aria-hidden="true"><small>${STAGES[index + 1].id === "normal" ? "10개 조합" : STAGES[index + 1].id === "low" ? "제련" : STAGES[index + 1].id === "mid" ? `10개 · ${LOW_TO_MID_SUCCESS}%` : `10개 · ${MID_TO_HIGH_SUCCESS}%`}</small><i></i></span>`
+        : "";
+      return `<div class="mk-node-wrap">
+        <${tag} class="mk-node is-${stage.id}${explainStage === stage.id ? " is-open" : ""}"${clickable ? ` type="button" data-explain-stage="${stage.id}" aria-expanded="${explainStage === stage.id}"` : ""} style="--i:${index}">
+          <span class="mk-node-art">${stageIcon(item.id, stage.id, `${stage.label} ${item.name}`)}</span>
+          <span class="mk-node-label">${escapeHtml(stage.label)}</span>
+          <strong>${value}</strong>
+          <small>${note}</small>
+        </${tag}>
+        ${next}
+      </div>`;
     }).join("");
+    const explain = explainStage && prices
+      ? `<div class="mk-explain"><div class="mk-explain-head"><strong>${escapeHtml(tierLabel(explainStage))} 적정가 계산</strong><button type="button" class="mk-ghost" data-explain-stage="${explainStage}">접기</button></div>${explainHtml(item, explainStage, prices, extra)}</div>`
+      : "";
+    const odds = normalRefineOdds(item.category);
+    const oddsColors = { low: "oklch(0.82 0.11 210)", mid: "oklch(0.8 0.15 295)", high: "oklch(0.88 0.15 85)" };
+    const compare = ["low", "mid", "high"]
+      .map((stageId) => {
+        const market = latestPrice(item.id, stageId);
+        const fair = prices?.[stageId] ?? null;
+        const result = verdict(market ? BigInt(market.price) : null, fair);
+        return `<div class="mk-cmp">
+          ${stageIcon(item.id, stageId, tierLabel(stageId))}
+          <span class="mk-cmp-copy"><strong>${escapeHtml(tierLabel(stageId))} 시세 ${market ? escapeHtml(compactMeso(market.price)) : "없음"}</strong><small>적정가 ${fair != null ? escapeHtml(compactMeso(fair)) : "-"}</small></span>
+          ${result ? `<span class="mk-verdict ${result.tone}"${result.title ? ` title="${escapeHtml(result.title)}"` : ""}>${escapeHtml(result.text)}</span>` : `<button type="button" class="mk-verdict is-empty" data-price-cell="${item.id}:${stageId}">시세 입력</button>`}
+        </div>`;
+      })
+      .join("");
+    craftBody.innerHTML = `
+      <section class="mk-panel mk-picker">
+        <h2>재료 선택</h2>
+        ${picker("gem", "보석")}
+        ${picker("crystal", "크리스탈")}
+      </section>
+      <div class="mk-right">
+        <section class="mk-panel mk-chain">
+          <div class="mk-chain-head">
+            <h2>${escapeHtml(item.name)} 적정가</h2>
+            <label class="mk-ore">
+              <span>원석 시세</span>
+              <input data-ore-input="${item.id}" inputmode="numeric" maxlength="40" autocomplete="off" value="${ore ? escapeHtml(String(ore.price)) : ""}" placeholder="원석 1개" aria-label="${escapeHtml(item.name)} 원석 시세" />
+              <small data-ore-reading>${ore ? escapeHtml(priceReading(String(ore.price))) : "메소"}</small>
+              <button type="button" data-save-ore="${item.id}">저장</button>
+            </label>
+            <button type="button" class="mk-ghost" data-price-cell="${item.id}:ore">기록</button>
+          </div>
+          ${prices ? "" : `<p class="mk-muted">원석 시세를 적으면 일반부터 상급까지 적정가를 계산해요.</p>`}
+          <div class="mk-nodes">${nodes}</div>
+          ${prices ? `<p class="mk-muted">하급·중급·상급을 누르면 계산 과정을 볼 수 있어요. 적정가는 제련할 때 함께 나오는 부산물 가치까지 나눠 반영한 값이에요.</p>` : ""}
+          ${explain}
+        </section>
+        <div class="mk-split">
+          <section class="mk-panel mk-sim" data-refine-sim>${refineSimHtml(item, prices)}</section>
+          <section class="mk-panel mk-odds">
+            <h2>일반 1회 제련 확률</h2>
+            <div class="mk-odds-bar">${odds.map((odd) => `<i style="width:${odd.percent}%;--c:${oddsColors[odd.stage]}"></i>`).join("")}</div>
+            <div class="mk-odds-legend">${odds.map((odd) => `<span><i style="--c:${oddsColors[odd.stage]}"></i>${escapeHtml(odd.label)} <small>${odd.percent}%</small></span>`).join("")}</div>
+            <div class="mk-cmp-list">
+              <span class="mk-cmp-title">시세 비교</span>
+              ${compare}
+            </div>
+          </section>
+          <section class="mk-panel mk-routes">
+            <h2>상급을 가장 싸게 얻는 방법</h2>
+            <div class="mk-route-list">
+              ${routes.routes
+                .map((route) => `<div class="mk-route${routes.best?.id === route.id ? " is-best" : ""}"><span>${escapeHtml(route.label)}${routes.best?.id === route.id ? "<em>최저</em>" : ""}</span><b>${meso(route.cost)}</b></div>`)
+                .join("")}
+            </div>
+            ${breakEven.value != null ? `<div class="mk-hint-row"><span>중급이 이 가격 이하면 사서 가공 이득</span><b>${meso(breakEven.value)}</b></div>` : ""}
+            ${lowBuyBreakEven.value != null ? `<div class="mk-hint-row${lowBuyBreakEven.value === 0n ? " is-muted" : ""}"><span>${lowBuyBreakEven.value === 0n ? "하급 구매·재고 의미 없음" : "하급이 이 가격 이하면 중급 제련 이득"}</span><b>${lowBuyBreakEven.value === 0n ? "가치 없음" : meso(lowBuyBreakEven.value)}</b></div>` : ""}
+            ${marketProfitBlock(item, marketProfits)}
+          </section>
+        </div>
+      </div>`;
   }
 
   function paint() {
@@ -1104,20 +1257,25 @@ export async function render(root) {
 
   let savingPrice = false;
 
-  async function savePrice(key) {
+  async function savePrice(key, field = null, cheerTarget = null) {
     if (savingPrice) return;
     savingPrice = true;
     try {
-      await persistPrice(key);
+      const saved = await persistPrice(key, field);
+      if (saved && cheerTarget?.isConnected) {
+        sfx("check");
+        burstAt(cheerTarget, ["#ffe28a", "#c9a6ff", "#ffffff"], 18, 0.8);
+      }
     } finally {
       savingPrice = false;
     }
   }
 
-  async function persistPrice(key) {
+  // field: 시세를 읽을 입력칸. 없으면 기록 창 → 화면 순서로 같은 키의 칸을 찾는다.
+  async function persistPrice(key, field = null) {
     const [itemId, tierId] = key.split(":");
     const item = makerItemById(itemId);
-    const input = historyDialog.querySelector(`[data-price-input="${key}"]`) ?? root.querySelector(`[data-price-input="${key}"]`);
+    const input = field ?? historyDialog.querySelector(`[data-price-input="${key}"]`) ?? root.querySelector(`[data-price-input="${key}"]`);
     const parsed = readBig(input?.value ?? "", `${item?.name ?? itemId} ${tierLabel(tierId)}`, 0n);
     if (parsed.error) {
       notify(parsed.error, "error");
@@ -1142,6 +1300,7 @@ export async function render(root) {
     notify("시세를 기록했습니다.");
     await loadPrices();
     if (historyDialog.open) historyDialog.close();
+    return true;
   }
 
   async function deletePrice(id) {
@@ -1272,21 +1431,42 @@ export async function render(root) {
       savePrice(saveButton.dataset.savePrice);
       return;
     }
-    const craftToggle = event.target.closest("[data-craft-toggle]");
-    if (craftToggle) {
-      const itemId = craftToggle.dataset.craftToggle;
-      const detail = craftBody.querySelector(`#maker-craft-detail-${itemId}`);
-      const willOpen = detail.hidden;
-      detail.hidden = !willOpen;
-      craftToggle.setAttribute("aria-expanded", String(willOpen));
-      craftToggle.querySelector(".maker-craft-head-hint").textContent = willOpen ? "접기" : "펼치기";
-      if (willOpen) openCraftCards.add(itemId);
-      else openCraftCards.delete(itemId);
+    const refineButton = event.target.closest("[data-refine]");
+    if (refineButton) {
+      refine(Number(refineButton.dataset.refine));
       return;
     }
-    const explainButton = event.target.closest("[data-explain-toggle]");
-    if (explainButton) {
-      toggleExplain(explainButton.dataset.explainToggle);
+    if (event.target.closest("[data-refine-reset]")) {
+      clearInterval(refineTimer);
+      refineTimer = 0;
+      refineSim = { itemId: pickedItemId, tries: 0, low: 0, mid: 0, high: 0, last: "" };
+      sfx("tick");
+      paintRefineSim();
+      return;
+    }
+    const pickItem = event.target.closest("[data-pick-item]");
+    if (pickItem) {
+      if (pickItem.dataset.pickItem !== pickedItemId) {
+        pickedItemId = pickItem.dataset.pickItem;
+        explainStage = "";
+        sfx("tick");
+        paintCraft();
+        craftBody.querySelector(`[data-pick-item="${pickedItemId}"]`)?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    const explainStageButton = event.target.closest("[data-explain-stage]");
+    if (explainStageButton) {
+      const stage = explainStageButton.dataset.explainStage;
+      explainStage = explainStage === stage ? "" : stage;
+      sfx("tick");
+      paintCraft();
+      return;
+    }
+    const saveOre = event.target.closest("[data-save-ore]");
+    if (saveOre) {
+      const input = craftBody.querySelector("[data-ore-input]");
+      savePrice(`${saveOre.dataset.saveOre}:ore`, input, saveOre);
       return;
     }
     const deleteButton = event.target.closest("[data-delete-price]");
@@ -1381,6 +1561,14 @@ export async function render(root) {
       if (!event.isComposing) updateReverseInput(reverseInput);
       return;
     }
+    const oreInput = event.target.closest("[data-ore-input]");
+    if (oreInput && !event.isComposing) {
+      const digits = oreInput.value.replace(/[^0-9]/g, "");
+      if (digits !== oreInput.value) oreInput.value = digits;
+      const reading = priceReading(oreInput.value);
+      craftBody.querySelector("[data-ore-reading]").textContent = reading || (oreInput.value.trim() ? "숫자를 확인해 주세요" : "메소");
+      return;
+    }
     const input = event.target.closest("[data-price-input]");
     if (!input || event.isComposing) return;
     updatePriceInput(input);
@@ -1409,6 +1597,13 @@ export async function render(root) {
     if (event.key === "Escape" && !quickPriceLayer.hidden) {
       event.preventDefault();
       closeQuickPrice();
+      return;
+    }
+    const oreField = event.target.closest("[data-ore-input]");
+    if (oreField && event.key === "Enter") {
+      if (event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      if (!event.repeat) savePrice(`${oreField.dataset.oreInput}:ore`, oreField, craftBody.querySelector("[data-save-ore]"));
       return;
     }
     const input = event.target.closest("[data-price-input]");

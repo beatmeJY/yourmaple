@@ -1,7 +1,9 @@
+import { sfx } from "../effects.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
-import { applyExpCoupons, asBig, buildPlan, formatMinutes, formatPerMinute, formatSigned, hourMeso } from "../hunt-calc.js";
-import { findJob, normalizeJobName } from "../job-label.js";
+import { applyExpCoupons, asBig, buildPlan, formatMinutes, formatPerMinute, formatSigned, hourMeso, mulDivRound, shortCount } from "../hunt-calc.js";
+import { findJob, jobStyle, normalizeJobName } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
+import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 import { translateDbError } from "../db-error.js";
@@ -78,59 +80,105 @@ function showMessage(target, text, kind) {
 
 export async function render(root) {
   root.innerHTML = `
-    <div class="studio-page">
-    <header class="page-header">
-      <p class="studio-kicker">사냥터</p>
-      <div class="studio-hero-row">
+    <div class="lp-page">
+      <header class="ym-page-head">
         <h1>레벨업 계산</h1>
-        <div class="button-row">
-          <button class="primary-button" type="button" data-goto-hunt-add>사냥 기록 추가</button>
+        <p>목표 레벨까지 필요한 경험치와, 고른 사냥 기록으로 걸리는 시간을 계산해요.</p>
+      </header>
+      <form class="lp-layout" id="plan-form" autocomplete="off">
+        <div class="lp-main">
+          <section class="lp-hero">
+            <input type="hidden" name="character_pick" value="" />
+            <div class="lp-chips" data-character-chips></div>
+            <div class="lp-steps">
+              <div class="lp-step">
+                <span class="lp-label">현재 레벨</span>
+                <span class="lp-stepper">
+                  <button type="button" data-step="from_level" data-delta="-1" aria-label="현재 레벨 내리기">−</button>
+                  <label class="lp-lv"><span>Lv.</span><input name="from_level" inputmode="numeric" aria-label="현재 레벨" /></label>
+                  <button type="button" data-step="from_level" data-delta="1" aria-label="현재 레벨 올리기">+</button>
+                </span>
+              </div>
+              <label class="lp-step lp-exp">
+                <span class="lp-label">현재 경험치 <small data-exp-percent></small></span>
+                <span class="lp-exp-well"><input name="current_exp" inputmode="numeric" data-grouped placeholder="이 레벨에서 채운 양" /></span>
+              </label>
+              <span class="lp-flow" aria-hidden="true"></span>
+              <div class="lp-step">
+                <span class="lp-label">목표 레벨</span>
+                <span class="lp-stepper is-goal">
+                  <button type="button" data-step="to_level" data-delta="-1" aria-label="목표 레벨 내리기">−</button>
+                  <label class="lp-lv"><span>Lv.</span><input name="to_level" inputmode="numeric" enterkeyhint="next" aria-label="목표 레벨" /></label>
+                  <button type="button" data-step="to_level" data-delta="1" aria-label="목표 레벨 올리기">+</button>
+                </span>
+              </div>
+            </div>
+            <div class="lp-total">
+              <div>
+                <span data-total-label>필요 경험치</span>
+                <strong data-total>-</strong>
+              </div>
+              <span class="lp-total-short" data-total-short></span>
+            </div>
+            <p class="form-message" data-plan-status hidden></p>
+          </section>
+
+          <section class="lp-panel lp-picks-panel">
+            <div class="lp-panel-head">
+              <h2>기준 사냥 기록</h2>
+              <span data-hunt-picks-label>캐릭터를 고르면 그 직업의 기록이 나와요</span>
+              <button class="lp-ghost" type="button" data-goto-hunt-add>+ 사냥 기록</button>
+            </div>
+            <input type="hidden" name="hunt_pick" value="" />
+            <div class="lp-picks" data-hunt-pick-list role="group" aria-label="기준 사냥 기록">
+              <p class="lp-muted">사냥 기록을 불러오는 중입니다.</p>
+            </div>
+          </section>
+
+          <section class="lp-panel lp-levels">
+            <div class="lp-panel-head">
+              <h2>레벨별 필요 경험치</h2>
+              <span>첫 레벨은 남은 양만 계산해요</span>
+            </div>
+            <div class="lp-rows" data-level-rows><p class="lp-muted">레벨을 정하면 나와요.</p></div>
+          </section>
         </div>
-      </div>
-    </header>
-    <section class="hunt-panel is-plan">
-      <div class="hunt-panel-body">
-      <form class="editor plan-editor" id="plan-form">
-        <label class="field span-all"><span>내 캐릭터</span><select name="character_pick"></select></label>
-        <div class="hunt-picks span-all" data-hunt-picks>
-          <span class="hunt-picks-label" data-hunt-picks-label>기준 사냥 기록</span>
-          <div class="hunt-pick-list" data-hunt-pick-list role="group" aria-label="기준 사냥 기록">
-            <p class="hunt-pick-empty">사냥 기록을 불러오는 중입니다.</p>
-          </div>
-        </div>
-        <input type="hidden" name="hunt_pick" value="" />
-        <fieldset class="plan-group span-all">
-          <legend>레벨</legend>
-          <div class="plan-grid is-level">
-            <label class="field"><span>현재 레벨</span><input name="from_level" inputmode="numeric" autocomplete="off" /></label>
-            <label class="field"><span>목표 레벨</span><input name="to_level" inputmode="numeric" enterkeyhint="next" autocomplete="off" /></label>
-            <label class="field"><span>현재 경험치</span><input name="current_exp" inputmode="numeric" data-grouped autocomplete="off" placeholder="이 레벨에서 이미 채운 양" /></label>
-          </div>
-        </fieldset>
-        <fieldset class="plan-group span-all">
-          <legend>사냥 정보</legend>
-          <div class="plan-grid is-rates">
-            <label class="field"><span>순메소</span><input class="is-gain" name="meso_amount" value="0" inputmode="text" data-grouped data-signed autocomplete="off" placeholder="적자는 -" /></label>
-            <label class="field"><span>1시간 쩔비</span><input name="leech_fee" value="0" inputmode="text" data-grouped data-signed autocomplete="off" placeholder="내가 내면 -" /></label>
-            <label class="field"><span>1시간 물약</span><input class="is-loss" name="potion_cost" value="0" inputmode="numeric" data-grouped autocomplete="off" placeholder="없으면 0" /></label>
-            <label class="field"><span>분당 경험치</span><input name="exp_minute" value="0" inputmode="numeric" data-grouped autocomplete="off" /></label>
-            <label class="field"><span>1시간 경험치</span><input name="exp_hour" value="0" inputmode="numeric" data-grouped autocomplete="off" /></label>
-            <label class="field is-hour-meso"><span>총 1시간 메소</span><input name="hour_meso" value="0" readonly tabindex="-1" autocomplete="off" aria-readonly="true" /></label>
-          </div>
-        </fieldset>
-        <fieldset class="plan-group span-all">
-          <legend>경험치 쿠폰</legend>
-          <div class="plan-grid is-pair">
-            <label class="field"><span>15분 경쿠 2배</span><input name="exp_coupon" inputmode="numeric" autocomplete="off" placeholder="장수" /></label>
-            <label class="field"><span>15분 경쿠 3배</span><input name="exp_coupon_3" inputmode="numeric" autocomplete="off" placeholder="장수" /></label>
-          </div>
-        </fieldset>
+
+        <aside class="lp-side">
+          <section class="lp-panel lp-time">
+            <h2>예상 소요 시간</h2>
+            <div class="lp-wells">
+              <label class="lp-well"><span>분당 경험치</span><input name="exp_minute" value="0" inputmode="numeric" data-grouped /></label>
+              <label class="lp-well"><span>1시간 경험치</span><input name="exp_hour" value="0" inputmode="numeric" data-grouped /></label>
+              <label class="lp-well"><span>순메소</span><input class="is-gain" name="meso_amount" value="0" inputmode="text" data-grouped data-signed placeholder="적자는 -" /></label>
+              <label class="lp-well"><span>1시간 쩔비</span><input name="leech_fee" value="0" inputmode="text" data-grouped data-signed placeholder="내가 내면 -" /></label>
+              <label class="lp-well"><span>1시간 물약</span><input class="is-loss" name="potion_cost" value="0" inputmode="numeric" data-grouped placeholder="없으면 0" /></label>
+              <label class="lp-well is-sum"><span>총 1시간 메소</span><input name="hour_meso" value="0" readonly tabindex="-1" aria-readonly="true" /></label>
+            </div>
+            <div class="lp-coupons">
+              <div class="lp-coupon">
+                <span><strong>15분 2배 경쿠</strong><small>장수만큼 15분씩 2배</small></span>
+                <span class="lp-mini-step"><button type="button" data-step="exp_coupon" data-delta="-1" aria-label="2배 경쿠 줄이기">−</button><input name="exp_coupon" inputmode="numeric" placeholder="0" aria-label="15분 2배 경쿠 장수" /><button type="button" data-step="exp_coupon" data-delta="1" aria-label="2배 경쿠 늘리기">+</button></span>
+              </div>
+              <div class="lp-coupon">
+                <span><strong>15분 3배 경쿠</strong><small>3배를 먼저 써요</small></span>
+                <span class="lp-mini-step"><button type="button" data-step="exp_coupon_3" data-delta="-1" aria-label="3배 경쿠 줄이기">−</button><input name="exp_coupon_3" inputmode="numeric" placeholder="0" aria-label="15분 3배 경쿠 장수" /><button type="button" data-step="exp_coupon_3" data-delta="1" aria-label="3배 경쿠 늘리기">+</button></span>
+              </div>
+            </div>
+            <div class="lp-tiles" data-plan-result></div>
+            <div class="lp-days">
+              <span class="lp-days-top">하루 사냥 시간<strong data-hours-label>2시간</strong></span>
+              <input type="range" name="day_hours" min="1" max="12" step="1" value="2" aria-label="하루 사냥 시간" />
+              <span class="lp-days-out" data-days>사냥 효율을 적으면 며칠 걸리는지 알려 줘요</span>
+            </div>
+            <p class="lp-note" data-plan-note></p>
+          </section>
+          <section class="lp-panel lp-quests">
+            <h2>퀘스트로 채우면</h2>
+            <div data-quest-fill><p class="lp-muted">불러오는 중입니다.</p></div>
+          </section>
+        </aside>
       </form>
-      <p class="hint" data-plan-note></p>
-      <p class="form-message" data-plan-status hidden></p>
-      <div class="summary is-plan" data-plan-result hidden></div>
-      </div>
-    </section>
     </div>
   `;
 
@@ -144,6 +192,8 @@ export async function render(root) {
   let characters = [];
   let accounts = [];
   let jobs = [];
+  let quests = [];
+  let doneQuests = new Set();
   let planExpSource = "minute";
 
   function curveOf() {
@@ -219,6 +269,8 @@ export async function render(root) {
       leech_fee: planForm.elements.leech_fee.value,
       exp_coupon: planForm.elements.exp_coupon.value,
       exp_coupon_3: planForm.elements.exp_coupon_3.value,
+      day_hours: planForm.elements.day_hours.value,
+      character_pick: planForm.elements.character_pick.value,
       expSource: planExpSource,
     };
     try {
@@ -275,23 +327,101 @@ export async function render(root) {
     setFieldTone(totalInput, moneyClass(net));
   }
 
+  function clearOutputs(message, kind = "info") {
+    planResult.innerHTML = "";
+    planNote.textContent = "";
+    root.querySelector("[data-total]").textContent = "-";
+    root.querySelector("[data-total-label]").textContent = "필요 경험치";
+    root.querySelector("[data-total-short]").textContent = "";
+    root.querySelector("[data-level-rows]").innerHTML = `<p class="lp-muted">레벨을 정하면 나와요.</p>`;
+    root.querySelector("[data-exp-percent]").textContent = "";
+    root.querySelector("[data-days]").textContent = "사냥 효율을 적으면 며칠 걸리는지 알려 줘요";
+    showMessage(planStatus, message, kind);
+    paintQuestFill(null);
+  }
+
+  function paintDayHours() {
+    root.querySelector("[data-hours-label]").textContent = `${planForm.elements.day_hours.value}시간`;
+  }
+
+  // 레벨별 줄: 첫 레벨은 남은 양, 나머지는 전체. 막대는 구간에서 가장 큰 레벨 기준.
+  function paintLevelRows(from, to, current) {
+    const box = root.querySelector("[data-level-rows]");
+    const curve = curveOf();
+    const rows = [];
+    for (let level = from; level < to; level += 1) {
+      const need = asBig(curve.get(level));
+      rows.push({ level, need, left: level === from ? need - current : need });
+    }
+    const max = rows.reduce((value, row) => (row.need > value ? row.need : value), 1n);
+    const total = rows.reduce((sum, row) => sum + row.left, 0n);
+    const LIMIT = 40;
+    let cum = 0n;
+    const html = rows.map((row, index) => {
+      cum += row.left;
+      if (index >= LIMIT) return "";
+      const width = Number((row.left * 1000n) / max) / 10;
+      const pct = total > 0n ? Number((cum * 100n) / total) : 100;
+      return `<div class="lp-row" style="--i:${Math.min(index, 16)}">
+        <strong>Lv.${row.level} → ${row.level + 1}</strong>
+        <span class="lp-row-bar"><i style="width:${Math.max(2, width)}%"></i></span>
+        <span class="lp-row-need"><b>${escapeHtml(shortCount(row.left))}</b>${row.left !== row.need ? `<small>전체 ${escapeHtml(shortCount(row.need))} 중</small>` : ""}</span>
+        <span class="lp-row-cum">${pct}%</span>
+      </div>`;
+    });
+    const more = rows.length > LIMIT ? `<p class="lp-muted">그 밖에 ${rows.length - LIMIT}레벨은 합계에 들어 있어요.</p>` : "";
+    box.innerHTML = html.join("") + more;
+  }
+
+  // 퀘스트 보상 경험치로 남은 양을 얼마나 채우는지. 고른 캐릭터가 이미 끝낸 퀘스트와 레벨이 안 되는 퀘스트는 뺀다.
+  function paintQuestFill(span) {
+    const box = root.querySelector("[data-quest-fill]");
+    if (!box) return;
+    if (!span || span.remaining <= 0n) {
+      box.innerHTML = `<p class="lp-muted">${span ? "이미 다 채웠어요." : "레벨을 정하면 보여 줘요."}</p>`;
+      return;
+    }
+    const character = pickedCharacter();
+    const rows = quests
+      .filter((quest) => asBig(quest.exp_reward) > 0n && Number(quest.start_level || 0) <= span.from)
+      .filter((quest) => !character || !doneQuests.has(`${character.id}:${quest.id}`))
+      .sort((left, right) => (asBig(right.exp_reward) > asBig(left.exp_reward) ? 1 : -1))
+      .slice(0, 5);
+    if (!rows.length) {
+      box.innerHTML = `<p class="lp-muted">${quests.length ? "지금 레벨에서 할 수 있는 경험치 퀘스트가 없어요." : "퀘스트 보상 경험치를 적어 두면 여기서 보여 줘요."}</p>`;
+      return;
+    }
+    const sum = rows.reduce((total, quest) => total + asBig(quest.exp_reward), 0n);
+    box.innerHTML = rows
+      .map((quest, index) => {
+        const exp = asBig(quest.exp_reward);
+        const basis = exp > span.remaining ? 10000n : (exp * 10000n) / span.remaining;
+        const pct = `${(Number(basis) / 100).toFixed(1)}%`;
+        return `<div class="lp-quest" style="--i:${index}">
+          <span class="lp-quest-top"><strong>${escapeHtml(quest.name)}</strong><span>${escapeHtml(shortCount(exp))} · <b>${pct}</b></span></span>
+          <span class="lp-quest-bar"><i style="width:${Number(basis) / 100}%"></i></span>
+        </div>`;
+      })
+      .join("") + `<p class="lp-muted">위 ${rows.length}개를 다 하면 남은 양의 ${sum >= span.remaining ? "100" : (Number((sum * 1000n) / span.remaining) / 10).toFixed(1)}%를 채워요.${character ? ` 이미 끝낸 퀘스트는 뺐어요(${escapeHtml(character.name)} 기준).` : ""}</p>`;
+  }
+
   function paintPlan() {
     paintPlanMoney();
+    paintDayHours();
     savePlan();
     const fromText = planForm.elements.from_level.value;
     const toText = planForm.elements.to_level.value;
     if (!fromText.trim() || !toText.trim()) {
-      planResult.hidden = true;
-      planResult.innerHTML = "";
-      showMessage(planStatus, "", "info");
-      planNote.textContent = "";
+      clearOutputs("");
       return;
     }
 
     const from = readCount(fromText, "현재 레벨", 1);
     const to = from.error ? from : readCount(toText, "목표 레벨", 1);
     const current = to.error ? to : readBig(planForm.elements.current_exp.value, "현재 경험치", 0n);
-    const exp = current.error ? current : readHourExp(planForm, planExpSource);
+    // 효율 칸이 비었거나 0이면 아직 안 적은 것으로 본다(캐릭터만 고른 상태). 시간 대신 필요 경험치만 보여 준다.
+    const blankRate = ["exp_minute", "exp_hour"].every((name) => /^[0,\s]*$/.test(planForm.elements[name].value));
+    const exp = current.error ? current : blankRate ? { error: "분당 경험치나 1시간 경험치를 입력해 주세요." } : readHourExp(planForm, planExpSource);
     const allowEmptyExp = exp.error === "분당 경험치나 1시간 경험치를 입력해 주세요.";
     const meso = exp.error && !allowEmptyExp ? exp : readMeso(planForm.elements.meso_amount.value);
     const potion = meso.error ? meso : readBig(planForm.elements.potion_cost.value, "1시간 물약", 0n);
@@ -300,10 +430,7 @@ export async function render(root) {
     const coupon3 = coupon.error ? coupon : readCount(planForm.elements.exp_coupon_3.value, "15분 경쿠 3배", 0);
     const failed = [from, to, current, allowEmptyExp ? { error: "" } : exp, meso, potion, leech, coupon, coupon3].find((item) => item.error);
     if (failed) {
-      planResult.hidden = true;
-      planResult.innerHTML = "";
-      planNote.textContent = "";
-      showMessage(planStatus, failed.error, "error");
+      clearOutputs(failed.error, "error");
       return;
     }
 
@@ -323,38 +450,49 @@ export async function render(root) {
       result = { error: "계산하지 못했습니다. 입력한 숫자를 확인해 주세요." };
     }
     if (result.error) {
-      planResult.hidden = true;
-      planResult.innerHTML = "";
-      planNote.textContent = "";
-      showMessage(planStatus, result.error, "error");
+      clearOutputs(result.error, "error");
       return;
     }
 
     showMessage(planStatus, "", "info");
+    const bar = asBig(curveOf().get(from.value));
+    const currentValue = current.value ?? 0n;
+    root.querySelector("[data-exp-percent]").textContent = bar > 0n && currentValue > 0n ? `· ${(Number((currentValue * 10000n) / bar) / 100).toFixed(2)}%` : "";
+    root.querySelector("[data-total-label]").textContent = `필요 경험치 · ${to.value - from.value}레벨`;
+    root.querySelector("[data-total]").textContent = formatCount(result.remaining);
+    root.querySelector("[data-total-short]").textContent = result.remaining >= 10000n ? `약 ${shortCount(result.remaining)}` : "";
+    paintLevelRows(from.value, to.value, currentValue);
+    paintQuestFill({ from: from.value, remaining: result.remaining });
+
     const cards = coupon.value ?? 0;
     const cards3 = coupon3.value ?? 0;
     const couponPlan =
       (cards > 0 || cards3 > 0) && result.minutes != null && result.minutes > 0n
         ? applyExpCoupons(result.remaining, exp.value, { double: cards, triple: cards3 })
         : null;
-    const time = result.minutes == null ? "경험치를 입력해 주세요" : result.remaining === 0n ? "이미 채웠습니다" : formatMinutes(result.minutes);
-    const couponTime = couponPlan ? `<article><span>경쿠 후</span><strong>${escapeHtml(formatMinutes(couponPlan.minutes))}</strong></article>` : "";
+    const rateText = allowEmptyExp ? "" : `${shortCount(exp.value)}/h`;
+    const time = result.minutes == null ? "효율을 적어 주세요" : result.remaining === 0n ? "이미 채웠어요" : formatMinutes(result.minutes);
     const savedText = couponPlan ? (couponPlan.saved > 0n ? formatMinutes(couponPlan.saved) : "1분 미만") : "";
-    const couponSaved = couponPlan ? `<article><span>단축</span><strong class="is-gain">${escapeHtml(savedText)}</strong></article>` : "";
     const grossValue = meso.value ?? 0n;
     const leechValue = leech.value ?? 0n;
     const potionValue = potion.value ?? 0n;
     const hourNet = hourMeso(grossValue, leechValue, potionValue);
     const netText = result.net == null ? "-" : formatSigned(result.net);
-    planResult.hidden = false;
     planResult.innerHTML = `
-      <article><span>남은 경험치</span><strong>${escapeHtml(formatCount(result.remaining))}</strong></article>
-      <article><span>걸리는 시간</span><strong>${escapeHtml(time)}</strong></article>
-      ${couponTime}
-      ${couponSaved}
-      <article><span>1시간 메소</span><strong class="${moneyClass(hourNet)}">${escapeHtml(formatSigned(hourNet))}</strong></article>
-      <article><span>예상 금액</span><strong class="${result.net == null ? "" : moneyClass(result.net)}">${escapeHtml(netText)}</strong></article>
+      <div class="is-time"><span>걸리는 시간${rateText ? ` · ${escapeHtml(rateText)}` : ""}</span><strong>${escapeHtml(time)}</strong></div>
+      <div class="${couponPlan ? "is-coupon" : ""}"><span>${couponPlan ? `경쿠 쓰면 · ${escapeHtml(savedText)} 단축` : "경쿠 쓰면"}</span><strong>${couponPlan ? escapeHtml(formatMinutes(couponPlan.minutes)) : "—"}</strong></div>
+      <div><span>1시간 메소</span><strong class="${moneyClass(hourNet)}">${escapeHtml(formatSigned(hourNet))}</strong></div>
+      <div><span>예상 금액</span><strong class="${result.net == null ? "" : moneyClass(result.net)}">${escapeHtml(netText)}</strong></div>
     `;
+    const minutes = couponPlan ? couponPlan.minutes : result.minutes;
+    const hours = BigInt(Number(planForm.elements.day_hours.value) || 2);
+    const days = root.querySelector("[data-days]");
+    if (minutes == null) days.textContent = "사냥 효율을 적으면 며칠 걸리는지 알려 줘요";
+    else if (minutes === 0n) days.textContent = "오늘 바로 끝나요";
+    else {
+      const count = (minutes + hours * 60n - 1n) / (hours * 60n);
+      days.innerHTML = `${couponPlan ? "경쿠 포함 " : ""}약 <strong>${escapeHtml(count.toLocaleString("ko-KR"))}일</strong>`;
+    }
     const couponNote = couponPlan ? couponPlanNote(cards, cards3, couponPlan, savedText) : "";
     planNote.textContent = couponNote.trim();
   }
@@ -386,10 +524,15 @@ export async function render(root) {
   }
 
   function paintCharacterPick() {
-    const select = planForm.elements.character_pick;
-    const current = select.value;
-    select.innerHTML = characterSelectHtml("캐릭터에서 레벨 가져오기");
-    if (current && characters.some((character) => character.id === current)) select.value = current;
+    const input = planForm.elements.character_pick;
+    if (input.value && !characters.some((character) => character.id === input.value)) input.value = "";
+    const box = root.querySelector("[data-character-chips]");
+    const chip = (id, name, sub, style) => {
+      const on = input.value === id;
+      return `<button type="button" class="lp-chip${on ? " is-on" : ""}" data-character-pick="${id}" aria-pressed="${on}"${style ? ` style="${style}"` : ""}>${escapeHtml(name)}${sub ? `<span>${escapeHtml(sub)}</span>` : ""}</button>`;
+    };
+    const list = [...characters].sort(compareCharacter);
+    box.innerHTML = list.map((character) => chip(character.id, character.name, character.level ? `Lv.${character.level}` : "", jobStyle(findJob(jobs, character.job)))).join("") + chip("", "직접 입력", "", "");
   }
 
   function pickedCharacter() {
@@ -442,17 +585,17 @@ export async function render(root) {
     if (character && input.value && !rows.some((row) => row.id === input.value)) input.value = "";
     const selected = input.value;
     if (!character) {
-      label.textContent = "기준 사냥 기록";
-      list.innerHTML = `<p class="hunt-pick-empty">캐릭터를 고르면 그 직업의 사냥 기록이 카드로 나옵니다.</p>`;
+      label.textContent = "캐릭터를 고르면 그 직업의 기록이 나와요";
+      list.innerHTML = `<p class="lp-muted">캐릭터를 고르거나 오른쪽에 효율을 직접 적어 주세요.</p>`;
       return;
     }
     if (!rows.length) {
-      label.textContent = "기준 사냥 기록";
+      label.textContent = "기록 없음";
       const who = character.job || character.name;
-      list.innerHTML = `<p class="hunt-pick-empty">${escapeHtml(who)} 사냥 기록이 없습니다. <a href="#/hunts?add=1">사냥 기록 추가</a>에서 만들어 보세요.</p>`;
+      list.innerHTML = `<p class="lp-muted">${escapeHtml(who)} 사냥 기록이 없습니다. <a href="#/hunts?add=1">사냥 기록 추가</a>에서 만들어 보세요.</p>`;
       return;
     }
-    label.textContent = `기준 사냥 기록 · ${rows.length}개 · 레벨 높은 순`;
+    label.textContent = `${rows.length}개 · 레벨 높은 순 · 누르면 효율을 가져와요`;
     list.innerHTML = rows
       .map((row) => {
         const figures = huntFigures(row);
@@ -518,6 +661,8 @@ export async function render(root) {
   function applyCharacter(character) {
     clearPlanRates();
     planForm.elements.from_level.value = character.level ? String(character.level) : "";
+    // 캐릭터 화면에 적어 둔 현재 경험치가 있으면 가져온다(sql/029).
+    if (character.exp != null && character.exp !== "") writeGrouped(planForm.elements.current_exp, asBig(character.exp));
     ensureNextTarget();
     paintHuntPick();
     paintPlan();
@@ -570,14 +715,23 @@ export async function render(root) {
 
   async function loadAll() {
     const supabase = await getSupabase();
-    const [huntResult, curveResult, characterResult, accountResult] = await Promise.all([
+    const [huntResult, curveResult, firstCharacters, accountResult, questResult, progressResult] = await Promise.all([
       supabase.from("hunts").select("id, character_id, character_name, job, level, potion_cost, leech_fee, exp_per_hour, meso_per_hour, title, memo, created_at").order("created_at", { ascending: false }),
       supabase.from("level_exp").select("id, level, exp_to_next").order("level", { ascending: true }),
-      supabase.from("characters").select("id, account_id, name, job, level, current_exp"),
+      supabase.from("characters").select("id, account_id, name, job, level, exp"),
       supabase.from("accounts").select("id, name").order("name"),
+      supabase.from("quests").select("id, name, start_level, exp_reward"),
+      supabase.from("character_quests").select("quest_id, character_id, completed"),
+      loadMainCharacter(),
     ]);
+    // sql/029 실행 전이면 exp 칸이 없다. 빼고 다시 읽는다.
+    const characterResult = firstCharacters.error && /\bexp\b/i.test(`${firstCharacters.error.message || ""}`)
+      ? await supabase.from("characters").select("id, account_id, name, job, level")
+      : firstCharacters;
     const jobResult = await supabase.from("jobs").select("id, family, name, color, color_dark, sort_order").order("sort_order");
     if (!root.isConnected) return;
+    quests = questResult.error ? [] : (questResult.data ?? []);
+    doneQuests = new Set((progressResult.error ? [] : (progressResult.data ?? [])).filter((row) => row.completed).map((row) => `${row.character_id}:${row.quest_id}`));
     const error = huntResult.error || curveResult.error || characterResult.error;
     if (error) {
       hunts = [];
@@ -598,7 +752,48 @@ export async function render(root) {
     if (!root.isConnected) return;
     if (seeded.error) notify(translateDbError(seeded.error), "error");
     paintCharacterPick();
+    // 처음 열었고 적어 둔 레벨이 없으면 대표 캐릭터로 시작한다.
+    if (!planForm.elements.from_level.value.trim() && !planForm.elements.character_pick.value) {
+      const main = characters.find((character) => character.id === mainCharacterId()) ?? [...characters].sort(compareCharacter)[0];
+      if (main) {
+        planForm.elements.character_pick.value = main.id;
+        paintCharacterPick();
+        applyCharacter(main);
+        return;
+      }
+    }
     paintHuntPick();
+    paintPlan();
+  }
+
+  function pickCharacter(id) {
+    planForm.elements.character_pick.value = id;
+    paintCharacterPick();
+    const character = characters.find((item) => item.id === id);
+    if (character) {
+      applyCharacter(character);
+      return;
+    }
+    clearPlanRates();
+    planForm.elements.from_level.value = "";
+    paintHuntPick();
+    paintPlan();
+  }
+
+  function stepField(name, delta) {
+    const input = planForm.elements[name];
+    const value = Number(String(input.value).replaceAll(",", "")) || 0;
+    const from = Number(planForm.elements.from_level.value) || 1;
+    let next = value + delta;
+    if (name === "from_level") next = Math.min(199, Math.max(1, next || 1));
+    else if (name === "to_level") next = Math.min(200, Math.max(from + 1, next || from + 1));
+    else next = Math.max(0, next);
+    input.value = name.startsWith("exp_coupon") && next === 0 ? "" : String(next);
+    if (name === "from_level") {
+      const to = Number(planForm.elements.to_level.value) || 0;
+      if (to <= next) planForm.elements.to_level.value = String(Math.min(200, next + 1));
+    }
+    sfx("tick");
     paintPlan();
   }
 
@@ -621,21 +816,18 @@ export async function render(root) {
     if (event.target.form === planForm) paintPlan();
   });
 
-  root.addEventListener("change", (event) => {
-    if (event.target === planForm.elements.character_pick) {
-      const character = characters.find((item) => item.id === event.target.value);
-      if (character) {
-        applyCharacter(character);
-        return;
-      }
-      clearPlanRates();
-      planForm.elements.from_level.value = "";
-      paintHuntPick();
-      paintPlan();
-    }
-  });
-
   root.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-character-pick]");
+    if (chip) {
+      sfx("tick");
+      pickCharacter(chip.dataset.characterPick);
+      return;
+    }
+    const step = event.target.closest("[data-step]");
+    if (step) {
+      stepField(step.dataset.step, Number(step.dataset.delta));
+      return;
+    }
     if (event.target.closest("[data-goto-hunt-add]")) {
       location.hash = "#/hunts?add=1";
     }

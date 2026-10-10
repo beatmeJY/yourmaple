@@ -1,6 +1,7 @@
 import { escapeHtml, formatCount, readBig } from "../format.js";
 import { DEFAULT_GIVE_UP_TRIALS, ENHANCE_SCROLLS, WEAPON_TYPES, attemptLeaves, bestAttemptMix, enhancementPolicyMap, enhancementSalePrices, optimizeEnhancement, reachableFinalAttacks, sameStateRoutes } from "../enhance-calc.js";
 import { translateDbError } from "../db-error.js";
+import { mountEnhanceSim } from "../enhance-sim.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
@@ -87,6 +88,7 @@ export async function render(root) {
   let currentMap = null;
   let selectedMapNode = null;
   let mapObserver = null;
+  let simPanel = null;
 
   root.innerHTML = `
     <div class="enhance-page enhance-optimizer-page">
@@ -94,6 +96,7 @@ export async function render(root) {
         <div><span class="enhance-eyebrow">OPTIMAL ENCHANT LAB</span><h1>강화 계산</h1><p>보유 메소로 강화에 도전할지, 목표 무기를 바로 살지 비교합니다.</p></div>
         <div class="enhance-hero-orb" aria-hidden="true"><span>BEST<br />ROUTE</span></div>
       </header>
+      <div class="es-wrap" data-enhance-sim></div>
       <section class="enhance-profile-vault" aria-labelledby="enhance-profile-title">
         <div class="enhance-profile-head"><div><span>SAVED ITEMS</span><h2 id="enhance-profile-title">내 강화 아이템</h2></div><small>계정별로 최대 ${MAX_ENHANCE_PROFILES}개까지 바로 불러옵니다.</small></div>
         <div class="enhance-profile-slots" data-profile-slots><span class="enhance-profile-loading">저장한 아이템을 불러오는 중입니다.</span></div>
@@ -836,6 +839,7 @@ export async function render(root) {
   }
 
   function paintResults() {
+    simPanel?.refresh();
     paintWeaponTypes();
     paintTargetSelect(reachableFinalAttacks(validWeapons().map((weapon) => weapon.attack), WEAPON_TYPES[state.weaponType].slots));
     paintStates();
@@ -1059,6 +1063,28 @@ export async function render(root) {
     event.preventDefault();
     event.target.blur();
   });
+
+  // 시뮬레이터: 무기 종류·주문서 시세·첫 노작 공격력·목표 공격력을 계산 화면에서 읽는다.
+  simPanel = mountEnhanceSim(root.querySelector("[data-enhance-sim]"), () => {
+    const firstWeapon = validWeapons()[0] ?? state.weapons.map((weapon) => ({ attack: readAttack(weapon.attack) })).find((weapon) => weapon.attack != null);
+    const weapon = WEAPON_TYPES[state.weaponType];
+    return {
+      slots: weapon.slots,
+      weaponLabel: `${weapon.label} · ${weapon.slots}회`,
+      name: profileName.trim() || "",
+      baseAttack: firstWeapon?.attack ?? null,
+      targetAttack: readAttack(state.targetAttack),
+      tenPrice: readMeso(state.scrollPrices.ten),
+      sixtyPrice: readMeso(state.scrollPrices.sixty),
+    };
+  });
+
+  // 계산 칸을 고칠 때마다 시뮬레이터도 맞춘다(시뮬레이터 자기 칸은 제외).
+  for (const type of ["input", "change"]) {
+    root.addEventListener(type, (event) => {
+      if (!event.target.closest("[data-enhance-sim]")) simPanel?.refresh();
+    });
+  }
 
   paintWeapons();
   paintResults();
