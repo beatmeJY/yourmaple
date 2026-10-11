@@ -342,7 +342,10 @@ export async function render(root) {
   function taskCard(task, now, index) {
     const people = orderedCharacters().filter((character) => isEligible(task, character));
     const blocked = task.needsTable && !ready;
-    const states = people.map((character) => ({ character, state: stateOf(task, character, now) }));
+    // 표 칸 순서: 지금 가능한 캐릭터 먼저, 그다음 다시 가능까지 적게 남은 순. 같으면 계정·레벨 순(orderedCharacters, 안정 정렬).
+    const states = people
+      .map((character) => ({ character, state: stateOf(task, character, now) }))
+      .sort((left, right) => (left.state.done ? left.state.next ?? Infinity : -Infinity) - (right.state.done ? right.state.next ?? Infinity : -Infinity) || 0);
     const readyCount = states.filter((item) => !item.state.done).length;
     const doneCount = states.length - readyCount;
     const isManaging = managing.has(task.key);
