@@ -49,7 +49,7 @@ jobs:
       - name: 공개할 파일만 모으기
         run: |
           mkdir -p _site
-          cp index.html .nojekyll favicon.ico favicon-32x32.png apple-touch-icon.png _site/
+          cp index.html privacy.html terms.html robots.txt sitemap.xml .nojekyll favicon.ico favicon-32x32.png apple-touch-icon.png _site/
           cp -r css js img _site/
 
       - name: 파일 주소에 버전 붙이기

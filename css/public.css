@@ -1,0 +1,46 @@
+/* 공개 정책 페이지 전용. 앱 스타일·인증·외부 글꼴에 의존하지 않는다. */
+:root { color-scheme: dark; --bg: #0d0b16; --panel: #181421; --text: #eeeaf7; --muted: #b4aabf; --line: #393044; --gold: #edcd8a; --accent: #c2b1f5; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body { margin: 0; background: radial-gradient(ellipse at 20% 0%, #272037 0, transparent 45%), var(--bg); color: var(--text); font: 16px/1.85 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; overflow-wrap: anywhere; }
+a { color: var(--accent); text-underline-offset: 4px; }
+a:hover { color: var(--gold); }
+a:focus-visible { outline: 2px solid var(--gold); outline-offset: 5px; border-radius: 3px; }
+.skip-link { position: fixed; left: 16px; top: -100px; z-index: 10; padding: 10px 18px; background: var(--panel); }
+.skip-link:focus { top: 12px; }
+.site-header, main, footer { width: min(1080px, calc(100% - 64px)); margin-inline: auto; }
+.site-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 100px; border-bottom: 1px solid var(--line); }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-size: 19px; font-weight: 800; text-decoration: none; }
+.brand img { border-radius: 11px; }
+.back-link { font-size: 14px; text-decoration: none; }
+.hero { max-width: 760px; padding: 70px 0 34px; animation: arrive .6s ease-out both; }
+.eyebrow { color: var(--gold); font-size: 12px; font-weight: 800; letter-spacing: .2em; }
+h1 { margin: 12px 0 20px; font-size: clamp(32px, 5vw, 52px); line-height: 1.25; letter-spacing: -.045em; }
+.lead { max-width: 620px; font-size: 19px; color: var(--muted); }
+.version { color: var(--muted); font-size: 13px; margin-top: 26px; }
+.notice { padding: 20px 24px; border-left: 3px solid var(--gold); border-radius: 0 14px 14px 0; background: var(--panel); margin: 0 0 44px; }
+.notice strong { color: var(--gold); font-size: 15px; }
+.notice p { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+.document-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 54px; }
+.contents { align-self: start; position: sticky; top: 24px; padding-bottom: 20px; }
+.contents p { font-size: 12px; color: var(--muted); letter-spacing: .06em; }
+.contents a { display: flex; gap: 12px; padding: 10px 0; text-decoration: none; color: var(--muted); font-size: 14px; border-bottom: 1px solid var(--line); transition: color .2s; }
+.contents a:hover { color: var(--gold); }
+.contents span { color: var(--gold); font-size: 11px; padding-top: 3px; }
+article { min-width: 0; }
+section { border-bottom: 1px solid var(--line); padding: 0 0 34px; margin-bottom: 34px; }
+.section-number { color: var(--gold); font-size: 12px; letter-spacing: .12em; margin: 0 0 6px; }
+h2 { font-size: 23px; line-height: 1.45; margin: 0 0 18px; letter-spacing: -.03em; }
+section p, section li { color: var(--muted); }
+section strong { color: var(--text); }
+ul { padding-left: 22px; }
+li { margin-block: 12px; }
+footer { padding: 32px 0 42px; border-top: 1px solid var(--line); margin-top: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px 28px; }
+footer a { font-size: 14px; text-decoration: none; }
+.footer-brand { font-weight: 800; color: var(--gold); }
+footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
+footer [aria-current="page"] { color: var(--text); }
+footer p { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--muted); }
+@keyframes arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 700px) { .site-header, main, footer { width: calc(100% - 40px); } .site-header { min-height: 84px; gap: 12px; } .brand { font-size: 16px; } .back-link { font-size: 12px; } .hero { padding-top: 40px; } .lead { font-size: 17px; } .notice { padding: 16px 18px; } .document-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } .contents { position: static; padding: 18px; background: var(--panel); border-radius: 16px; } .contents p { margin-top: 0; } h2 { font-size: 21px; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .hero { animation: none; } .contents a { transition: none; } }

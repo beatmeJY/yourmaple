@@ -61,6 +61,8 @@
 
 ## 7. 현재 상태 (2026-10-09 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
 
+- 2026-10-19 (Codex) 공개 SEO 준비: 홈 설명·canonical·OG/Twitter, robots.txt·sitemap.xml, privacy.html·terms.html·css/public.css 및 Search Console DNS TXT 안내 추가. 배포 파일 수집에도 정적 페이지 포함. 정책은 서울 리전(사용자 확인)을 반영한 초안이며 삭제 절차·로그/백업 보존·국외 처리와 시행일 확정 필요. PC 1280·모바일 375 무스크립트 렌더·목차·가로 넘침·모션 축소, 메타·XML·배포 산출물 검증 통과. 실제 색인·Search Console 등록은 별도 진행 [실측·진술]
+
 - 2026-10-19 (Codex) 숙제표 휠 가로 이동·재렌더 스크롤 위치 유지, 보스 4종 저장 성공 후 입장 연출, 무릉 첫 진입 효율 1위 캐릭터 자동 선택. 기존 스크롤 초기화 재현 후 PC 1280·모바일 375에서 가짜 Supabase 회귀 검증(저장 실패 복원·모션 축소 포함), 기존 check 11개 통과. 실제 로그인 DB 저장은 이번 검증에 포함하지 않음 [실측]
 
 - 도메인: 2026-10-09 `https://yourmaple.kr`로 옮겼다(가비아 DNS, Custom domain, Enforce HTTPS, Supabase Site URL — 설정은 사용자 [진술]). HTTPS 접속·www 이동·인증서·`https_enforced: true` 확인. `http://` 주소와 예전 `github.io` 주소의 https 이동은 캐시 만료 전이라 재확인 필요 [실측]

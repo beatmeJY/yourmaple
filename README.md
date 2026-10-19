@@ -151,3 +151,31 @@ Secret key 는 Secret 에도 넣지 않습니다.
   - TXT `_github-pages-challenge-beatmeJY`: GitHub 계정의 도메인 소유 인증용. 지우지 않습니다.
 - 저장소 Settings → Pages 의 Custom domain 은 `yourmaple.kr`, Enforce HTTPS 는 켜 둡니다. Actions 배포라 `CNAME` 파일은 두지 않습니다.
 - 주소가 바뀌면 로그인 상태와 다크 모드 같은 브라우저 저장값은 새로 시작합니다. 데이터는 Supabase 에 있어 그대로입니다.
+
+
+## 공개 페이지와 Google Search Console
+
+홈의 메타 설명·Open Graph·Twitter 카드는 `index.html`에서 관리합니다. 공유 카드는 기존 180×180 로고를 쓰는 `summary` 형식입니다. 로그인 없이 읽는 정책 문서는 `privacy.html`·`terms.html`, 전용 스타일은 `css/public.css`입니다. 정책 링크를 로그인 화면에 연결하는 작업은 별도로 진행합니다.
+
+### 공개 전 정책 확인
+
+- 정책 문서는 **공개 준비용 초안**입니다. 문의 이메일과 Supabase 서울 리전은 반영했지만, 시행일·수탁자 법인·국외 처리의 국가/항목/목적/시점/방법/보유기간/법적 근거/거부 절차와 로그·백업 보존기간을 실제 계약·설정 기준으로 확정해야 합니다. 서울 DB 리전만으로 인증·지원 등의 처리가 모두 국내라고 판단하지 않습니다.
+- 현재 탈퇴 버튼이나 삭제 API는 없습니다. 정책은 운영자에게 요청하는 방식으로 안내합니다. 공개 전에 요청 접수 → 본인 확인 → Storage 이미지 삭제 → 사용자 데이터·Auth 계정 삭제 → 결과 안내 절차를 테스트하세요. `auth.users` 외래 키의 CASCADE만으로 Storage 파일까지 삭제되지는 않습니다. 관리자 키는 브라우저에 넣지 않습니다.
+- 임시 계정 로그아웃과 소셜 앱 연결 해제는 탈퇴·서버 데이터 삭제가 아닙니다.
+- 실제 삭제·로그/백업 보존·국외 처리 안내를 확정한 뒤, 두 페이지의 초안 안내를 제거하고 시행일을 표시하세요.
+- 공식 근거: [개인정보 처리방침 규정](https://law.go.kr/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029332499), [Supabase 사용자 삭제](https://supabase.com/docs/guides/auth/managing-user-data), [Supabase 데이터 처리 계약](https://supabase.com/legal/customer-resources/data-processing-addendum).
+
+### 가비아 DNS TXT로 도메인 소유권 확인
+
+1. [Google Search Console](https://search.google.com/search-console/) → 속성 추가 → **도메인**에 `yourmaple.kr`을 입력합니다(`https://`나 경로는 넣지 않음).
+2. Google이 발급한 TXT 값 `google-site-verification=…`을 복사합니다. 임의 예시 값으로 등록하면 인증되지 않습니다.
+3. 가비아 My가비아 → DNS 관리 도구 → `yourmaple.kr` 설정 → 레코드 추가에서 **타입 TXT / 호스트 @ / 값은 Google이 준 전체 문자열**로 저장합니다. TTL은 기본값을 사용합니다. 화면 이름은 가비아 UI 변경에 따라 다를 수 있습니다.
+4. 기존 A 4개, `www` CNAME, `_github-pages-challenge-beatmeJY` TXT는 수정·삭제하지 않습니다. 새 TXT 레코드를 추가하는 작업입니다.
+5. DNS 반영 후 Search Console에서 확인합니다. 바로 확인되지 않으면 전파를 기다린 뒤 재시도합니다. 인증 후에도 TXT를 유지합니다. 필요하면 `dig TXT yourmaple.kr +short`로 값이 보이는지 확인합니다.
+6. 이 변경을 **배포한 뒤**, 사이트맵 메뉴에서 `https://yourmaple.kr/sitemap.xml`을 제출합니다. 홈·`privacy.html`·`terms.html`의 URL 검사에서 실제 페이지 확인 후 필요한 URL의 색인을 요청합니다.
+
+`robots.txt`는 크롤링을 허용하고 사이트맵 위치를 안내합니다. 접근 제어나 개인정보 보호 수단이 아닙니다. 사이트맵에는 공개된 정규 URL 세 개만 넣고 `#/homework` 같은 해시 화면, OAuth 콜백·코드·토큰 URL이나 개인 기록은 넣지 않습니다. 현재 해시 SPA의 개별 기능 검색 노출을 보장하지 않습니다. Search Console 등록·사이트맵 제출도 색인이나 검색 순위를 보장하지 않습니다.
+
+배포 설정은 새 정적 파일도 `_site`에 복사합니다. 코드 작성과 Google 계정의 소유권 확인은 별개이며, 이번 변경만으로 Search Console에 자동 등록되지 않습니다.
+
+공식 안내: [DNS TXT 소유권 확인](https://support.google.com/webmasters/answer/9008080), [사이트맵 작성](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap), [URL 구조와 해시](https://developers.google.com/search/docs/crawling-indexing/url-structure).
