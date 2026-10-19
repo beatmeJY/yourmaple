@@ -4,6 +4,7 @@ import { applyExpCoupons, asBig, buildPlan, formatMinutes, formatPerMinute, form
 import { findJob, jobStyle, normalizeJobName } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
+import { isLoggedIn } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 import { translateDbError } from "../db-error.js";
@@ -714,6 +715,20 @@ export async function render(root) {
   }
 
   async function loadAll() {
+    // 로그인 전: 내 캐릭터·사냥 기록 없이 계산만 한다(경험치표는 내장 값 levelExpSeed).
+    if (!isLoggedIn()) {
+      hunts = [];
+      curveRows = [];
+      characters = [];
+      accounts = [];
+      jobs = [];
+      quests = [];
+      doneQuests = new Set();
+      paintCharacterPick();
+      paintHuntPick();
+      paintPlan();
+      return;
+    }
     const supabase = await getSupabase();
     const [huntResult, curveResult, firstCharacters, accountResult, questResult, progressResult] = await Promise.all([
       supabase.from("hunts").select("id, character_id, character_name, job, level, potion_cost, leech_fee, exp_per_hour, meso_per_hour, title, memo, created_at").order("created_at", { ascending: false }),

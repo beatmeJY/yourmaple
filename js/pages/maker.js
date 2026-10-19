@@ -31,6 +31,7 @@ import {
   enchantCraftCost,
   tierPrices,
 } from "../maker-calc.js";
+import { isLoggedIn, requireLogin, restoreFields, snapshotFields, takeDraft } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
@@ -1241,6 +1242,12 @@ export async function render(root) {
 
   async function loadPrices() {
     const current = ++loadId;
+    // 로그인 전에는 저장된 시세가 없다(저장할 때 로그인).
+    if (!isLoggedIn()) {
+      priceRows = [];
+      paint();
+      return;
+    }
     const supabase = await getSupabase();
     const { data, error } = await supabase
       .from("maker_gem_prices")
@@ -1292,6 +1299,8 @@ export async function render(root) {
       notify("지금 시세와 같습니다.", "info");
       return;
     }
+    // 로그인 전이면 적은 시세와 화면의 다른 입력을 맡기고 로그인하러 간다. 돌아오면 같은 시세 창에 그대로 채워 준다.
+    if (!requireLogin("메이커 시세는 로그인한 계정에 저장돼요.", { key, value: input?.value ?? "", fields: snapshotFields(root) })) return;
     const supabase = await getSupabase();
     const { error } = await supabase.from("maker_gem_prices").insert({ item: itemId, tier: tierId, price: parsed.value.toString() });
     if (!root.isConnected) return;
@@ -1632,4 +1641,19 @@ export async function render(root) {
   paint();
   updateReverseCalculator();
   await loadPrices();
+  // 로그인하러 가기 전에 적던 시세가 있으면 되살린다: 다른 칸은 그대로, 시세는 그 시세 창을 열어 채워 둔다(저장은 사용자가 누른다).
+  const draft = takeDraft("maker");
+  if (draft && root.isConnected) {
+    restoreFields(root, draft.fields);
+    const [itemId, tierId] = String(draft.key || "").split(":");
+    if (itemId && tierId && makerItemById(itemId)) {
+      openHistory(itemId, tierId);
+      const input = historyDialog.querySelector(`[data-price-input="${draft.key}"]`);
+      if (input) {
+        input.value = draft.value;
+        updatePriceInput(input);
+      }
+    }
+    notify("로그인했어요. 적어 둔 시세를 그대로 채워 뒀으니 저장을 눌러 주세요.", "info");
+  }
 }

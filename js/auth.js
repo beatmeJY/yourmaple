@@ -9,7 +9,7 @@ const knownErrors = [
   ["Signup requires a valid password", "비밀번호를 입력해 주세요."],
   ["email rate limit exceeded", "인증 메일을 너무 많이 요청했습니다. 잠시 후 다시 시도하세요."],
   ["For security purposes", "요청이 너무 빠릅니다. 잠시 후 다시 시도하세요."],
-  ["Anonymous sign-ins are disabled", "둘러보기(익명 로그인)가 아직 꺼져 있습니다. Supabase → Authentication → Sign In / Providers 에서 Anonymous sign-ins 를 켜 주세요."],
+  ["Signups not allowed", "새 가입이 꺼져 있습니다. Supabase → Authentication → Sign In / Providers 의 User Signups 에서 Allow new users to sign up 을 켜 주세요."],
   ["provider is not enabled", "이 로그인 방식이 아직 꺼져 있습니다. Supabase → Authentication → Sign In / Providers 에서 Google·Discord 를 켜 주세요."],
   ["Manual linking is disabled", "계정 연결이 아직 꺼져 있습니다. Supabase → Authentication → Sign In / Providers 의 Allow manual linking 을 켜 주세요."],
   ["Identity is already linked to another user", "이 계정은 이미 다른 Your Maple 계정에 연결되어 있습니다. 로그아웃한 뒤 그 계정으로 로그인해 주세요."],
@@ -28,16 +28,10 @@ function returnUrl() {
   return `${location.origin}${location.pathname}`;
 }
 
-/** 로그인 없이 둘러보기 = 익명 계정. 데이터는 그 브라우저의 임시 계정에 저장되고, 나중에 구글·디스코드를 연결하면 그대로 이어진다. */
-export function isAnonymous(session) {
-  return Boolean(session?.user?.is_anonymous);
-}
-
-/** 화면에 보일 계정 이름: 이메일 → 이름 → "임시 계정" */
+/** 화면에 보일 계정 이름: 이메일 → 이름 */
 export function accountLabel(session) {
   const user = session?.user;
   if (!user) return "";
-  if (user.is_anonymous) return "임시 계정";
   return user.email || user.user_metadata?.full_name || user.user_metadata?.name || "로그인됨";
 }
 
@@ -98,18 +92,5 @@ export async function signOut() {
 export async function signInWithProvider(provider) {
   const supabase = await getSupabase();
   const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: returnUrl() } });
-  return { error: error ? translateAuthError(error) : "" };
-}
-
-export async function signInAsGuest() {
-  const supabase = await getSupabase();
-  const { error } = await supabase.auth.signInAnonymously();
-  return { error: error ? translateAuthError(error) : "" };
-}
-
-/** 임시 계정에 구글·디스코드를 연결한다. 연결되면 같은 계정(같은 데이터)으로 다른 기기에서도 로그인할 수 있다. */
-export async function linkProvider(provider) {
-  const supabase = await getSupabase();
-  const { error } = await supabase.auth.linkIdentity({ provider, options: { redirectTo: returnUrl() } });
   return { error: error ? translateAuthError(error) : "" };
 }

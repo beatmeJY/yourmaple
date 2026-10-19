@@ -107,17 +107,19 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 4. Authentication 에서 Email 로그인을 켜 둡니다. 개인용이면 Confirm email 을 끄면 가입 직후 바로 로그인됩니다.
 5. Authentication → URL Configuration 의 Site URL 을 `http://127.0.0.1:5500` 으로 맞춥니다.
 
-### 둘러보기(익명)·Google·Discord 로그인 (2026-10-19)
+### Google·Discord 로그인과 로그인 없이 쓰기 (2026-10-19)
 
-로그인 화면에 "Google로 계속하기", "Discord로 계속하기", "로그인 없이 둘러보기"가 있습니다. 둘러보기는 그 브라우저에 임시 계정을 만들고, 앱 위쪽 "계정 연결"로 나중에 Google·Discord를 붙이면 같은 기록으로 이어집니다. 아래를 켜기 전에는 버튼을 누르면 무엇을 켜야 하는지 안내가 나옵니다.
+- 로그인하지 않아도 앱이 열립니다. 홈은 소개 화면이고, **레벨업 계산·메이커 계산·무릉도장(·강화 계산)** 은 로그인 없이 계산할 수 있습니다. 저장 버튼을 누르면 그때 로그인 화면으로 가고, 로그인하고 돌아오면 그 화면으로 돌아와 적던 값을 다시 채워 둡니다(저장은 다시 누름). 맡긴 값은 sessionStorage 에 30분 동안 둡니다(`js/session.js`).
+- 캐릭터·숙제·사냥·퀘스트·몬스터·거래·메모·링크는 내 기록 화면이라 로그인해야 열립니다(`js/routes.js` 의 `auth: true`).
+- 로그인 화면에는 "Google로 계속하기", "Discord로 계속하기", 접힌 "이메일로 로그인"이 있습니다. 아래를 켜기 전에는 버튼을 누르면 무엇을 켜야 하는지 안내가 나옵니다.
 
+0. **Sign In / Providers → User Signups → Allow new users to sign up** 을 켭니다. 꺼져 있으면 처음 오는 Google·Discord 계정이 "Signups not allowed for this instance"로 막힙니다. 같은 곳의 **Confirm email** 은 켜 두는 것을 권합니다(아무 이메일로나 바로 가입하지 못하게). **Anonymous sign-ins 는 끕니다**(로그인 없이 둘러보기는 2026-10-19 삭제).
 1. **URL Configuration**: Site URL 을 `https://yourmaple.kr` 로, Redirect URLs 에 `https://yourmaple.kr/**` 와 `http://127.0.0.1:5500/**` 를 넣습니다(로그인 뒤 돌아올 주소).
-2. **Sign In / Providers → Anonymous sign-ins** 를 켭니다. 봇이 임시 계정을 많이 만들 수 있으니 공개 전에 **Attack Protection 의 CAPTCHA** 도 켜는 것을 권합니다(다음 단계에서 화면에 붙임).
-3. **Allow manual linking** 을 켭니다(임시 계정에 Google·Discord 연결).
-4. **Google**: Google Cloud Console → API 및 서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID(웹 애플리케이션). 승인된 리디렉션 URI 에 `https://<프로젝트>.supabase.co/auth/v1/callback` 을 넣고, 받은 클라이언트 ID·보안 비밀을 Supabase 의 Google provider 에 넣습니다. OAuth 동의 화면도 만들어야 합니다.
-5. **Discord**: Discord Developer Portal → New Application → OAuth2 → Redirects 에 같은 `.../auth/v1/callback` 을 넣고, Client ID·Client Secret 을 Supabase 의 Discord provider 에 넣습니다.
+2. **Google**: Google Cloud Console → API 및 서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID(웹 애플리케이션). 승인된 리디렉션 URI 에 `https://<프로젝트>.supabase.co/auth/v1/callback` 을 넣고, 받은 클라이언트 ID·보안 비밀을 Supabase 의 Google provider 에 넣습니다. OAuth 동의 화면도 만들어야 합니다.
+3. **Discord**: Discord Developer Portal → New Application → OAuth2 → Redirects 에 같은 `.../auth/v1/callback` 을 넣고, Client ID·Client Secret 을 Supabase 의 Discord provider 에 넣습니다.
 
 - 로그인은 PKCE 방식(`flowType: "pkce"`, `js/supabase-client.js`)이라 돌아올 때 주소에 `?code=` 가 붙고, 처리한 뒤 지웁니다(`#` 은 화면 주소로 씀). 그래서 이메일 가입 확인 링크도 **가입한 그 브라우저에서** 열어야 로그인이 이어집니다.
+- 같은 이메일(예: 처음 가입한 이메일과 같은 Gmail)로 Google·Discord 로그인하면 Supabase 가 같은 계정에 자동으로 붙입니다(기존 이메일이 인증된 경우). 이메일이 다르면 계정이 따로 생깁니다.
 - 클라이언트 보안 비밀은 Supabase 에만 넣고 이 저장소에는 넣지 않습니다.
 
 ## 키 구분

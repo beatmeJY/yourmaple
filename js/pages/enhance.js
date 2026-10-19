@@ -2,6 +2,7 @@ import { escapeHtml, formatCount, readBig } from "../format.js";
 import { DEFAULT_GIVE_UP_TRIALS, ENHANCE_SCROLLS, WEAPON_TYPES, attemptLeaves, bestAttemptMix, enhancementPolicyMap, enhancementSalePrices, optimizeEnhancement, reachableFinalAttacks, sameStateRoutes } from "../enhance-calc.js";
 import { translateDbError } from "../db-error.js";
 import { mountEnhanceSim } from "../enhance-sim.js";
+import { isLoggedIn, requireLogin, takeDraft } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
@@ -264,6 +265,13 @@ export async function render(root) {
 
   async function loadProfiles(selectId = activeProfileId) {
     const current = ++profileLoadId;
+    // 로그인 전에는 저장된 아이템이 없다. 계산은 그대로 하고, 저장할 때 로그인한다.
+    if (!isLoggedIn()) {
+      profiles = [];
+      paintProfileSlots();
+      paintProfileControls();
+      return;
+    }
     const supabase = await getSupabase();
     const { data, error } = await supabase
       .from("enhance_profiles")
@@ -304,6 +312,8 @@ export async function render(root) {
       return;
     }
     removeLowMarketPrices();
+    // 로그인 전이면 지금 설정을 통째로 맡기고 로그인하러 간다. 돌아오면 같은 설정을 다시 채운다.
+    if (!requireLogin("강화 아이템 설정은 로그인한 계정에 저장돼요.", { name, settings: profileSnapshot() })) return;
     profileSaving = true;
     paintProfileControls();
     const supabase = await getSupabase();
@@ -1089,5 +1099,20 @@ export async function render(root) {
   paintWeapons();
   paintResults();
   paintProfileControls();
-  loadProfiles();
+  await loadProfiles();
+  // 로그인하러 가기 전에 저장하려던 설정이 있으면 새 아이템으로 되살린다(저장은 사용자가 누른다).
+  const draft = takeDraft("enhance");
+  if (draft?.settings && root.isConnected) {
+    selectProfile(null);
+    applyProfileSettings(draft.settings);
+    profileName = draft.name ?? "";
+    activeSortOrder = profiles.length;
+    syncStaticInputs();
+    paintWeapons();
+    paintResults();
+    paintProfileSlots();
+    paintProfileControls();
+    markProfileDirty();
+    notify("로그인했어요. 저장하려던 설정을 그대로 채워 뒀으니 저장을 눌러 주세요.", "info");
+  }
 }

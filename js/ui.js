@@ -92,14 +92,14 @@ export function renderShell() {
           </div>
           <div class="topbar-actions">
             <button class="feature-search-open" type="button" data-feature-search-open aria-label="기능 찾기"><span class="ym-search-icon" aria-hidden="true"></span></button>
-            <div class="topbar-profile-wrap">
+            <div class="topbar-profile-wrap" data-logged-in hidden>
               <button class="topbar-profile" type="button" data-profile-toggle aria-haspopup="menu" aria-expanded="false" aria-label="대표 캐릭터 고르기"></button>
               <div class="profile-menu ym-glass" data-profile-menu hidden></div>
             </div>
             <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><i aria-hidden="true"></i><span>효과음 켜짐</span></button>
-            <button class="link-account-open" type="button" data-link-account hidden>계정 연결</button>
-            <p class="account-email" id="account-email"></p>
-            <button class="icon-button" type="button" data-logout>로그아웃</button>
+            <p class="account-email" id="account-email" data-logged-in hidden></p>
+            <button class="icon-button" type="button" data-logout data-logged-in hidden>로그아웃</button>
+            <button class="login-open" type="button" data-login-open data-logged-out hidden>로그인</button>
           </div>
         </header>
         <main id="main" class="main"></main>

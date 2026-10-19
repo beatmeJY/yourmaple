@@ -32,6 +32,7 @@ import {
   spanText,
 } from "../dojo-calc.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
+import { isLoggedIn, requireLogin, takeDraft } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
@@ -282,6 +283,8 @@ export async function render(root) {
   let landedKey = "";
   let arriveCard = false;
   let savedSnapshot = "";
+  // 로그인하러 가기 전에 적던 기록(로그인 뒤 되살림). 다른 캐릭터를 골라도 묻지 않고 그 캐릭터 기록 위에 다시 채운다.
+  let carried = null;
   let runsReady = true;
   let priceRows = [];
   let recordRows = [];
@@ -1317,6 +1320,17 @@ export async function render(root) {
     const previousCharacter = form.dataset.openCharacter || "";
     const previousParty = form.dataset.openParty || "solo";
     if (characterId === previousCharacter && party === previousParty) return true;
+    // 로그인 전에는 열 기록이 없다. 개인/팀만 바꾸고 적던 값은 그대로 둔다.
+    if (!isLoggedIn()) {
+      form.dataset.openCharacter = characterId;
+      form.dataset.openParty = party;
+      return true;
+    }
+    if (carried) {
+      fillSheet(sheetFor(characterId, party), characterId, party);
+      applyCarried();
+      return true;
+    }
     if (snapshot() !== savedSnapshot && !window.confirm("저장하지 않은 내용이 있습니다. 다른 기록을 열까요?")) {
       form.elements.character_id.value = previousCharacter;
       form.elements.party.value = previousParty;
@@ -1325,6 +1339,24 @@ export async function render(root) {
     }
     fillSheet(sheetFor(characterId, party), characterId, party);
     return true;
+  }
+
+  // 로그인하러 갈 때 맡길 기록: 지금 칸의 값과 고른 개인/팀(열린 기록과 다를 수 있어 버튼 값을 쓴다).
+  function carrySheet() {
+    syncRuns();
+    return { ...JSON.parse(snapshot()), party: form.elements.party.value || "solo" };
+  }
+
+  // 맡겨 둔 기록(수련 점수·구간 초·실제 시간)을 지금 열린 칸에 채운다. 저장 전이라 "저장 필요" 상태로 남는다.
+  function applyCarried() {
+    if (!carried) return;
+    form.elements.score.value = carried.score ?? "";
+    BANDS.forEach((band, index) => {
+      form.elements[`band_${band.start}`].value = carried.bands?.[index] ?? "";
+    });
+    draftRuns = new Map(carried.runs ?? []);
+    paintPlan();
+    paintWho();
   }
 
   function clearInputs() {
@@ -1345,6 +1377,19 @@ export async function render(root) {
 
   async function load() {
     const id = ++loadId;
+    // 로그인 전: 루트 계산만 한다. 캐릭터 기록·허리띠 시세는 로그인하면 보인다.
+    if (!isLoggedIn()) {
+      characters = [];
+      accounts = [];
+      priceRows = [];
+      recordRows = [];
+      paintCharacters();
+      paintBelts();
+      records.innerHTML = `<p class="empty">로그인하면 캐릭터별 무릉 기록과 효율 순위가 여기 보여요. 지금은 위에 구간 초를 적어 루트를 계산해 볼 수 있어요.</p>`;
+      paintPlan();
+      paintWho();
+      return;
+    }
     belts.innerHTML = `<p class="empty">시세를 불러오는 중입니다.</p>`;
     records.innerHTML = `<p class="empty">기록을 불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
@@ -1419,6 +1464,7 @@ export async function render(root) {
       notify("지금 시세와 같습니다.", "info");
       return;
     }
+    if (!requireLogin("허리띠 시세는 로그인한 계정에 저장돼요.", { belt: { id: beltId, value: input?.value ?? "" }, sheet: carrySheet() })) return;
     const supabase = await getSupabase();
     const { error } = await supabase.from("dojo_belt_prices").insert({ belt: beltId, price: parsed.value.toString() });
     if (!root.isConnected) return;
@@ -1461,6 +1507,8 @@ export async function render(root) {
       notify("구간 초나 실제 시간을 하나 이상 입력해 주세요.", "error");
       return false;
     }
+    // 로그인 전이면 적은 기록을 맡기고 로그인하러 간다. 돌아오면 다시 채워 두고, 저장할 캐릭터를 고르게 한다.
+    if (!requireLogin("무릉 기록은 로그인한 계정의 캐릭터에 저장돼요.", { sheet: carrySheet() })) return false;
     const character = readCharacter();
     if (character.error) {
       notify(character.error, "error");
@@ -1492,6 +1540,7 @@ export async function render(root) {
     form.dataset.openCharacter = character.characterId;
     form.dataset.openParty = current.party ? "team" : "solo";
     savedSnapshot = snapshot();
+    carried = null;
     const sibling = sheetFor(character.characterId, current.party ? "solo" : "team");
     if (sibling && sibling.id !== data.id && String(sibling.score ?? "") !== String(payload.score ?? "")) {
       await supabase.from("dojo_records").update({ score: payload.score }).eq("id", sibling.id);
@@ -1884,8 +1933,23 @@ export async function render(root) {
   const scoreLog = mountDojoScoreLog(root.querySelector("[data-score-log]"));
   root.querySelector("[data-score-log-open]").addEventListener("click", () => {
     sfx("tick");
+    if (!requireLogin("통합 점수 기록은 로그인한 계정에 저장돼요.", { sheet: carrySheet() })) return;
     scoreLog.open(form.dataset.openCharacter || form.elements.character_id?.value || "");
   });
   await load();
-  if (/[?&]log\b/.test(location.hash) && root.isConnected) scoreLog.open(form.dataset.openCharacter || "");
+  // 로그인하러 가기 전에 적던 기록·시세가 있으면 되살린다(저장은 사용자가 누른다).
+  const draft = takeDraft("dojo");
+  if (draft && root.isConnected) {
+    if (draft.sheet) {
+      carried = draft.sheet;
+      if (carried.party === "team" && form.elements.party.value !== "team") setParty("team");
+      applyCarried();
+    }
+    if (draft.belt) {
+      const input = belts.querySelector(`[data-price="${draft.belt.id}"]`);
+      if (input) input.value = draft.belt.value;
+    }
+    notify(draft.belt ? "로그인했어요. 적어 둔 허리띠 시세를 채워 뒀으니 저장을 눌러 주세요." : "로그인했어요. 적어 둔 기록을 채워 뒀어요. 저장할 캐릭터를 확인하고 저장을 눌러 주세요.", "info");
+  }
+  if (/[?&]log\b/.test(location.hash) && root.isConnected && isLoggedIn()) scoreLog.open(form.dataset.openCharacter || "");
 }

@@ -1,4 +1,4 @@
-import { OAUTH_PROVIDERS, signIn, signInAsGuest, signInWithProvider, signUp } from "../auth.js";
+import { OAUTH_PROVIDERS, signIn, signInWithProvider, signUp } from "../auth.js";
 import { notify } from "../toast.js";
 
 export function renderSetup(root, message, title = "설정이 필요합니다") {
@@ -29,18 +29,17 @@ export function providerButtons(attr) {
   ).join("");
 }
 
-export function renderLogin(root, failure = "") {
+// reason: 왜 로그인해야 하는지(저장 버튼·내 기록 화면에서 올 때). 위쪽 "돌아가기"로 로그인 없이 앱으로 돌아간다.
+export function renderLogin(root, { failure = "", reason = "" } = {}) {
   root.innerHTML = `
     <section class="auth-screen">
       <div class="auth-card">
+        <button class="auth-back" type="button" data-login-cancel>← 돌아가기</button>
         <img class="auth-logo" src="./apple-touch-icon.png" alt="" width="64" height="64" />
         <h1>Your Maple</h1>
         <p>메이플랜드 강화·무릉·숙제·사냥을 한곳에서 계산하고 기록해요.</p>
+        ${reason ? `<p class="auth-reason"><b>로그인이 필요해요</b><span></span></p>` : ""}
         <div class="auth-providers">${providerButtons("data-oauth")}</div>
-        <button class="auth-guest" type="button" data-guest>
-          <strong>로그인 없이 둘러보기</strong>
-          <small>이 브라우저에 임시 계정을 만들어요. 나중에 Google·Discord를 연결하면 기록이 그대로 이어져요.</small>
-        </button>
         <details class="auth-email">
           <summary>이메일로 로그인</summary>
         <form id="auth-form">
@@ -60,10 +59,11 @@ export function renderLogin(root, failure = "") {
       </div>
     </section>
   `;
+  if (reason) root.querySelector(".auth-reason span").textContent = reason;
   if (failure) notify(failure, "error");
 
-  // 구글·디스코드·둘러보기: 누르는 동안 다른 버튼을 막고, 실패하면 이유를 알린다(성공하면 그 사이트로 이동하거나 바로 앱이 열린다).
-  const quickButtons = [...root.querySelectorAll("[data-oauth], [data-guest]")];
+  // 구글·디스코드: 누르는 동안 다른 버튼을 막고, 실패하면 이유를 알린다(성공하면 그 사이트로 이동한다).
+  const quickButtons = [...root.querySelectorAll("[data-oauth]")];
   async function runQuick(button, action) {
     for (const item of quickButtons) item.disabled = true;
     button.classList.add("is-busy");
@@ -77,8 +77,7 @@ export function renderLogin(root, failure = "") {
   for (const button of root.querySelectorAll("[data-oauth]")) {
     button.addEventListener("click", () => runQuick(button, () => signInWithProvider(button.dataset.oauth)));
   }
-  const guest = root.querySelector("[data-guest]");
-  guest.addEventListener("click", () => runQuick(guest, signInAsGuest));
+
 
   const form = root.querySelector("#auth-form");
   const switchButton = root.querySelector("[data-switch-auth]");

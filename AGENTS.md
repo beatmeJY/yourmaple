@@ -73,6 +73,7 @@
 - 2026-10-11 (Claude) 캐릭터 카드: 경험치 막대를 카드 폭 한 줄로 키움, 숙제 칩(`js/homework-status.js`, 숙제 체크리스트와 같은 기준 읽기 전용 — 무릉 붉은·피아 보라·파풀 파랑·조각 초록·직접 추가 금색, 했으면 회색 ✓, 누르면 숙제로 이동) [실측, 가짜 Supabase]
 - 2026-10-11 (Claude) 숙제에 자쿰(노말·카오스)·혼테일(노말, 카오스는 준비 중)·핑크빈·웨딩(6시간)·크림슨·말레이시아(7일) 파퀘 추가, 캐릭터 카드 칩도 같이(`RAIDS`, 새 SQL 없음) [실측, 가짜 Supabase]
 - 2026-10-19 (Claude) 로그인 1단계: 둘러보기(Supabase 익명 로그인)·Google·Discord 로그인, 임시 계정에 Google·Discord 연결(헤더 "계정 연결"), 임시 계정 로그아웃 경고, PKCE 전환(`js/auth.js`, `js/pages/login.js`, `js/main.js`). Supabase 설정은 README "둘러보기(익명)·Google·Discord 로그인" — 사용자 설정 필요. 가짜 Supabase로 버튼 호출·오류 안내·되돌아온 오류 처리 확인, 로그인 화면에 이용약관·개인정보 처리방침 링크. Google 설정은 사용자 완료 [진술], 실제 OAuth 로그인 확인은 사용자 몫 [실측, 가짜 Supabase]
+- 2026-10-19 (Claude) 로그인 없이 쓰기: 둘러보기(익명) 삭제, 로그인 전에도 앱이 열리고 홈은 소개 화면. 레벨업·메이커·무릉(·강화)은 로그인 없이 계산, 저장 버튼에서 로그인 화면(이유 표시)으로 가고 돌아오면 같은 화면에 적던 값 복원(`js/session.js` requireLogin·takeDraft, sessionStorage 30분). 내 기록 화면은 `routes.js` `auth: true`. 가짜 Supabase로 무릉·메이커·강화 저장→로그인→복원→저장 호출, 로그인 화면 이유·돌아가기, 로그인 후 기존 화면 그대로 확인, PC·모바일 375 [실측, 가짜 Supabase]. 실제 OAuth 왕복 복원은 미검증. 2026-10-19 배포
 - 배포: GitHub Pages. 마지막 배포는 무릉 허리띠 변경(2026-10-08, Pages 실행 성공·공개 사이트 반영 확인). 그 뒤의 강화 계산 개편(보유 메소 vs 바로 구매, 노작 섞기 `bestAttemptMix`, 강화 지도, 같은 상태 비교)과 메이커·거래 UI 변경은 미배포다. 커밋 여부는 git으로 확인한다 [실측]
 - 검증: `node js/*.check.mjs` 11개(homework-calc 무릉 점수 포함), 구문·`git diff --check`. 화면은 가짜 Supabase 검증 페이지로 PC 1024·1280·1440px, 모바일 375px, 다크 모드를 확인한다 [실측]
 - 미검증: 실제 로그인 DB 저장(강화 프로필 schemaVersion 2, 거래 저장, 무릉 점수), 사용자 간 접근 차단 [실측]

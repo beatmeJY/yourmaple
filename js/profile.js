@@ -3,6 +3,7 @@ import { translateDbError } from "./db-error.js";
 import { burstAt, sfx } from "./effects.js";
 import { escapeHtml, formatCount } from "./format.js";
 import { jobRecord } from "./job-label.js";
+import { isLoggedIn } from "./session.js";
 import { getSupabase } from "./supabase-client.js";
 import { notify } from "./toast.js";
 
@@ -40,6 +41,11 @@ function byLevel(left, right) {
 }
 
 async function load() {
+  // 로그인 전(계산기만 쓰는 중)에는 내 캐릭터가 없다. DB 를 부르지 않고 빈 목록으로 둔다.
+  if (!isLoggedIn()) {
+    state = { loaded: false, saved: false, mainId: "", characters: [], userId: "" };
+    return state;
+  }
   const supabase = await getSupabase();
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth?.user?.id || "";

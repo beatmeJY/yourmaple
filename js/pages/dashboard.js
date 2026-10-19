@@ -8,6 +8,7 @@ import { formatMinutes } from "../hunt-calc.js";
 import { jobLabel, jobRecord } from "../job-label.js";
 import { loadMainCharacter, mainCharacterId, setMainCharacter } from "../profile.js";
 import { categories, routes } from "../routes.js";
+import { isLoggedIn } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 
 // 대표 캐릭터는 js/profile.js 가 profiles.main_character_id 로 저장한다(헤더 프로필과 같다).
@@ -66,7 +67,60 @@ async function loadCharacters(supabase) {
   }
 }
 
+// 로그인 전 홈: 소개 + 로그인 없이 쓰는 계산기 + 모든 기능(로그인이 필요한 곳은 자물쇠).
+const OPEN_TOOLS = [
+  { id: "level-plan", glyph: "EXP", hue: 150, title: "레벨업 계산", text: "사냥터 효율과 쿠폰으로 목표 레벨까지 걸리는 시간" },
+  { id: "maker", glyph: "◆", hue: 210, title: "메이커 계산", text: "보석 제작 단계별 비용과 기대 이익" },
+  { id: "dojo", glyph: "武", hue: 25, title: "무릉도장 루트", text: "구간 기록으로 검은 허리띠까지 가장 빠른 루트" },
+];
+
+function renderGuest(root) {
+  const tools = OPEN_TOOLS.filter((tool) => routes.some((route) => route.id === tool.id));
+  root.innerHTML = `
+    <div class="ym-home is-guest">
+      <div class="ym-home-col">
+        <section class="ym-home-hero ym-glass ym-guest-hero">
+          <span class="ym-guest-kicker">메이플랜드 도우미</span>
+          <h2>계산은 바로, 기록은 로그인해서</h2>
+          <p>레벨업·메이커·무릉 계산은 로그인 없이 써 보세요. 저장 버튼을 누를 때만 로그인하면 되고, 입력한 값은 로그인 뒤에도 그대로 남아요.</p>
+          <button class="ym-guest-login" type="button" data-login-open>Google·Discord로 로그인</button>
+        </section>
+        <section class="ym-home-panel ym-glass ym-home-features">
+          <header class="ym-home-head"><h2>모든 기능</h2><span>🔒 = 로그인하면 열려요</span></header>
+          <div class="ym-feature-grid">${categories.map(featureTile).join("")}</div>
+        </section>
+      </div>
+      <div class="ym-home-col">
+        <section class="ym-home-panel ym-glass ym-guest-tools">
+          <header class="ym-home-head"><h2>로그인 없이 쓰는 계산기</h2></header>
+          <div class="ym-guest-tool-list">${tools
+            .map((tool, index) => `<a class="ym-guest-tool" href="#/${tool.id}" style="--hue:${tool.hue};--i:${index}">
+              <span class="ym-feature-glyph${tool.glyph.length > 1 ? " is-small" : ""}" aria-hidden="true">${escapeHtml(tool.glyph)}</span>
+              <span><strong>${escapeHtml(tool.title)}</strong><small>${escapeHtml(tool.text)}</small></span>
+              <i aria-hidden="true">›</i>
+            </a>`)
+            .join("")}</div>
+        </section>
+        <section class="ym-home-panel ym-glass ym-guest-more">
+          <header class="ym-home-head"><h2>로그인하면</h2></header>
+          <ul>
+            <li>캐릭터별 보스·무릉·파퀘 숙제 체크와 다시 가능한 시각</li>
+            <li>사냥 기록, 경험치, 퀘스트 진행, 메모·링크</li>
+            <li>입력한 시세와 기록을 다른 기기에서도 그대로</li>
+          </ul>
+        </section>
+      </div>
+    </div>`;
+  root.addEventListener("click", (event) => {
+    if (event.target.closest(".ym-guest-tool, .ym-feature-tile a, .ym-feature-tile button")) sfx("tick");
+  });
+}
+
 export async function render(root) {
+  if (!isLoggedIn()) {
+    renderGuest(root);
+    return;
+  }
   root.innerHTML = `
     <div class="ym-home">
       <div class="ym-home-col">
@@ -279,11 +333,12 @@ function paintHero(hero, rows, heroId, progress) {
 // ── 모든 기능 ────────────────────────────────────────────────────────────
 
 function featureTile(category, index) {
+  const lock = (route) => (route.auth && !isLoggedIn() ? `<i class="ym-feature-lock" aria-label="로그인 필요">🔒</i>` : "");
   const subs = category.routes
     .map((route) =>
       route.quick
-        ? `<button type="button" class="ym-feature-sub" data-quick-nav="${route.id}">${escapeHtml(route.label)}</button>`
-        : `<a class="ym-feature-sub" href="#/${route.id}">${escapeHtml(route.label)}</a>`,
+        ? `<button type="button" class="ym-feature-sub" data-quick-nav="${route.id}">${escapeHtml(route.label)}${lock(route)}</button>`
+        : `<a class="ym-feature-sub" href="#/${route.id}">${escapeHtml(route.label)}${lock(route)}</a>`,
     )
     .join("");
   const first = category.routes.find((route) => !route.quick) ?? category.routes[0];
