@@ -1387,6 +1387,11 @@ export async function render(root) {
     else {
       recordRows = recordResult.data ?? [];
       paintRecords();
+      // 처음 열 때만 효율 순위 첫 캐릭터를 선택한다. 저장·재조회 때 사용자의 선택은 유지한다.
+      const first = records.querySelector("[data-open]");
+      if (!form.dataset.openCharacter && first) {
+        fillSheet(sheetFor(first.dataset.open, first.dataset.party), first.dataset.open, first.dataset.party);
+      }
       if (!runsReady) {
         records.insertAdjacentHTML(
           "afterbegin",

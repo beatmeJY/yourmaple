@@ -14330,3 +14330,33 @@ button.dj-log-row:hover { background: rgba(0, 0, 0, 0.32); }
 .char-hw-chip.is-wedding-pq { --chip-h: 330; }
 .char-hw-chip.is-crimson-pq { --chip-h: 10; }
 .char-hw-chip.is-malaysia-pq { --chip-h: 100; }
+/* 노말·카오스 숙제표 정렬 기준 고르기 */
+.hw-sortby { display: inline-flex; align-items: center; gap: 2px; height: 30px; padding: 0 3px 0 10px; border-radius: var(--radius-pill); border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); }
+.hw-sortby small { margin-right: 4px; color: #a59dbd; font-size: 11px; font-weight: 700; }
+.hw-sortby-btn { height: 24px; padding: 0 10px; border: 0; border-radius: var(--radius-pill); background: transparent; color: #cfc8e2; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.45s var(--spring); }
+.hw-sortby-btn:active { transform: scale(0.9); }
+.hw-sortby-btn.is-on { background: linear-gradient(180deg, oklch(0.78 0.14 295), oklch(0.62 0.17 295)); color: #fff; box-shadow: 0 4px 12px -6px oklch(0.7 0.17 295); }
+@media (prefers-reduced-motion: reduce) { .hw-sortby-btn { transition: none; } }
+/* 줄이 하나뿐인 숙제표: 왼쪽 이름 칸 없이 캐릭터 칸만 */
+.hw-table.is-bare { --label: 0px; }
+.hw-table.is-bare .hw-trow { grid-template-columns: repeat(var(--cols, 3), minmax(88px, 112px)); }
+@media (max-width: 640px) {
+  .hw-table.is-bare .hw-trow { grid-template-columns: repeat(var(--cols, 3), minmax(88px, 1fr)); }
+}
+
+/* 보스 입장: 게임의 보스 명패처럼 초상과 문양을 펼친다. */
+.fx-boss-entry { --entry-tone: var(--gold); position: fixed; inset: 0; z-index: 190; display: grid; place-items: center; pointer-events: none; background: radial-gradient(ellipse at center, var(--bg) 0%, transparent 72%); animation: fx-fade-in .3s both; }
+.fx-boss-entry[data-boss="pianus"] { --entry-tone: var(--danger); }
+.fx-boss-entry[data-boss="horntail"] { --entry-tone: var(--accent); }
+.fx-boss-entry.is-leaving { animation: fx-fade-out .35s both; }
+.fx-boss-stage { position: relative; isolation: isolate; display: grid; justify-items: center; gap: 10px; width: min(92vw, 560px); padding: 28px 16px; text-align: center; color: var(--text); animation: ym-pop-in .65s var(--spring) both; }
+.fx-boss-seal { position: absolute; z-index: -1; inset: 5% 12%; border: 1px solid var(--entry-tone); border-radius: 50%; box-shadow: 0 0 70px -15px var(--entry-tone), inset 0 0 50px -20px var(--entry-tone); animation: boss-seal-open 1.2s ease-out both; }
+.fx-boss-stage img { width: 140px; height: 130px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 0 20px var(--entry-tone)); }
+.fx-boss-stage small { color: var(--entry-tone); font-size: 12px; font-weight: 800; letter-spacing: .3em; }
+.fx-boss-stage strong { font-size: clamp(30px, 7vw, 54px); line-height: 1.15; color: var(--entry-tone); text-shadow: 0 3px 24px var(--bg); }
+.fx-boss-stage span { font-size: 16px; font-weight: 700; }
+.fx-boss-stage b { font-size: 14px; letter-spacing: .12em; color: var(--muted); }
+@keyframes boss-seal-open { from { transform: scale(.55) rotate(-35deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .fx-boss-entry, .fx-boss-entry.is-leaving, .fx-boss-stage, .fx-boss-seal { animation: none; }
+}

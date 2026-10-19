@@ -1,7 +1,7 @@
 import { bosses, bossTimeParts, formatStamp, readBossTime } from "../boss-cooldown.js";
 import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face.js";
 import { translateDbError } from "../db-error.js";
-import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
+import { BURST_COLORS, burstAt, celebrate, enterBoss, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
 import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, RAIDS, RESET_KINDS, availableDay, periodMs, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
 import { jobRecord } from "../job-label.js";
@@ -33,6 +33,8 @@ const TABS = [
 const HOUR_MS = 3_600_000;
 const READY_ONLY_KEY = "maple-note-homework-ready-only";
 const SOON_KEY = "maple-note-homework-soon";
+// 노말·카오스가 있는 숙제표의 정렬 기준 모드(숙제 key → 모드 key). 이 기기에만 기억한다.
+const SORT_MODE_KEY = "maple-note-homework-sort-mode";
 
 function tableMissing(error, pattern = /homework_(tasks|checks)/i) {
   const raw = `${error?.message || ""} ${error?.details || ""} ${error?.code || ""}`;
@@ -44,6 +46,23 @@ function readFlag(key) {
     return localStorage.getItem(key) === "1";
   } catch {
     return false;
+  }
+}
+
+function readSortModes() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SORT_MODE_KEY) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSortModes(value) {
+  try {
+    localStorage.setItem(SORT_MODE_KEY, JSON.stringify(value));
+  } catch {
+    // 기억하지 못해도 이번에는 적용한다.
   }
 }
 
@@ -127,6 +146,7 @@ export async function render(root) {
   const soonToggle = root.querySelector("[data-soon-also]");
   readyToggle.checked = readFlag(READY_ONLY_KEY);
   soonToggle.checked = readFlag(SOON_KEY);
+  let sortModes = readSortModes();
 
   let characters = [];
   let tasks = [];
@@ -343,9 +363,16 @@ export async function render(root) {
     const people = orderedCharacters().filter((character) => isEligible(task, character));
     const blocked = task.needsTable && !ready;
     // 표 칸 순서: 지금 가능한 캐릭터 먼저, 그다음 다시 가능까지 적게 남은 순. 같으면 계정·레벨 순(orderedCharacters, 안정 정렬).
+    // 노말·카오스가 있으면 사용자가 고른 모드 하나로 줄을 세운다(기본 노말).
+    const units = unitsOf(task);
+    const sortUnit = units.length > 1 ? units.find((unit) => unit.key === sortModes[task.key]) ?? units[0] : null;
+    const sortKey = (item) => {
+      const state = sortUnit ? stateOf(sortUnit, item.character, now) : item.state;
+      return state.done ? state.next ?? Infinity : -Infinity;
+    };
     const states = people
       .map((character) => ({ character, state: stateOf(task, character, now) }))
-      .sort((left, right) => (left.state.done ? left.state.next ?? Infinity : -Infinity) - (right.state.done ? right.state.next ?? Infinity : -Infinity) || 0);
+      .sort((left, right) => sortKey(left) - sortKey(right) || 0);
     const readyCount = states.filter((item) => !item.state.done).length;
     const doneCount = states.length - readyCount;
     const isManaging = managing.has(task.key);
@@ -372,9 +399,13 @@ export async function render(root) {
       .join("");
     // 무릉은 통합 점수로 완료를 판단하므로 체크 칸 줄을 두지 않는다(sql/033 전에는 예전처럼 체크 칸).
     const scoreOnly = task.key === "dojo" && dojoReady && !isManaging;
-    const table = (columns, headCell, rowCell) => `<div class="hw-tscroll"><div class="hw-table" style="--cols:${columns.length}">
-        <div class="hw-trow is-head"><div class="hw-tlabel is-corner"></div>${columns.map(headCell).join("")}</div>
-        ${scoreOnly ? "" : task.modes && !isManaging ? modeRows(columns) : `<div class="hw-trow"><div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(task.name)}</strong><small>${escapeHtml(RESET_KINDS[task.kind]?.label ?? "")}</small></span></div>${columns.map(rowCell).join("")}</div>`}
+    // 줄이 하나뿐인 표(파풀·피아·핑크빈·파퀘·직접 추가 등, 캐릭터 고르기 중 포함)는 왼쪽 이름 칸을 두지 않는다.
+    // 숙제 이름·초기화 방식은 카드 제목에 이미 있다. 노말·카오스, 무릉 점수처럼 줄이 여럿이면 이름 칸을 둔다.
+    const bare = isManaging || (task.key !== "dojo" && !(task.modes && task.modes.length > 1));
+    const label = (html) => (bare ? "" : html);
+    const table = (columns, headCell, rowCell) => `<div class="hw-tscroll"><div class="hw-table${bare ? " is-bare" : ""}" style="--cols:${columns.length}">
+        <div class="hw-trow is-head">${label(`<div class="hw-tlabel is-corner"></div>`)}${columns.map(headCell).join("")}</div>
+        ${scoreOnly ? "" : task.modes && !isManaging && !bare ? modeRows(columns) : bare && task.modes && !isManaging ? `<div class="hw-trow">${columns.map((item) => checkCell(unitsOf(task)[0], item.character, stateOf(unitsOf(task)[0], item.character, now), now)).join("")}</div>` : `<div class="hw-trow">${label(`<div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(task.name)}</strong><small>${escapeHtml(RESET_KINDS[task.kind]?.label ?? "")}</small></span></div>`)}${columns.map(rowCell).join("")}</div>`}
         ${extraRows(columns)}
       </div></div>`;
     let body;
@@ -399,6 +430,12 @@ export async function render(root) {
         <span class="hw-card-icon">${icon}</span>
         <span class="hw-card-title"><strong>${escapeHtml(task.name)} 숙제표</strong><small>${escapeHtml(task.sub)}</small></span>
         ${task.key === "dojo" ? `<a class="hw-mini hw-link" href="#/dojo?log">자세한 기록</a>` : ""}
+        ${sortUnit && !isManaging && people.length > 1
+          ? `<span class="hw-sortby" role="group" aria-label="${escapeHtml(task.name)} 정렬 기준"><small>정렬</small>${task.modes
+              .filter((mode) => !mode.disabled)
+              .map((mode) => `<button type="button" class="hw-sortby-btn${mode.key === sortUnit.key ? " is-on" : ""}" data-sort-mode="${escapeHtml(task.key)}" data-mode="${escapeHtml(mode.key)}" aria-pressed="${mode.key === sortUnit.key}">${escapeHtml(mode.label)}</button>`)
+              .join("")}</span>`
+          : ""}
         <span class="hw-card-count" title="끝낸 캐릭터 / 표시한 캐릭터"><span class="hw-mini-ring"></span><b>${doneCount}</b>/${states.length}</span>
         ${task.custom
           ? `<button type="button" class="hw-mini is-danger" data-delete-task="${task.key}">숙제 지우기</button>`
@@ -414,6 +451,10 @@ export async function render(root) {
   }
 
   function paintCards() {
+    // 표를 다시 만들어도 사용자가 보고 있던 가로·세로 위치를 유지한다.
+    const positions = new Map([...cardsBox.querySelectorAll("[data-task-card]")].map((card) => [card.dataset.taskCard, card.querySelector(".hw-tscroll")?.scrollLeft ?? 0]));
+    const ancestors = [];
+    for (let node = cardsBox.parentElement; node; node = node.parentElement) ancestors.push([node, node.scrollTop]);
     const now = Date.now();
     paintTabs();
     const list = visibleTasks().filter((task) => tab === "all" || task.kind === tab);
@@ -433,6 +474,11 @@ export async function render(root) {
     root.querySelector("[data-total]").innerHTML = `전체 <strong>${done}</strong> / ${total}`;
     root.querySelector("[data-add-open]").disabled = !ready;
     cardsBox.innerHTML = list.length ? list.map((task, index) => taskCard(task, now, index)).join("") : `<p class="hw-muted">이 초기화 방식의 숙제가 없어요.</p>`;
+    for (const card of cardsBox.querySelectorAll("[data-task-card]")) {
+      const scroller = card.querySelector(".hw-tscroll");
+      if (scroller) scroller.scrollLeft = positions.get(card.dataset.taskCard) ?? 0;
+    }
+    for (const [node, top] of ancestors) node.scrollTop = top;
     // 등장 연출은 처음 한 번만(다시 그릴 때 깜빡이지 않게).
     if (painted) root.querySelector(".hw-page").classList.add("is-settled");
     painted = true;
@@ -636,7 +682,9 @@ export async function render(root) {
       const cell = cardsBox.querySelector(`[data-check="${CSS.escape(task.key)}"][data-character="${character.id}"]`) ?? cardsBox.querySelector(`[data-task-card="${CSS.escape(task.key)}"]`) ?? target;
       burstAt(cell, task.boss ? BOSS_BURST[task.key] : BURST_COLORS.success, task.boss ? 26 : 18, task.boss ? 1.1 : 0.9);
     } else sfx("uncheck");
-    if (undoable && value != null) {
+    const bossKey = task.key.split("-")[0];
+    const entering = doneNow && target && ["pianus", "papulatus", "zakum", "horntail"].includes(bossKey);
+    if (!entering && undoable && value != null) {
       notify(`${character.name} · ${task.name}: ${formatStamp(new Date(value))}에 끝낸 것으로 기록했습니다.`, "info", { label: "취소", onClick: () => undo(task.key, character.id) });
     }
     const { error } = await persist(task, character, value);
@@ -649,7 +697,10 @@ export async function render(root) {
       notify(translateDbError(error), "error");
       return;
     }
-    if (doneNow) cheerIfComplete(character);
+    // 실제 클릭으로 입장한 보스만, DB 저장 성공 후 연출한다. 시각 수정·취소에는 띄우지 않는다.
+    if (entering) {
+      enterBoss(task.name, character.name, BOSS_ART[bossKey], bossKey);
+    } else if (doneNow) cheerIfComplete(character);
   }
 
   async function undo(taskKey, characterId) {
@@ -924,7 +975,26 @@ export async function render(root) {
 
   // ── 이벤트 ────────────────────────────────────────────────
 
+  root.addEventListener("wheel", (event) => {
+    const scroller = event.target.closest(".hw-tscroll");
+    if (!scroller || event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+    if (event.target.closest("input, textarea, select")) return;
+    const before = scroller.scrollLeft;
+    const delta = event.deltaY * (event.deltaMode === 1 ? 20 : event.deltaMode === 2 ? scroller.clientWidth : 1);
+    scroller.scrollLeft += delta;
+    // 양 끝에서는 원래 세로 스크롤을 허용한다. 트랙패드 가로 제스처도 그대로 둔다.
+    if (scroller.scrollLeft !== before) event.preventDefault();
+  }, { passive: false });
+
   root.addEventListener("click", async (event) => {
+    const sortButton = event.target.closest("[data-sort-mode]");
+    if (sortButton) {
+      sortModes = { ...sortModes, [sortButton.dataset.sortMode]: sortButton.dataset.mode };
+      writeSortModes(sortModes);
+      sfx("tick");
+      paintCards();
+      return;
+    }
     const tabButton = event.target.closest("[data-tab]");
     if (tabButton) {
       tab = tabButton.dataset.tab;

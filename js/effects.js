@@ -26,6 +26,7 @@ export function paletteHue(name) {
 
 // [주파수, 시작(초), 길이(초), 파형, 음량]
 const SOUNDS = {
+  entrance: [[98, 0, 0.9, "triangle", 0.12], [147, 0.1, 0.9, "triangle", 0.09], [196, 0.22, 0.8, "triangle", 0.1], [294, 0.4, 0.9, "triangle", 0.1], [392, 0.55, 0.9, "triangle", 0.08]],
   tick: [[1320, 0, 0.06, "sine", 0.05]],
   check: [[660, 0, 0.12, "triangle", 0.12], [990, 0.07, 0.2, "triangle", 0.12]],
   uncheck: [[440, 0, 0.12, "sine", 0.07]],
@@ -207,4 +208,25 @@ export function celebrate(title, subtitle = "") {
     overlay.classList.add("is-leaving");
     setTimeout(() => overlay.remove(), 300);
   }, 2300);
+}
+
+// 보스 입장: 조작을 가리지 않는 보스별 문양·초상·저음 팡파르.
+let entranceTimer = 0;
+export function enterBoss(name, characterName, art, key) {
+  clearTimeout(entranceTimer);
+  document.querySelector(".fx-boss-entry")?.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "fx-boss-entry";
+  overlay.dataset.boss = key;
+  overlay.setAttribute("role", "status");
+  overlay.innerHTML = `<div class="fx-boss-stage"><i class="fx-boss-seal" aria-hidden="true"></i><img alt="" /><small>BOSS ENCOUNTER</small><strong></strong><span></span><b>입장했습니다</b></div>`;
+  overlay.querySelector("img").src = art;
+  overlay.querySelector("strong").textContent = name;
+  overlay.querySelector("span").textContent = characterName;
+  document.body.append(overlay);
+  sfx("entrance");
+  entranceTimer = setTimeout(() => {
+    overlay.classList.add("is-leaving");
+    setTimeout(() => overlay.remove(), 350);
+  }, 2600);
 }
