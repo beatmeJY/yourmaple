@@ -14453,3 +14453,16 @@ button.account-email:hover { color: var(--text); background: rgba(255, 255, 255,
 .dj-quick-char-make:disabled { opacity: 0.5; cursor: progress; }
 .dj-quick-char small { color: #d9c49c; font-size: 11.5px; word-break: keep-all; }
 @media (prefers-reduced-motion: reduce) { .dj-quick-char, .dj-quick-char-make { animation: none; transition: none; } }
+/* 탈퇴 7일 유예: 대기 중 표시와 취소 */
+.account-danger.is-pending { border-color: oklch(0.82 0.14 85 / 0.55); background: oklch(0.6 0.12 85 / 0.12); }
+.account-danger.is-pending h3 { color: oklch(0.88 0.13 85); }
+.account-cancel { height: 40px; border: 0; border-radius: 12px; background: linear-gradient(180deg, oklch(0.82 0.13 160), oklch(0.66 0.14 160)); color: #052417; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; transition: filter 0.2s, transform 0.45s var(--spring); }
+.account-cancel:hover { filter: brightness(1.08); }
+.account-cancel:active { transform: scale(0.97); }
+.account-cancel:disabled { opacity: 0.5; cursor: progress; }
+.deletion-banner { position: fixed; left: 50%; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 12px; width: min(680px, calc(100vw - 24px)); padding: 10px 12px 10px 16px; border-radius: 16px; border: 1px solid oklch(0.7 0.17 25 / 0.6); background: rgba(40, 14, 14, 0.94); box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.8); color: #ffe1d8; font-size: 13px; transform: translateX(-50%); animation: deletion-banner-in 0.5s var(--spring) both; }
+.deletion-banner span { flex: 1; min-width: 0; word-break: keep-all; }
+.deletion-banner b { color: #ffb4a3; }
+.deletion-banner button { flex: none; height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: linear-gradient(180deg, oklch(0.82 0.13 160), oklch(0.66 0.14 160)); color: #052417; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+@keyframes deletion-banner-in { from { opacity: 0; transform: translate(-50%, 20px); } }
+@media (prefers-reduced-motion: reduce) { .deletion-banner { animation: none; } .account-cancel { transition: none; } }

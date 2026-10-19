@@ -1,4 +1,4 @@
-import { openAccountDialog } from "./account.js";
+import { checkPendingDeletion, openAccountDialog } from "./account.js";
 import { accountLabel, signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
@@ -74,6 +74,8 @@ function showApp(session) {
   for (const node of document.querySelectorAll("[data-logged-in]")) node.hidden = !userId;
   for (const node of document.querySelectorAll("[data-logged-out]")) node.hidden = Boolean(userId);
   if (!entered) return;
+  // 탈퇴 대기 중이면 화면 아래에 남은 날과 "탈퇴 취소" 띠를 보인다(로그아웃이면 띠를 지운다).
+  checkPendingDeletion();
   // 로그인하고 돌아왔으면 저장하려던 화면으로 간다(그 화면이 맡겨 둔 입력값을 되살린다).
   const next = userId ? takeNext() : null;
   if (next?.route && `#/${next.route}` !== location.hash.split("?")[0]) location.hash = `#/${next.route}`;

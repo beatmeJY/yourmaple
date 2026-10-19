@@ -99,6 +99,8 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 
 034까지 이미 실행했다면 `sql/035_delete_my_account.sql` 만 실행합니다. 화면의 "내 계정 → 회원 탈퇴"가 부르는 함수(`delete_my_account`)를 만듭니다. 호출한 사용자 계정을 지우면 모든 표의 기록이 cascade 로 함께 지워집니다. 이미 이 파일을 실행했다면 같은 파일을 다시 실행합니다.
 
+035까지 이미 실행했다면 `sql/036_account_deletion_grace.sql` 만 실행합니다(035를 안 했어도 이 파일만으로 됩니다). 회원 탈퇴를 7일 유예로 바꿉니다: "탈퇴 신청"은 `account_deletions` 에 한 줄만 남기고, 7일 안에 취소할 수 있으며, 7일이 지난 신청은 매일 03:00(UTC) pg_cron 작업이 계정을 지웁니다(기록은 cascade). 035의 즉시 삭제 함수는 화면에서 부르지 못하게 막습니다. 이미 이 파일을 실행했다면 같은 파일을 다시 실행합니다.
+
 `anon` 행이 없고, 표마다 `rls_enabled` 가 true 이면 정상입니다.
 
 ## 로그인 연결
@@ -121,7 +123,7 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 3. **Discord**: Discord Developer Portal → New Application → OAuth2 → Redirects 에 같은 `.../auth/v1/callback` 을 넣고, Client ID·Client Secret 을 Supabase 의 Discord provider 에 넣습니다.
 
 - 로그인은 PKCE 방식(`flowType: "pkce"`, `js/supabase-client.js`)이라 돌아올 때 주소에 `?code=` 가 붙고, 처리한 뒤 지웁니다(`#` 은 화면 주소로 씀).
-- 회원 탈퇴는 헤더 이메일 → "내 계정"(`js/account.js`)에서 합니다. 얼굴 이미지를 지운 뒤 `sql/035_delete_my_account.sql` 의 함수로 계정을 지우고, 모든 기록은 cascade 로 함께 지워집니다.
+- 회원 탈퇴는 헤더 이메일 → "내 계정"(`js/account.js`)에서 합니다. 계정 이메일을 똑같이 적어야 신청되고, **7일 유예** 뒤 매일 예약 작업이 계정을 지웁니다(sql/036). 대기 중에는 화면 아래 띠와 내 계정 창에서 취소할 수 있습니다. 2026-10-19 즉시 삭제(sql/035)로 운영자 계정 기록을 잃은 뒤 바꿨습니다.
 - 같은 이메일(예: 처음 가입한 이메일과 같은 Gmail)로 Google·Discord 로그인하면 Supabase 가 같은 계정에 자동으로 붙입니다(기존 이메일이 인증된 경우). 이메일이 다르면 계정이 따로 생깁니다.
 - 클라이언트 보안 비밀은 Supabase 에만 넣고 이 저장소에는 넣지 않습니다.
 
