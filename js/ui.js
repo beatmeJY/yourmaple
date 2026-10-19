@@ -97,6 +97,7 @@ export function renderShell() {
               <div class="profile-menu ym-glass" data-profile-menu hidden></div>
             </div>
             <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><i aria-hidden="true"></i><span>효과음 켜짐</span></button>
+            <button class="link-account-open" type="button" data-link-account hidden>계정 연결</button>
             <p class="account-email" id="account-email"></p>
             <button class="icon-button" type="button" data-logout>로그아웃</button>
           </div>

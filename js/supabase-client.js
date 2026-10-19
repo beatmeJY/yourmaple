@@ -65,6 +65,8 @@ export async function getSupabase() {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      // 구글·디스코드에서 돌아올 때 토큰을 # 대신 ?code= 로 받는다(# 은 화면 주소로 쓰기 때문).
+      flowType: "pkce",
     },
   });
   return client;
