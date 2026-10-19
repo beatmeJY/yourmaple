@@ -1,13 +1,6 @@
 import { ConfigError, getSupabase } from "./supabase-client.js";
 
 const knownErrors = [
-  ["Invalid login credentials", "이메일 또는 비밀번호가 맞지 않습니다."],
-  ["Email not confirmed", "이메일 인증이 끝나지 않았습니다. 메일함의 링크를 누른 뒤 다시 로그인하세요."],
-  ["User already registered", "이미 가입된 이메일입니다. 로그인을 선택해 주세요."],
-  ["Password should be at least", "비밀번호가 너무 짧습니다. 6자 이상으로 다시 입력하세요."],
-  ["Unable to validate email", "이메일 형식을 확인해 주세요."],
-  ["Signup requires a valid password", "비밀번호를 입력해 주세요."],
-  ["email rate limit exceeded", "인증 메일을 너무 많이 요청했습니다. 잠시 후 다시 시도하세요."],
   ["For security purposes", "요청이 너무 빠릅니다. 잠시 후 다시 시도하세요."],
   ["Signups not allowed", "새 가입이 꺼져 있습니다. Supabase → Authentication → Sign In / Providers 의 User Signups 에서 Allow new users to sign up 을 켜 주세요."],
   ["provider is not enabled", "이 로그인 방식이 아직 꺼져 있습니다. Supabase → Authentication → Sign In / Providers 에서 Google·Discord 를 켜 주세요."],
@@ -28,7 +21,7 @@ function returnUrl() {
   return `${location.origin}${location.pathname}`;
 }
 
-/** 화면에 보일 계정 이름: 이메일 → 이름 */
+/** 화면에 보일 계정 이름: 이메일 → 이름 (2026-10-19부터 로그인은 Google·Discord만, 비밀번호는 받지 않는다) */
 export function accountLabel(session) {
   const user = session?.user;
   if (!user) return "";
@@ -70,18 +63,7 @@ export async function startAuth(onSession) {
   }
 }
 
-export async function signIn(email, password) {
-  const supabase = await getSupabase();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  return { error: error ? translateAuthError(error) : "" };
-}
 
-export async function signUp(email, password) {
-  const supabase = await getSupabase();
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) return { error: translateAuthError(error), needsEmailConfirm: false };
-  return { error: "", needsEmailConfirm: !data.session };
-}
 
 export async function signOut() {
   const supabase = await getSupabase();

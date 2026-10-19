@@ -14372,13 +14372,7 @@ button.dj-log-row:hover { background: rgba(0, 0, 0, 0.32); }
 .auth-provider:disabled { cursor: progress; opacity: 0.6; }
 .auth-provider.is-busy { animation: auth-busy 1s ease-in-out infinite; }
 @keyframes auth-busy { 50% { opacity: 0.45; } }
-.auth-email { margin-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 10px; }
-.auth-email summary { cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 700; text-align: center; list-style: none; }
-.auth-email summary::-webkit-details-marker { display: none; }
-.auth-email summary::after { content: " ▾"; }
-.auth-email[open] summary::after { content: " ▴"; }
-.auth-email[open] > *:not(summary) { animation: ym-fade-up 0.3s var(--ease-out) both; }
-.auth-email form { margin-top: 10px; }
+.auth-card > p.auth-note { margin: 12px 0 0; color: var(--muted); font-size: 12px; word-break: keep-all; }
 @media (prefers-reduced-motion: reduce) {
   .auth-provider, .auth-provider.is-busy { animation: none; transition: none; }
 }
@@ -14419,3 +14413,43 @@ button.dj-log-row:hover { background: rgba(0, 0, 0, 0.32); }
   .ym-home.is-guest .ym-guest-more { order: 3; }
   .ym-home.is-guest .ym-home-features { order: 4; }
 }
+/* 내 계정 창(헤더 이메일 버튼): 계정 정보·로그인 수단·회원 탈퇴 */
+button.account-email { border: 0; background: none; padding: 4px 8px; border-radius: 8px; font: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+button.account-email:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.account-dialog { width: min(440px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--glass-line); color: var(--text); }
+.account-dialog[open] { animation: ym-pop-in 0.4s var(--spring) both; }
+.account-dialog::backdrop { background: rgba(8, 6, 16, 0.6); }
+.account-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.account-head h2 { margin: 0; font-size: 19px; }
+.account-info { display: grid; gap: 8px; margin: 0; }
+.account-info > div { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; align-items: center; }
+.account-info dt { color: var(--muted); font-size: 12px; font-weight: 700; }
+.account-info dd { margin: 0; overflow-wrap: anywhere; font-size: 14px; }
+.account-providers { display: flex; flex-wrap: wrap; gap: 6px; }
+.account-provider { padding: 3px 10px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.08); font-size: 12px; font-weight: 800; }
+.account-provider.is-google { background: #fff; color: #1f1f1f; }
+.account-provider.is-discord { background: #5865f2; color: #fff; }
+.account-note { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; word-break: keep-all; }
+.account-note a { color: var(--muted); }
+.account-danger { display: grid; gap: 8px; margin-top: 16px; padding: 14px; border-radius: 14px; border: 1px solid oklch(0.65 0.18 25 / 0.5); background: oklch(0.45 0.15 25 / 0.14); }
+.account-danger h3 { margin: 0; font-size: 15px; color: oklch(0.82 0.13 25); }
+.account-danger p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55; word-break: keep-all; }
+.account-delete { height: 40px; border: 0; border-radius: 12px; background: oklch(0.58 0.2 25); color: #fff; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; transition: filter 0.2s, transform 0.45s var(--spring); }
+.account-delete:disabled { cursor: not-allowed; opacity: 0.4; }
+.account-delete:not(:disabled):hover { filter: brightness(1.1); }
+.account-delete:not(:disabled):active { transform: scale(0.97); }
+.account-delete.is-busy { animation: auth-busy 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .account-dialog[open], .account-delete.is-busy { animation: none; } }
+/* 무릉: 이름만으로 캐릭터 만들기 칸 */
+.dj-quick-char { display: grid; gap: 6px; margin: 4px 0 12px; padding: 12px 14px; border-radius: 10px; border: 1px dashed oklch(0.8 0.13 85 / 0.55); background: rgba(0, 0, 0, 0.22); animation: ym-fade-up 0.35s var(--ease-out) both; }
+.dj-quick-char[hidden] { display: none; }
+.dj-quick-char-hint { margin: 0; color: #ffe2a8; font-size: 13px; font-weight: 700; word-break: keep-all; }
+.dj-quick-char-row { display: flex; gap: 8px; align-items: center; }
+.dj-quick-char-row input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid oklch(0.8 0.13 85 / 0.4); border-radius: 10px; background: rgba(0, 0, 0, 0.35); color: #fff4dc; font: inherit; font-size: 15px; }
+.dj-quick-char-row input:focus { outline: none; border-color: oklch(0.86 0.15 85); box-shadow: 0 0 0 3px oklch(0.8 0.15 70 / 0.25); }
+.dj-quick-char-make { flex: none; height: 38px; padding: 0 16px; border: 0; border-radius: 10px; background: linear-gradient(180deg, #f3c76a, #c98b2a); color: #2a1600; font: inherit; font-weight: 800; cursor: pointer; transition: transform 0.45s var(--spring), filter 0.2s; }
+.dj-quick-char-make:hover { filter: brightness(1.08); }
+.dj-quick-char-make:active { transform: scale(0.94); }
+.dj-quick-char-make:disabled { opacity: 0.5; cursor: progress; }
+.dj-quick-char small { color: #d9c49c; font-size: 11.5px; word-break: keep-all; }
+@media (prefers-reduced-motion: reduce) { .dj-quick-char, .dj-quick-char-make { animation: none; transition: none; } }

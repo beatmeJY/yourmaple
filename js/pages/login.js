@@ -1,4 +1,4 @@
-import { OAUTH_PROVIDERS, signIn, signInWithProvider, signUp } from "../auth.js";
+import { OAUTH_PROVIDERS, signInWithProvider } from "../auth.js";
 import { notify } from "../toast.js";
 
 export function renderSetup(root, message, title = "설정이 필요합니다") {
@@ -40,21 +40,7 @@ export function renderLogin(root, { failure = "", reason = "" } = {}) {
         <p>메이플랜드 강화·무릉·숙제·사냥을 한곳에서 계산하고 기록해요.</p>
         ${reason ? `<p class="auth-reason"><b>로그인이 필요해요</b><span></span></p>` : ""}
         <div class="auth-providers">${providerButtons("data-oauth")}</div>
-        <details class="auth-email">
-          <summary>이메일로 로그인</summary>
-        <form id="auth-form">
-          <label class="field">
-            <span>이메일</span>
-            <input name="email" type="email" autocomplete="username" required />
-          </label>
-          <label class="field">
-            <span>비밀번호</span>
-            <input name="password" type="password" minlength="6" autocomplete="current-password" required />
-          </label>
-          <button class="primary-button" type="submit">로그인</button>
-        </form>
-        <button class="text-button" type="button" data-switch-auth>계정이 없으면 가입</button>
-        </details>
+        <p class="auth-note">Your Maple은 비밀번호를 받지 않아요. 로그인은 Google·Discord가 처리해요.</p>
         <p class="auth-legal">계속하면 <a href="./terms.html">이용약관</a>과 <a href="./privacy.html">개인정보 처리방침</a>에 동의하는 것으로 봅니다.</p>
       </div>
     </section>
@@ -77,58 +63,4 @@ export function renderLogin(root, { failure = "", reason = "" } = {}) {
   for (const button of root.querySelectorAll("[data-oauth]")) {
     button.addEventListener("click", () => runQuick(button, () => signInWithProvider(button.dataset.oauth)));
   }
-
-
-  const form = root.querySelector("#auth-form");
-  const switchButton = root.querySelector("[data-switch-auth]");
-  const submitButton = form.querySelector(".primary-button");
-  const password = form.elements.password;
-  let mode = "login";
-
-  function showMessage(text, kind) {
-    notify(text, kind);
-  }
-
-  function setMode(next) {
-    mode = next;
-    const joining = mode === "signup";
-    submitButton.textContent = joining ? "가입하기" : "로그인";
-    switchButton.textContent = joining ? "이미 계정이 있으면 로그인" : "계정이 없으면 가입";
-    password.autocomplete = joining ? "new-password" : "current-password";
-    showMessage("", "info");
-  }
-
-  switchButton.addEventListener("click", () => {
-    setMode(mode === "login" ? "signup" : "login");
-  });
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const email = form.elements.email.value.trim();
-    const passwordValue = form.elements.password.value;
-    submitButton.disabled = true;
-    switchButton.disabled = true;
-    showMessage("처리 중입니다.", "info");
-
-    try {
-      if (mode === "signup") {
-        const result = await signUp(email, passwordValue);
-        if (result.error) {
-          showMessage(result.error, "error");
-        } else if (result.needsEmailConfirm) {
-          setMode("login");
-          showMessage("가입 메일을 보냈습니다. 메일의 링크를 누른 뒤 로그인해 주세요.", "info");
-        }
-      } else {
-        const result = await signIn(email, passwordValue);
-        if (result.error) showMessage(result.error, "error");
-      }
-    } catch (error) {
-      showMessage(error?.message || "로그인 처리 중 문제가 생겼습니다.", "error");
-    } finally {
-      submitButton.disabled = false;
-      switchButton.disabled = false;
-      if (mode === "signup") submitButton.textContent = "가입하기";
-    }
-  });
 }

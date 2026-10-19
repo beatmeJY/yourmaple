@@ -97,6 +97,8 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 
 033까지 이미 실행했다면 `sql/034_dojo_score_clear.sql` 만 실행합니다. 숙제 체크리스트 무릉 "오늘 초기화"(오늘 쌓은 점수만 0으로, 통합 점수는 그대로)를 기록할 수 있게 합니다. 이미 이 파일을 실행했다면 같은 파일을 다시 실행합니다.
 
+034까지 이미 실행했다면 `sql/035_delete_my_account.sql` 만 실행합니다. 화면의 "내 계정 → 회원 탈퇴"가 부르는 함수(`delete_my_account`)를 만듭니다. 호출한 사용자 계정을 지우면 모든 표의 기록이 cascade 로 함께 지워집니다. 이미 이 파일을 실행했다면 같은 파일을 다시 실행합니다.
+
 `anon` 행이 없고, 표마다 `rls_enabled` 가 true 이면 정상입니다.
 
 ## 로그인 연결
@@ -111,14 +113,15 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 
 - 로그인하지 않아도 앱이 열립니다. 홈은 소개 화면이고, **레벨업 계산·메이커 계산·무릉도장(·강화 계산)** 은 로그인 없이 계산할 수 있습니다. 저장 버튼을 누르면 그때 로그인 화면으로 가고, 로그인하고 돌아오면 그 화면으로 돌아와 적던 값을 다시 채워 둡니다(저장은 다시 누름). 맡긴 값은 sessionStorage 에 30분 동안 둡니다(`js/session.js`).
 - 캐릭터·숙제·사냥·퀘스트·몬스터·거래·메모·링크는 내 기록 화면이라 로그인해야 열립니다(`js/routes.js` 의 `auth: true`).
-- 로그인 화면에는 "Google로 계속하기", "Discord로 계속하기", 접힌 "이메일로 로그인"이 있습니다. 아래를 켜기 전에는 버튼을 누르면 무엇을 켜야 하는지 안내가 나옵니다.
+- 로그인은 **Google·Discord만** 씁니다(2026-10-19 이메일·비밀번호 로그인 삭제 — 비밀번호를 보관하지 않음). 로그인 화면에는 "Google로 계속하기", "Discord로 계속하기"만 있습니다. 아래를 켜기 전에는 버튼을 누르면 무엇을 켜야 하는지 안내가 나옵니다.
 
-0. **Sign In / Providers → User Signups → Allow new users to sign up** 을 켭니다. 꺼져 있으면 처음 오는 Google·Discord 계정이 "Signups not allowed for this instance"로 막힙니다. 같은 곳의 **Confirm email** 은 켜 두는 것을 권합니다(아무 이메일로나 바로 가입하지 못하게). **Anonymous sign-ins 는 끕니다**(로그인 없이 둘러보기는 2026-10-19 삭제).
+0. **Sign In / Providers → User Signups → Allow new users to sign up** 을 켭니다. 꺼져 있으면 처음 오는 Google·Discord 계정이 "Signups not allowed for this instance"로 막힙니다. **Anonymous sign-ins 는 끕니다**(로그인 없이 둘러보기는 2026-10-19 삭제). **Email provider 도 끕니다**(이메일·비밀번호 로그인 삭제). 끄기 전에 Authentication → Users 에서 이메일로 가입한 기존 계정의 Identities 에 google 또는 discord 가 함께 있는지 확인합니다(없으면 그 계정으로 들어갈 수 없게 됨).
 1. **URL Configuration**: Site URL 을 `https://yourmaple.kr` 로, Redirect URLs 에 `https://yourmaple.kr/**` 와 `http://127.0.0.1:5500/**` 를 넣습니다(로그인 뒤 돌아올 주소).
 2. **Google**: Google Cloud Console → API 및 서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID(웹 애플리케이션). 승인된 리디렉션 URI 에 `https://<프로젝트>.supabase.co/auth/v1/callback` 을 넣고, 받은 클라이언트 ID·보안 비밀을 Supabase 의 Google provider 에 넣습니다. OAuth 동의 화면도 만들어야 합니다.
 3. **Discord**: Discord Developer Portal → New Application → OAuth2 → Redirects 에 같은 `.../auth/v1/callback` 을 넣고, Client ID·Client Secret 을 Supabase 의 Discord provider 에 넣습니다.
 
-- 로그인은 PKCE 방식(`flowType: "pkce"`, `js/supabase-client.js`)이라 돌아올 때 주소에 `?code=` 가 붙고, 처리한 뒤 지웁니다(`#` 은 화면 주소로 씀). 그래서 이메일 가입 확인 링크도 **가입한 그 브라우저에서** 열어야 로그인이 이어집니다.
+- 로그인은 PKCE 방식(`flowType: "pkce"`, `js/supabase-client.js`)이라 돌아올 때 주소에 `?code=` 가 붙고, 처리한 뒤 지웁니다(`#` 은 화면 주소로 씀).
+- 회원 탈퇴는 헤더 이메일 → "내 계정"(`js/account.js`)에서 합니다. 얼굴 이미지를 지운 뒤 `sql/035_delete_my_account.sql` 의 함수로 계정을 지우고, 모든 기록은 cascade 로 함께 지워집니다.
 - 같은 이메일(예: 처음 가입한 이메일과 같은 Gmail)로 Google·Discord 로그인하면 Supabase 가 같은 계정에 자동으로 붙입니다(기존 이메일이 인증된 경우). 이메일이 다르면 계정이 따로 생깁니다.
 - 클라이언트 보안 비밀은 Supabase 에만 넣고 이 저장소에는 넣지 않습니다.
 

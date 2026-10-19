@@ -97,7 +97,7 @@ export function renderShell() {
               <div class="profile-menu ym-glass" data-profile-menu hidden></div>
             </div>
             <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><i aria-hidden="true"></i><span>효과음 켜짐</span></button>
-            <p class="account-email" id="account-email" data-logged-in hidden></p>
+            <button class="account-email" id="account-email" type="button" data-account-open data-logged-in hidden title="내 계정 · 회원 탈퇴"></button>
             <button class="icon-button" type="button" data-logout data-logged-in hidden>로그아웃</button>
             <button class="login-open" type="button" data-login-open data-logged-out hidden>로그인</button>
           </div>

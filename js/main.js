@@ -1,3 +1,4 @@
+import { openAccountDialog } from "./account.js";
 import { accountLabel, signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
@@ -122,6 +123,10 @@ document.body.addEventListener("click", async (event) => {
       return;
     }
     openLinkPanel();
+    return;
+  }
+  if (event.target.closest("[data-account-open]")) {
+    openAccountDialog();
     return;
   }
   if (event.target.closest("[data-login-open]")) {

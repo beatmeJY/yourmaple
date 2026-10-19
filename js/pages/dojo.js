@@ -32,10 +32,13 @@ import {
   spanText,
 } from "../dojo-calc.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
+import { createQuickCharacter } from "../quick-character.js";
 import { isLoggedIn, requireLogin, takeDraft } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
+// 캐릭터 선택의 "＋ 새 캐릭터" 항목 값
+const QUICK_OPTION = "__quick_new";
 const recordColumns = "id, character_id, character_name, party, floors, score, runs, memo, created_at, updated_at";
 
 function formatWhen(value) {
@@ -183,6 +186,15 @@ export async function render(root) {
           <label class="dj-picker"><span class="sr-only">캐릭터 선택</span>
             <select name="character_id" aria-label="캐릭터 선택"><option value="">캐릭터 선택</option></select>
           </label>
+        </div>
+        <div class="dj-quick-char" data-quick-char hidden>
+          <p class="dj-quick-char-hint" data-quick-char-hint>이름만 적으면 바로 캐릭터를 만들어요.</p>
+          <div class="dj-quick-char-row">
+            <input data-quick-char-name maxlength="30" autocomplete="off" placeholder="캐릭터 이름" aria-label="새 캐릭터 이름" />
+            <button type="button" class="dj-quick-char-make" data-quick-char-create>만들기</button>
+            <button type="button" class="text-button" data-quick-char-cancel>닫기</button>
+          </div>
+          <small>직업·레벨은 나중에 캐릭터 관리에서 채워요. 만든 캐릭터는 무릉 숙제표와 퀘스트에도 바로 보여요.</small>
         </div>
         <div data-records></div>
       </section>
@@ -384,9 +396,66 @@ export async function render(root) {
     const known = new Set(accounts.map((account) => account.id));
     const loose = characters.filter((character) => !known.has(character.account_id)).sort(compareCharacter);
     if (loose.length) groups.push(`<optgroup label="계정 없음">${loose.map(characterOption).join("")}</optgroup>`);
-    select.innerHTML = [`<option value="">캐릭터 선택</option>`, ...groups].join("");
+    // 로그인했으면 맨 아래에 "이름만으로 새 캐릭터"(캐릭터가 없을 때 적던 기록을 바로 저장할 수 있게)
+    const quick = isLoggedIn() ? [`<option value="${QUICK_OPTION}">＋ 새 캐릭터 (이름만)</option>`] : [];
+    select.innerHTML = [`<option value="">캐릭터 선택</option>`, ...groups, ...quick].join("");
     if (current && characters.some((character) => character.id === current)) select.value = current;
   }
+
+  // ── 이름만으로 캐릭터 만들기 ──────────────────────────────
+  const quickBox = root.querySelector("[data-quick-char]");
+
+  function showQuickCharacter(hint = "이름만 적으면 바로 캐릭터를 만들어요.", { focus = true } = {}) {
+    quickBox.hidden = false;
+    quickBox.querySelector("[data-quick-char-hint]").textContent = hint;
+    if (focus) quickBox.querySelector("[data-quick-char-name]").focus({ preventScroll: false });
+  }
+
+  function hideQuickCharacter() {
+    quickBox.hidden = true;
+    quickBox.querySelector("[data-quick-char-name]").value = "";
+  }
+
+  async function createCharacterQuick() {
+    const input = quickBox.querySelector("[data-quick-char-name]");
+    const button = quickBox.querySelector("[data-quick-char-create]");
+    if (button.disabled) return;
+    // 지금 적던 기록을 맡겨 두고, 새 캐릭터를 열면 그 위에 다시 채운다(새 캐릭터는 저장된 기록이 없어 칸이 비워지므로).
+    const keep = carried ?? carrySheet();
+    button.disabled = true;
+    const supabase = await getSupabase();
+    const result = await createQuickCharacter(supabase, input.value, { homeworkKeys: ["dojo"] });
+    button.disabled = false;
+    if (!root.isConnected) return;
+    if (result.error || result.dbError) {
+      notify(result.error || translateDbError(result.dbError), "error");
+      input.focus();
+      return;
+    }
+    characters = [...characters, result.character];
+    if (result.createdAccount) accounts = sortByName([...accounts, result.account]);
+    paintCharacters();
+    hideQuickCharacter();
+    carried = keep;
+    form.elements.character_id.value = result.character.id;
+    openSheet(result.character.id, form.elements.party.value || "solo");
+    paintWho();
+    sfx("check");
+    burstAt(form.elements.character_id, ["#ffd98a", "#ff9a6b", "#ffffff"], 16, 0.8);
+    notify(`${result.character.name} 캐릭터를 만들었어요. 저장을 누르면 이 캐릭터에 기록돼요.`, "info");
+    if (result.warning) notify(translateDbError(result.warning), "error");
+  }
+
+  quickBox.addEventListener("click", (event) => {
+    if (event.target.closest("[data-quick-char-create]")) createCharacterQuick();
+    if (event.target.closest("[data-quick-char-cancel]")) hideQuickCharacter();
+  });
+  quickBox.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing || !event.target.closest("[data-quick-char-name]")) return;
+    // 기록 폼 안이라 Enter 가 기록 저장으로 가지 않게 막는다.
+    event.preventDefault();
+    createCharacterQuick();
+  });
 
   function readCharacter() {
     const id = form.elements.character_id.value;
@@ -1423,6 +1492,8 @@ export async function render(root) {
     if (accountResult.error) notify(translateDbError(accountResult.error), "error");
     accounts = accountResult.error ? [] : sortByName(accountResult.data ?? []);
     paintCharacters();
+    // 로그인했는데 캐릭터가 하나도 없으면 이름만으로 만드는 칸을 바로 보여 준다.
+    if (!characters.length) showQuickCharacter("아직 캐릭터가 없어요. 이름만 적으면 바로 만들어 기록을 저장할 수 있어요.", { focus: false });
     if (priceResult.error) showError(belts, priceResult.error);
     else {
       priceRows = priceResult.data ?? [];
@@ -1511,7 +1582,10 @@ export async function render(root) {
     if (!requireLogin("무릉 기록은 로그인한 계정의 캐릭터에 저장돼요.", { sheet: carrySheet() })) return false;
     const character = readCharacter();
     if (character.error) {
-      notify(character.error, "error");
+      if (!characters.length) {
+        showQuickCharacter("캐릭터가 아직 없어요. 이름만 적어 만들면 적던 기록이 그 캐릭터에 저장돼요.");
+        notify("저장할 캐릭터가 없어요. 이름만 적어 캐릭터를 만들어 주세요.", "info");
+      } else notify(`${character.error} 목록에 없으면 "＋ 새 캐릭터"로 이름만 적어 만들 수 있어요.`, "error");
       return false;
     }
     const existing = sheetFor(character.characterId, current.party ? "team" : "solo");
@@ -1672,6 +1746,11 @@ export async function render(root) {
     if (event.target.name?.startsWith("band_") || event.target.name === "score") paintPlan();
   });
   form.addEventListener("change", (event) => {
+    if (event.target.name === "character_id" && event.target.value === QUICK_OPTION) {
+      event.target.value = form.dataset.openCharacter || "";
+      showQuickCharacter();
+      return;
+    }
     if (event.target.matches("[data-clock-target]")) {
       clockTarget = event.target.value;
       if (routePending) routePending.key = clockTarget;
@@ -1949,7 +2028,10 @@ export async function render(root) {
       const input = belts.querySelector(`[data-price="${draft.belt.id}"]`);
       if (input) input.value = draft.belt.value;
     }
-    notify(draft.belt ? "로그인했어요. 적어 둔 허리띠 시세를 채워 뒀으니 저장을 눌러 주세요." : "로그인했어요. 적어 둔 기록을 채워 뒀어요. 저장할 캐릭터를 확인하고 저장을 눌러 주세요.", "info");
+    const sheetNote = characters.length
+      ? "로그인했어요. 적어 둔 기록을 채워 뒀어요. 저장할 캐릭터를 확인하고 저장을 눌러 주세요."
+      : "로그인했어요. 적어 둔 기록을 채워 뒀어요. 캐릭터 이름만 적어 만든 뒤 저장을 눌러 주세요.";
+    notify(draft.belt ? "로그인했어요. 적어 둔 허리띠 시세를 채워 뒀으니 저장을 눌러 주세요." : sheetNote, "info");
   }
   if (/[?&]log\b/.test(location.hash) && root.isConnected && isLoggedIn()) scoreLog.open(form.dataset.openCharacter || "");
 }
