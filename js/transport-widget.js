@@ -1,7 +1,7 @@
 import { transportState, transportTime, transportCountdown } from "./transport-calc.js";
 
 const elevatorIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 15V8m-2 2 2-2 2 2m4-1v7m-2-2 2 2 2-2"/></svg>`;
-const shipIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h18l-4 6H7l-4-6Zm5 0V8h8v6m-4-6V3m0 1 6 3h-6M3 22c2-2 4 2 6 0s4 2 6 0 4 2 6 0"/></svg>`;
+const shipIcon = `<img class="transport-icon transport-ship-icon" src="img/ship-icon.png" alt="" width="24" height="24" />`;
 
 // #app 밖에 한 번만 붙여 화면 전환·로그인 화면에서도 시간을 유지한다.
 export function mountTransportWidget() {
