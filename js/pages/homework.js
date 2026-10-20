@@ -199,7 +199,7 @@ export async function render(root) {
         needsTable: true,
         modes: raid.modes,
       })),
-      { key: "dojo", name: "무릉도장", kind: "daily", glyph: "武", hue: 25, sub: "매일 00시 초기화", needsTable: true },
+      { key: "dojo", name: "무릉도장", kind: "daily", glyph: "武", img: "img/dojo-icon.png", hue: 25, sub: "매일 00시 초기화", needsTable: true },
     ];
     const custom = tasks.map((task) => ({ key: task.id, name: task.name, kind: task.reset_kind, glyph: [...task.name.trim()][0] || "숙", hue: 295, sub: `직접 추가 · ${RESET_KINDS[task.reset_kind]?.label ?? ""}`, custom: true, needsTable: true }));
     return [...builtIn, ...custom];

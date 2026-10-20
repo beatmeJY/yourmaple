@@ -1,6 +1,6 @@
 import { sfx } from "./effects.js";
 import { escapeHtml } from "./format.js";
-import { categories, homeRoute } from "./routes.js";
+import { categories, glyphInner, homeRoute } from "./routes.js";
 
 // 헤더 기능 검색: 화면 이름·분류 이름으로 찾아 이동한다. "/" 키로 어디서든 검색칸에 들어간다.
 // 좁은 화면에서는 돋보기 버튼만 보이고, 누르면 헤더 위로 검색칸이 펼쳐진다.
@@ -14,6 +14,7 @@ const items = [
       category: category.label,
       hue: category.hue,
       glyph: category.glyph,
+      icon: category.icon,
       quick: Boolean(route.quick),
     })),
   ),
@@ -46,7 +47,7 @@ function paint(results) {
   list.innerHTML = results
     .map(
       (item, index) => `<button type="button" class="feature-search-item${index === active ? " is-active" : ""}" data-feature-go="${item.id}"${item.quick ? ' data-quick="true"' : ""} role="option" aria-selected="${index === active}" style="--hue:${item.hue}">
-        <span class="feature-search-glyph${String(item.glyph).length > 1 ? " is-small" : ""}" aria-hidden="true">${escapeHtml(item.glyph)}</span>
+        <span class="feature-search-glyph${item.icon ? " is-icon" : String(item.glyph).length > 1 ? " is-small" : ""}" aria-hidden="true">${item.icon ? glyphInner(item) : escapeHtml(item.glyph)}</span>
         <span class="feature-search-copy"><strong>${escapeHtml(item.label)}</strong>${item.category ? `<span>${escapeHtml(item.category)}</span>` : ""}</span>
       </button>`,
     )

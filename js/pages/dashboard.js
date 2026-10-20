@@ -7,7 +7,7 @@ import { expProgress } from "../exp-progress.js";
 import { formatMinutes } from "../hunt-calc.js";
 import { jobLabel, jobRecord } from "../job-label.js";
 import { loadMainCharacter, mainCharacterId, setMainCharacter } from "../profile.js";
-import { categories, routes } from "../routes.js";
+import { categories, glyphInner, routes } from "../routes.js";
 import { isLoggedIn } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 
@@ -71,7 +71,7 @@ async function loadCharacters(supabase) {
 const OPEN_TOOLS = [
   { id: "level-plan", glyph: "EXP", hue: 150, title: "레벨업 계산", text: "사냥터 효율과 쿠폰으로 목표 레벨까지 걸리는 시간" },
   { id: "maker", glyph: "◆", hue: 210, title: "메이커 계산", text: "보석 제작 단계별 비용과 기대 이익" },
-  { id: "dojo", glyph: "武", hue: 25, title: "무릉도장 루트", text: "구간 기록으로 검은 허리띠까지 가장 빠른 루트" },
+  { id: "dojo", glyph: "武", icon: "img/dojo-icon.png", hue: 25, title: "무릉도장 루트", text: "구간 기록으로 검은 허리띠까지 가장 빠른 루트" },
 ];
 
 function renderGuest(root) {
@@ -95,7 +95,7 @@ function renderGuest(root) {
           <header class="ym-home-head"><h2>로그인 없이 쓰는 계산기</h2></header>
           <div class="ym-guest-tool-list">${tools
             .map((tool, index) => `<a class="ym-guest-tool" href="#/${tool.id}" style="--hue:${tool.hue};--i:${index}">
-              <span class="ym-feature-glyph${tool.glyph.length > 1 ? " is-small" : ""}" aria-hidden="true">${escapeHtml(tool.glyph)}</span>
+              <span class="ym-feature-glyph${tool.icon ? " is-icon" : tool.glyph.length > 1 ? " is-small" : ""}" aria-hidden="true">${tool.icon ? glyphInner(tool) : escapeHtml(tool.glyph)}</span>
               <span><strong>${escapeHtml(tool.title)}</strong><small>${escapeHtml(tool.text)}</small></span>
               <i aria-hidden="true">›</i>
             </a>`)
@@ -346,7 +346,7 @@ function featureTile(category, index) {
   return `
     <div class="ym-feature-tile" style="--hue:${category.hue};--i:${index}">
       <a class="ym-feature-main" href="#/${first.id}">
-        <span class="ym-feature-glyph${glyph.length > 1 ? " is-small" : ""}" aria-hidden="true">${escapeHtml(glyph)}</span>
+        <span class="ym-feature-glyph${category.icon ? " is-icon" : glyph.length > 1 ? " is-small" : ""}" aria-hidden="true">${category.icon ? glyphInner(category) : escapeHtml(glyph)}</span>
         <strong>${escapeHtml(category.label)}</strong>
       </a>
       <div class="ym-feature-subs">${subs}</div>

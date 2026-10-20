@@ -1,4 +1,4 @@
-import { categories, categoryOf, homeRoute, isHiddenRoute, routes } from "./routes.js";
+import { categories, categoryOf, glyphInner, homeRoute, isHiddenRoute, routes } from "./routes.js";
 
 const pages = {
   dashboard: () => import("./pages/dashboard.js"),
@@ -43,7 +43,28 @@ export async function renderRoute(root) {
   return id;
 }
 
-const openCategories = new Set();
+// 메뉴 분류는 기본으로 모두 펼친다(2026-10-21 사용자 요청: 메뉴가 적어 한 번에 누를 수 있게).
+// 사용자가 접은 분류만 이 브라우저에 기억한다. 지금 보는 화면의 분류는 늘 펼쳐 보인다.
+const COLLAPSED_KEY = "maple-note-nav-collapsed";
+
+function readCollapsed() {
+  try {
+    const list = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "[]");
+    return new Set(Array.isArray(list) ? list : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeCollapsed() {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsedCategories]));
+  } catch {
+    // 기억하지 못해도 이번 방문에서는 그대로 따른다.
+  }
+}
+
+const collapsedCategories = readCollapsed();
 let navRendered = false;
 
 function hueColor(hue, alpha = 1) {
@@ -57,20 +78,19 @@ function subLink(route, activeId) {
   return `<${tag} class="nav-sub${active ? " is-active" : ""}" ${attrs}${active ? ` aria-current="page"` : ""}><i class="nav-dot" aria-hidden="true"></i><span>${route.label}</span></${tag}>`;
 }
 
-// 펼침형 분류 트리. 지금 화면의 분류는 항상 펼치고, 나머지는 누른 것만 펼친다.
+// 펼침형 분류 트리. 기본은 모두 펼침, 사용자가 접은 분류만 접는다(지금 화면의 분류는 늘 펼침).
 export function renderNav(nav, activeId) {
   const current = categoryOf(activeId);
-  if (current) openCategories.add(current.id);
   const home = `<a class="nav-home${activeId === homeRoute.id ? " is-active" : ""}" href="#/${homeRoute.id}" data-route="${homeRoute.id}"${activeId === homeRoute.id ? ` aria-current="page"` : ""}><span class="nav-glyph" aria-hidden="true">${homeRoute.glyph}</span><span>${homeRoute.label}</span></a>`;
   // 메뉴가 차례로 떠오르는 효과는 처음 한 번만. 페이지를 옮길 때마다 다시 재생되지 않게 한다.
   nav.classList.toggle("is-entering", !navRendered);
   navRendered = true;
   nav.innerHTML = `${home}<div class="nav-groups">${categories.map((category, index) => {
-    const open = openCategories.has(category.id);
+    const open = !collapsedCategories.has(category.id) || category.id === current?.id;
     const active = category.id === current?.id;
     return `<section class="nav-group${open ? " is-open" : ""}${active ? " is-active" : ""}" style="--hue:${category.hue};--cat:${hueColor(category.hue)};--i:${index}">
       <button type="button" class="nav-cat" data-nav-cat="${category.id}" aria-expanded="${open}" aria-controls="nav-subs-${category.id}">
-        <span class="nav-glyph${category.glyph.length > 2 ? " is-long" : ""}" aria-hidden="true">${category.glyph}</span>
+        <span class="nav-glyph${category.icon ? " is-icon" : category.glyph.length > 2 ? " is-long" : ""}" aria-hidden="true">${glyphInner(category)}</span>
         <span class="nav-cat-name">${category.label}</span>
         <span class="nav-count">${category.routes.length}</span>
         <span class="nav-chev" aria-hidden="true">›</span>
@@ -78,6 +98,13 @@ export function renderNav(nav, activeId) {
       <div class="nav-subs" id="nav-subs-${category.id}"><div class="nav-subs-inner">${category.routes.map((route) => subLink(route, activeId)).join("")}</div></div>
     </section>`;
   }).join("")}</div>`;
+  // 메뉴를 다 펼치면 세로가 짧은 화면에서 사이드바가 스크롤된다. 지금 화면 메뉴가 보이게 사이드바 안에서만 맞춘다.
+  const active = nav.querySelector(".nav-sub.is-active");
+  const panel = nav.closest(".sidebar-panel");
+  if (active && panel && panel.scrollHeight > panel.clientHeight) {
+    const top = active.getBoundingClientRect().top - panel.getBoundingClientRect().top;
+    if (top < 0 || top + active.offsetHeight > panel.clientHeight) panel.scrollTop += top - panel.clientHeight / 2;
+  }
 }
 
 export function toggleNavCategory(button) {
@@ -85,8 +112,9 @@ export function toggleNavCategory(button) {
   const open = !group.classList.contains("is-open");
   group.classList.toggle("is-open", open);
   button.setAttribute("aria-expanded", String(open));
-  if (open) openCategories.add(button.dataset.navCat);
-  else openCategories.delete(button.dataset.navCat);
+  if (open) collapsedCategories.delete(button.dataset.navCat);
+  else collapsedCategories.add(button.dataset.navCat);
+  writeCollapsed();
 }
 
 // 헤더의 분류 경로: 분류 색 점 + 분류 이름 › 화면 이름
