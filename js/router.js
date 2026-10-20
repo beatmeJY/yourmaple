@@ -10,6 +10,7 @@ const pages = {
   maker: () => import("./pages/maker.js"),
   enhance: () => import("./pages/enhance.js"),
   monsters: () => import("./pages/monsters.js"),
+  "item-catalog": () => import("./pages/item-catalog.js"),
   trades: () => import("./pages/trades.js"),
   quests: () => import("./pages/quests.js"),
   notes: () => import("./pages/notes.js"),

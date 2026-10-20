@@ -1,12 +1,14 @@
+import { catalogError, loadCatalog } from "../catalog.js";
+import { itemOptionFields, itemSnapshot, optionSummary, readItemOptions, tradeItemKey } from "../item-options.js";
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
 import { escapeHtml, formatCount, readCount } from "../format.js";
 import { matchesText } from "../filters.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
-import { combineLots, completeGroups, isCompleteTrade, isPartialSell, openGroups, tradeName } from "../trade-merge.js";
+import { combineLots, isCompleteTrade, isPartialSell, tradeName } from "../trade-merge.js";
 
-const columns = "id, name, buy_price, buy_qty, sell_price, sell_qty, created_at, updated_at";
+const columns = "id, name, buy_price, buy_qty, sell_price, sell_qty, created_at, updated_at, item_id, item_snapshot, item_options";
 
 const blank = {
   id: "",
@@ -73,7 +75,9 @@ export async function render(root) {
       <aside class="trade-side">
         <form class="editor trade-editor ym-glass" id="trade-form">
           <h2 data-form-title>거래 추가</h2>
+          <label class="field span-all"><span>공용 아이템</span><select name="catalog_item"><option value="">직접 입력 · 도감 연결 없음</option></select><small class="trade-catalog-status" data-catalog-status>공용 아이템을 불러오는 중입니다.</small></label>
           <label class="field span-all"><span>아이템명</span><input name="name" required autocomplete="off" /></label>
+          <details class="trade-item-options"><summary>실제 아이템 옵션</summary><p class="hint">실제로 산 아이템의 옵션을 입력하세요. 같은 이름도 옵션이 다르면 별도로 기록합니다.</p><div class="trade-options-grid">${itemOptionFields.map(({ key, label }) => `<label class="field"><span>${escapeHtml(label)}</span><input name="option_${key}" inputmode="numeric" autocomplete="off" /></label>`).join("")}</div></details>
           <div class="trade-form-sides span-all">
             <fieldset class="trade-form-side is-buy">
               <legend>매수</legend>
@@ -105,6 +109,8 @@ export async function render(root) {
   const form = root.querySelector("#trade-form");
   const title = root.querySelector("[data-form-title]");
   let rows = [];
+  let catalogItems = [];
+  let currentItemSnapshot = {};
   let view = "all";
   let loadId = 0;
   let selectedId = "";
@@ -120,7 +126,7 @@ export async function render(root) {
 
   function saveError(error) {
     if (/replace_my_trades|PGRST202/.test(`${error?.message} ${error?.code}`)) {
-      return "거래 저장·취소를 사용하려면 Supabase에서 sql/037_trade_undo.sql을 실행해 주세요.";
+      return "거래 저장·취소를 사용하려면 Supabase에서 sql/038_shared_game_catalog.sql을 실행해 주세요.";
     }
     if (error?.code === "40001" || /다른 곳에서.*변경/.test(error?.message ?? "")) {
       return "다른 곳에서 거래가 변경되어 처리하지 않았습니다. 새로고침 후 최신 거래를 확인해 주세요.";
@@ -135,12 +141,12 @@ export async function render(root) {
     const saved = lastSave;
     try {
       const supabase = await getSupabase();
-      const { error } = await supabase.rpc("replace_my_trades", { expected: saved.after, replacement: saved.before, restore_times: true });
+      const { error } = await supabase.rpc("replace_my_trades_v2", { expected: saved.after, replacement: saved.before, restore_times: true });
       if (error) { showStatus(saveError(error), "error"); return; }
       lastSave = null;
       form.dataset.editingId = "";
       title.textContent = "거래 추가";
-      await loadRows({ merge: false });
+      await loadRows();
       sfx("uncheck");
       showStatus(`${saved.name}의 마지막 저장을 취소했습니다.`, "info");
     } catch (error) { showStatus(saveError(error), "error"); }
@@ -245,6 +251,7 @@ export async function render(root) {
       <article class="trade-card${selectedId === row.id ? " is-selected" : ""}" data-select-trade="${escapeHtml(row.id)}">
         <div class="trade-card-id">
           <h3><button class="text-button" type="button" data-select-name="${escapeHtml(row.id)}" aria-pressed="${selectedId === row.id}">${escapeHtml(row.name)}</button></h3>
+          <p class="trade-option-copy">${escapeHtml(optionSummary(row.item_options) || "옵션 미기록")}</p>
           ${profit == null || profit === 0 ? "" : `<span class="trade-profit-sticker ${tone}">${profit > 0 ? "흑자" : "적자"}</span>`}
         </div>
         <section class="trade-lane is-buy">
@@ -380,6 +387,7 @@ export async function render(root) {
     return {
       value: {
         name: row.name,
+        item_id: row.item_id ?? null, item_snapshot: row.item_snapshot ?? {}, item_options: row.item_options ?? {},
         buy_price: buyPrice.value,
         buy_qty: buyQty.value,
         sell_price: sold.sellPrice,
@@ -408,12 +416,12 @@ export async function render(root) {
             row.id !== id &&
             !isPartialSell(row) &&
             isCompleteTrade(row) === complete &&
-            tradeName(row.name) === stored.name,
+            tradeItemKey(row) === tradeItemKey(stored),
         );
     const before = [sameLot, id ? rows.find((row) => row.id === id) : null].filter(Boolean).map((row) => ({ ...row }));
     const target = sameLot ?? before[0];
     const after = { ...(target ?? {}), ...(sameLot ? combineLots([sameLot, stored]) : stored), id: target?.id ?? crypto.randomUUID() };
-    const { data, error } = await supabase.rpc("replace_my_trades", { expected: before, replacement: [after] });
+    const { data, error } = await supabase.rpc("replace_my_trades_v2", { expected: before, replacement: [after] });
     if (!error && data) {
       lastSave = { ...data, name: stored.name };
       paintUndo();
@@ -450,8 +458,8 @@ export async function render(root) {
         return;
       }
       if (form.dataset.editingId === row.id) closeForm();
-      showStatus(saved.merged ? "이름이 같은 거래를 한 줄로 합쳤습니다." : "거래를 수정했습니다.", "info");
-      await loadRows({ merge: false });
+      showStatus(saved.merged ? "이름과 옵션이 같은 거래를 한 줄로 합쳤습니다." : "거래를 수정했습니다.", "info");
+      await loadRows();
     } catch (error) {
       showStatus(saveError(error), "error");
       restoreTradeInputs(row);
@@ -470,6 +478,7 @@ export async function render(root) {
     form.elements.buy_qty.value = row.buy_qty ?? "";
     form.elements.sell_price.value = row.sell_price ?? "";
     form.elements.sell_qty.value = row.sell_qty ? row.sell_qty : "";
+    fillTradeItem(row);
     selectedId = row.id || "";
     paintSelection();
     form.elements.name.focus();
@@ -480,6 +489,7 @@ export async function render(root) {
     form.hidden = false;
     form.dataset.editingId = "";
     form.reset();
+    currentItemSnapshot = {};
     selectedId = "";
     title.textContent = "거래 추가";
     paintSelection();
@@ -501,11 +511,42 @@ export async function render(root) {
     }
   }
 
+  function fillTradeItem(row) {
+    form.elements.catalog_item.value = row.item_id || "";
+    currentItemSnapshot = { ...(row.item_snapshot ?? {}) };
+    for (const { key } of itemOptionFields) form.elements[`option_${key}`].value = row.item_options?.[key] ?? "";
+    if (row.item_id && !catalogItems.some((item) => item.id === row.item_id)) {
+      const option = document.createElement("option"); option.value = row.item_id; option.textContent = `${row.item_snapshot?.name || row.name} (거래 당시 기록)`;
+      form.elements.catalog_item.append(option); form.elements.catalog_item.value = row.item_id;
+    }
+  }
+
+  function readTradeItem() {
+    const parsed = readItemOptions(Object.fromEntries(itemOptionFields.map(({ key }) => [key, form.elements[`option_${key}`].value])));
+    if (parsed.error) return parsed;
+    return { value: { item_id: form.elements.catalog_item.value || null, item_snapshot: { ...currentItemSnapshot }, item_options: parsed.value } };
+  }
+
+  async function loadItems() {
+    const result = await loadCatalog("catalog_items");
+    if (!root.isConnected) return;
+    const status = root.querySelector("[data-catalog-status]");
+    if (result.error) { status.textContent = catalogError(result.error); return; }
+    catalogItems = result.data;
+    for (const item of catalogItems) {
+      const option = document.createElement("option"); option.value = item.id; option.textContent = `${item.name} · ${item.category}`; form.elements.catalog_item.append(option);
+    }
+    status.textContent = catalogItems.length ? "선택하면 기본 옵션을 채워요. 실제 옵션은 직접 조정할 수 있어요." : "도감은 준비 중입니다. 직접 입력해 거래를 기록할 수 있어요.";
+  }
+
   function readForm(mode = "all") {
     if (mode === "sell") {
       const selected = rows.find((row) => row.id === selectedId);
       if (!selected) return { error: "매도할 보유 거래를 목록에서 선택해 주세요." };
       if (tradeName(form.elements.name.value) !== tradeName(selected.name)) return { error: "아이템명이 선택한 거래와 다릅니다. 매도할 거래를 다시 선택해 주세요." };
+      const descriptor = readTradeItem();
+      if (descriptor.error) return descriptor;
+      if (tradeItemKey({ name: selected.name, ...descriptor.value }) !== tradeItemKey(selected)) return { error: "선택한 거래와 옵션이 다릅니다. 거래를 다시 선택하거나 수정으로 옵션을 변경해 주세요." };
       if (remainingOf(selected) <= 0) return { error: "선택한 거래에는 판매할 재고가 없습니다." };
       const sold = readSellFields(form.elements.sell_price.value.trim(), form.elements.sell_qty.value.trim(), remainingOf(selected));
       if (sold.error) return sold;
@@ -513,8 +554,10 @@ export async function render(root) {
       const sellQty = selected.sell_qty + sold.sellQty;
       const revenue = BigInt(selected.sell_price ?? 0) * BigInt(selected.sell_qty) + BigInt(sold.sellPrice) * BigInt(sold.sellQty);
       const sellPrice = Number((revenue + BigInt(sellQty) / 2n) / BigInt(sellQty));
-      return { value: { name: selected.name, buy_price: selected.buy_price, buy_qty: selected.buy_qty, sell_price: sellPrice, sell_qty: sellQty } };
+      return { value: { item_id: selected.item_id ?? null, item_snapshot: selected.item_snapshot ?? {}, item_options: selected.item_options ?? {}, name: selected.name, buy_price: selected.buy_price, buy_qty: selected.buy_qty, sell_price: sellPrice, sell_qty: sellQty } };
     }
+    const descriptor = readTradeItem();
+    if (descriptor.error) return descriptor;
     const name = form.elements.name.value.trim();
     if (!name) return { error: "아이템명을 입력해 주세요." };
     const buyPrice = readCount(form.elements.buy_price.value, "개당 산 가격", 0);
@@ -527,6 +570,7 @@ export async function render(root) {
     if (sold.error) return sold;
     return {
       value: {
+        ...descriptor.value,
         name,
         buy_price: buyPrice.value,
         buy_qty: buyQty.value,
@@ -536,25 +580,7 @@ export async function render(root) {
     };
   }
 
-  async function collapseOpenTrades(supabase, data) {
-    const groups = [...openGroups(data), ...completeGroups(data)];
-    if (!groups.length) return data;
-    for (const group of groups) {
-      const [keep, ...rest] = [...group].sort((a, b) => a.created_at.localeCompare(b.created_at));
-      const { error } = await supabase.from("trades").update(combineLots(group)).eq("id", keep.id);
-      if (error) throw error;
-      const { error: deleteError } = await supabase.from("trades").delete().in(
-        "id",
-        rest.map((row) => row.id),
-      );
-      if (deleteError) throw deleteError;
-    }
-    const { data: next, error } = await supabase.from("trades").select(columns).order("updated_at", { ascending: false });
-    if (error) throw error;
-    return next ?? [];
-  }
-
-  async function loadRows({ merge = true } = {}) {
+  async function loadRows() {
     const current = ++loadId;
     list.innerHTML = `<p class="empty">거래를 불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
@@ -564,26 +590,29 @@ export async function render(root) {
       rows = [];
       summary.innerHTML = "";
       list.innerHTML = "";
-      showStatus(translateDbError(error), "error");
+      showStatus(catalogError(error), "error");
       return;
     }
-    try {
-      rows = merge ? await collapseOpenTrades(supabase, data ?? []) : data ?? [];
-    } catch (mergeError) {
-      rows = data ?? [];
-      showStatus(translateDbError(mergeError), "error");
-    }
+    rows = data ?? [];
     if (current !== loadId || !list.isConnected) return;
     paintList();
     paintSelection();
   }
 
   root.addEventListener("input", (event) => {
+    if (event.target === form.elements.name && form.elements.name.value.trim() !== currentItemSnapshot.name) { form.elements.catalog_item.value = ""; currentItemSnapshot = {}; }
     if (event.target.closest("[data-trade-field]")) applyAmountCommas(event.target);
     if (event.target.closest("[data-search]")) paintList();
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target === form.elements.catalog_item) {
+      const item = catalogItems.find((item) => item.id === event.target.value);
+      currentItemSnapshot = item ? itemSnapshot(item) : {};
+      if (item) form.elements.name.value = item.name;
+      for (const { key } of itemOptionFields) form.elements[`option_${key}`].value = item?.base_options?.[key] ?? "";
+      return;
+    }
     if (!event.target.matches("[data-sort]")) return;
     sort = event.target.value;
     paintList();
@@ -624,6 +653,7 @@ export async function render(root) {
         form.dataset.editingId = "";
         title.textContent = "거래 추가";
         form.elements.name.value = selected.name;
+        fillTradeItem(selected);
         paintSelection();
         form.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       }
@@ -701,10 +731,10 @@ export async function render(root) {
       title.textContent = "거래 추가";
       cheer(mode, parsed.value);
       showStatus(
-        saved.merged ? "이름이 같은 거래를 한 줄로 합쳤습니다." : mode === "sell" ? "이번 판매분을 저장했습니다." : id ? "거래를 수정했습니다." : "거래를 저장했습니다.",
+        saved.merged ? "이름과 옵션이 같은 거래를 한 줄로 합쳤습니다." : mode === "sell" ? "이번 판매분을 저장했습니다." : id ? "거래를 수정했습니다." : "거래를 저장했습니다.",
         "info",
       );
-      await loadRows({ merge: false });
+      await loadRows();
     } catch (error) {
       showStatus(translateDbError(error), "error");
     } finally {
@@ -720,5 +750,5 @@ export async function render(root) {
     await saveForm();
   });
 
-  await loadRows();
+  await Promise.all([loadRows(), loadItems()]);
 }

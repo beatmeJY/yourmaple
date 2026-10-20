@@ -14552,3 +14552,19 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 
 /* 계정 메뉴 얼굴: 업로드한 그림 비율을 유지하며 전체 얼굴을 보여 준다. */
 .glyph-icon.account-menu-face { object-fit: contain; --icon-scale: 1; }
+
+/* 공용 도감과 거래의 실제 옵션 */
+.catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.catalog-search { max-width: 460px; margin-bottom: 12px; }
+.catalog-item { display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 20px; animation: ym-fade-up .35s var(--ease-out) both; min-width: 0; }
+.catalog-item h2 { font-size: 18px; margin: 10px 0; }
+.catalog-item p { overflow-wrap: anywhere; color: var(--muted); }
+.catalog-item-art { flex: none; width: 52px; height: 52px; display: grid; place-items: center; color: var(--gold); font-size: 24px; }
+.catalog-item-art img, .catalog-monster-image { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.mo-stage .catalog-monster-image { max-height: 140px; }
+.trade-item-options { grid-column: 1 / -1; padding: 14px; border: 1px solid var(--line); border-radius: 16px; }
+.trade-item-options summary { cursor: pointer; color: var(--gold); font-weight: 700; }
+.trade-options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.trade-option-copy { font-size: 12px; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
+.trade-catalog-status { color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .catalog-item { animation: none; } }

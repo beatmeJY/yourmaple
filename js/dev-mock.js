@@ -59,6 +59,8 @@ function seed() {
     dojo_score_log: [],
     dojo_belt_prices: [{ id: "p1", user_id: USER.id, belt: "white", price: "180000", created_at: iso(-30) }],
     notes: [{ id: "n1", user_id: USER.id, title: "목업 메모", content: "?mock 으로 연 가짜 데이터입니다.", category: "일반", created_at: iso(-10), updated_at: iso(-10) }],
+    catalog_monsters: [{ id: "d0000000-0000-4000-8000-000000000001", name: "연습용 달팽이", level: 1, hp: 15, exp: 3, required_accuracy: 1, accuracy_per_level: 0.1, drop_items: "달팽이 껍질", weak_elements: null, resist_elements: null }],
+    catalog_items: [{ id: "e0000000-0000-4000-8000-000000000001", name: "연습용 아대", category: "아대", base_options: { attack: 30, remaining_upgrades: 7 }, requirements: { 레벨: 50 }, image_url: null }],
     hunts: [], level_exp: [], quests: [], character_quests: [], quest_notes: [], monsters: [], links: [], trades: [],
     maker_gem_prices: [], enhance_profiles: [], account_deletions: [],
   };
@@ -133,6 +135,7 @@ class Query {
     this.filters = [];
     this.sorts = [];
     this.limitCount = null;
+    this.rangeStart = 0;
     this.columns = "*";
     this.returning = false;
     this.mode = "many";
@@ -200,6 +203,7 @@ class Query {
     this.limitCount = count;
     return this;
   }
+  range(start, end) { this.rangeStart = start; this.limitCount = end - start + 1; return this; }
   single() {
     this.mode = "single";
     return this;
@@ -226,6 +230,7 @@ class Query {
   }
 
   run() {
+    if ((["catalog_monsters", "catalog_items"].includes(this.table) && this.action !== "select") || this.table === "catalog_monster_reviews") return { data: null, error: { message: "permission denied for shared catalog", code: "42501" } };
     const rows = rowsOf(this.table);
     let result = [];
     if (this.action === "select") {
@@ -260,7 +265,7 @@ class Query {
     for (const { column, ascending } of [...this.sorts].reverse()) {
       result = [...result].sort((left, right) => compare(left[column], right[column]) * (ascending ? 1 : -1));
     }
-    if (this.limitCount != null) result = result.slice(0, this.limitCount);
+    if (this.limitCount != null) result = result.slice(this.rangeStart, this.rangeStart + this.limitCount);
     const joins = joinsOf(this.columns);
     const data = result.map((row) => withJoins(row, joins));
     if (this.action !== "select" && !this.returning && this.mode === "many") return { data: null, error: null };
@@ -362,6 +367,7 @@ const storage = {
 // 탈퇴처럼 되돌릴 수 없는 함수는 목업에서 실행하지 않는다.
 const strip = ({ user_id: _userId, ...row }) => row;
 const RPCS = {
+  replace_my_trades_v2(args) { return RPCS.replace_my_trades(args); },
   replace_my_trades({ expected = [], replacement = [], restore_times = false } = {}) {
     const rows = rowsOf("trades");
     const ids = new Set([...expected, ...replacement].map((row) => String(row.id)));

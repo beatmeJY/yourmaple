@@ -44,7 +44,7 @@ export async function renderRecords(root, options) {
     `
       : "");
   const filterClass = options.filterClass ? ` ${options.filterClass}` : options.levelMode || options.levelFilters ? "" : " filters-search-only";
-  const formHtml = `
+  const formHtml = options.readOnly ? "" : `
     <form class="editor" hidden>
       <h2 data-form-title>${options.addLabel}</h2>
       ${options.fields.map(fieldHtml).join("")}
@@ -221,19 +221,17 @@ export async function renderRecords(root, options) {
     const current = ++loadId;
     list.innerHTML = `<p class="empty">불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
-    const { data, error } = await supabase
-      .from(options.table)
-      .select(options.columns)
-      .order(options.order, { ascending: options.ascending ?? false });
+    const { data, error } = options.load
+      ? await options.load(supabase)
+      : await supabase.from(options.table).select(options.columns).order(options.order, { ascending: options.ascending ?? false });
     if (current !== loadId || !list.isConnected) return;
     if (error) {
       rows = [];
-      list.innerHTML = "";
-      showStatus(translateDbError(error), "error");
+      list.innerHTML = `<p class="empty">${escapeHtml(options.errorMessage ? options.errorMessage(error) : translateDbError(error))}</p>`;
       return;
     }
     rows = data ?? [];
-    if (options.settle) {
+    if (options.settle && !options.readOnly) {
       const settled = await options.settle(rows, supabase);
       if (current !== loadId || !list.isConnected) return;
       if (settled?.error) {
@@ -270,6 +268,7 @@ export async function renderRecords(root, options) {
       paintList();
       return;
     }
+    if (options.readOnly) return;
     if (event.target.closest("[data-add]")) {
       showStatus("", "info");
       fillForm({ id: "" });
@@ -300,8 +299,9 @@ export async function renderRecords(root, options) {
     await loadRows();
   });
 
-  form.addEventListener("submit", async (event) => {
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (options.readOnly) return;
     const parsed = readForm();
     if (parsed.error) {
       showStatus(parsed.error, "error");

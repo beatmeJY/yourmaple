@@ -53,14 +53,20 @@
 
 - 변경은 `sql/NNN_설명.sql` 새 파일로 추가하고, 사용자가 Supabase SQL Editor에서 직접 실행한다. 새 파일을 만들면 사용자에게 실행해 달라고 꼭 알린다.
 - **같은 파일을 다시 실행해도 안전하게** 작성한다: `create table if not exists`, `drop constraint/policy/trigger if exists` 후 다시 생성.
-- 모든 표는 `user_id` + `assign_user_id` 트리거 + RLS(본인 행만 select/insert/update/delete)를 갖는다. `sql/016_dojo.sql`, `sql/027_maker.sql`을 본보기로 쓴다.
+- 개인 데이터 표는 `user_id` + `assign_user_id` 트리거 + RLS(본인 행만 select/insert/update/delete)를 갖는다. 2026-10-21 사용자 결정에 따라 `catalog_monsters`·`catalog_items`는 공용 기준 정보 예외로 `user_id` 없이 비로그인 포함 SELECT만 허용하며, 쓰기는 SQL Editor 운영자만 한다. `catalog_monster_reviews`는 운영자 전용 비공개 검토 표다. `sql/016_dojo.sql`, `sql/027_maker.sql`을 본보기로 쓴다.
 - 새 SQL 파일은 README의 "데이터베이스 만들기" 목록에도 한 줄 추가한다.
 
 ## 6. 기능별 도메인 메모
 
+- 공용 도감·기존 데이터 이전·거래 실제 옵션은 `docs/shared-catalog.md`를 따른다. 운영 적용은 sql/038 실행 후 앱 배포 순서다.
+
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-09 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-10-21 (Codex) 사용자 배포 요청 후 운영 SQL038 설치 확인: 공용 테이블·거래 옵션 3컬럼·SELECT 전용 정책·익명 거래 함수 차단, 함수 3종 본문 해시가 로컬 SQL과 일치(SECURITY INVOKER). 운영 확인은 읽기 전용, 사용자 데이터 수정 없음. 기존 로컬 검증 결과 유지, 공용 도감 UI 배포 진행 [실측]
+
+- 2026-10-21 (Codex) 공용 몬스터·아이템 도감(비로그인 SELECT/운영자 SQL 관리)과 개인 거래 실제 옵션 분리. sql/038 추가: 기존 몬스터 원본 보존·읽기 보관, 충돌 검토 비공개·비충돌 이전, 거래 아이템 참조/스냅샷/실제 옵션 및 v2 저장·취소. 조회 중 몬스터/거래 자동 합산·삭제 제거, 옵션 다른 거래 합산 방지. check 14개·임시 PostgreSQL(재실행/이전/RLS/스냅샷/취소/동시 수정/롤백)·PC 1280/모바일 375 가짜 DB(공용 조회/거래/SQL 미적용/퀘스트 회귀)·배포 import·diff 통과. 운영 DB 읽기 확인: 몬스터 0·거래 8, 스키마/데이터 수정 없음. 검증용 트리거·로그인 새로고침/선택자·MOCK 띠 겹침·새 테스트 괄호 오류를 수정한 뒤 재검증. codex/shared-game-catalog 별도 worktree, 미커밋·미배포·SQL 사용자 실행 필요. 상세 docs/shared-catalog.md [실측]
 
 - 2026-10-21 (Codex) 메뉴 아이콘 통일·거래 내역/퀘스트 정보·대표 얼굴(기본 1번)·교통 상태 문구 배포 준비. PC 1280·모바일 375 최종 아이콘 정렬·대표 전환·실패 fallback·로그아웃·교통 상태와 계산 검증 통과. 추가 검증에서 이전 크기 규칙을 기대한 옛 스크립트 실패는 최종 실측 정렬 기준으로 재검증 [실측]
 

@@ -16,7 +16,8 @@ const allCategories = [
   { id: "maker", label: "메이커·강화", glyph: "◆", icon: "img/maker-icon.png", hue: 210, routes: [{ id: "maker", label: "메이커 계산" }, { id: "enhance", label: "강화 계산", dev: true }] },
   { id: "trade", label: "거래 내역", glyph: "⇄", icon: "img/trade-icon.png", hue: 180, routes: [{ id: "trades", label: "거래 내역", auth: true }] },
   { id: "quest", label: "퀘스트 정보", glyph: "Q", icon: "img/quest-icon.png", hue: 85, routes: [{ id: "quests", label: "퀘스트 정보", auth: true }] },
-  { id: "monster", label: "몬스터 정보", glyph: "M", icon: "img/monster-icon.png", hue: 65, routes: [{ id: "monsters", label: "몬스터 도감", auth: true }] },
+  { id: "monster", label: "몬스터 정보", glyph: "M", icon: "img/monster-icon.png", hue: 65, routes: [{ id: "monsters", label: "몬스터 도감" }] },
+  { id: "item", label: "아이템 정보", glyph: "템", hue: 75, routes: [{ id: "item-catalog", label: "아이템 정보" }] },
   { id: "memo", label: "메모", glyph: "✎", hue: 340, routes: [{ id: "notes", label: "메모", auth: true }] },
   // 링크는 화면이 아니라 떠 있는 패널(quick). 2026-10-21 메모와 분리해 한 줄 메뉴로.
   { id: "link", label: "링크", glyph: "↗", hue: 260, routes: [{ id: "links", label: "링크", quick: true, auth: true }] },
