@@ -15,7 +15,7 @@ export function mountTransportWidget() {
       <div class="transport-clock"><span>한국 시각</span><time data-transit-clock></time></div>
       <article class="transport-card" data-helios-card>
         <div class="transport-card-title">${elevatorIcon}<h2>헬리오스탑</h2><span data-helios-direction></span></div>
-        <strong data-helios-state></strong><p>다음 상태까지 <b data-helios-remain></b></p>
+        <strong data-helios-state></strong><p><span data-helios-next></span> <b data-helios-remain></b></p>
         <div class="transport-times"><span>↑ 다음 출발 <b data-helios-up></b></span><span>↓ 다음 출발 <b data-helios-down></b></span></div>
       </article>
       <article class="transport-card" data-ship-card>
@@ -31,7 +31,7 @@ export function mountTransportWidget() {
   document.body.append(host);
   const button = host.querySelector(".transport-toggle");
   const panel = host.querySelector(".transport-panel");
-  const nodes = Object.fromEntries([...host.querySelectorAll("[data-transit-clock], [data-helios-direction], [data-helios-state], [data-helios-remain], [data-helios-up], [data-helios-down], [data-ship-badge], [data-ship-state], [data-ship-next], [data-ship-remain], [data-ship-close], [data-ship-depart], [data-helios-mini], [data-ship-mini], [data-helios-mini-remain], [data-ship-mini-remain]")].map((node) => [node.attributes[0].name, node]));
+  const nodes = Object.fromEntries([...host.querySelectorAll("[data-transit-clock], [data-helios-direction], [data-helios-state], [data-helios-remain], [data-helios-next], [data-helios-up], [data-helios-down], [data-ship-badge], [data-ship-state], [data-ship-next], [data-ship-remain], [data-ship-close], [data-ship-depart], [data-helios-mini], [data-ship-mini], [data-helios-mini-remain], [data-ship-mini-remain]")].map((node) => [node.attributes[0].name, node]));
   const text = (key, value) => { if (nodes[key].textContent !== value) nodes[key].textContent = value; };
   let timer = 0;
   function update() {
@@ -39,27 +39,31 @@ export function mountTransportWidget() {
     if (!host.isConnected) return;
     const now = Date.now();
     const { helios, ship } = transportState(now);
-    const shipLabel = { waiting: "다음 배 대기", boarding: "탑승 가능", closed: "탑승 마감" }[ship.phase];
-    const miniHelios = `${helios.direction === "up" ? "↑" : "↓"} ${helios.waiting ? "대기" : "출발"}`;
+    const shipLabel = { waiting: "출발함", boarding: "탑승 중", closed: "탑승 마감" }[ship.phase];
+    const miniHelios = helios.waiting ? "대기 중" : helios.direction === "up" ? "올라감" : "내려감";
+    const nextUp = helios.upAt < helios.downAt;
+    const nextHeliosLabel = `${nextUp ? "↑ 올라감" : "↓ 내려감"}까지`;
+    const nextHeliosAt = nextUp ? helios.upAt : helios.downAt;
     text("data-transit-clock", transportTime(now));
     text("data-helios-direction", helios.direction === "up" ? "상행" : "하행");
-    text("data-helios-state", helios.label);
-    text("data-helios-remain", transportCountdown(helios.changesAt, now));
+    text("data-helios-state", miniHelios);
+    text("data-helios-next", nextHeliosLabel);
+    text("data-helios-remain", transportCountdown(nextHeliosAt, now));
     text("data-helios-up", transportTime(helios.upAt));
     text("data-helios-down", transportTime(helios.downAt));
     text("data-ship-state", shipLabel);
-    text("data-ship-badge", { waiting: "대기", boarding: "탑승 중", closed: "마감" }[ship.phase]);
-    text("data-ship-next", { waiting: "탑승 시작까지", boarding: "탑승 마감까지", closed: "출발까지" }[ship.phase]);
+    text("data-ship-badge", shipLabel);
+    text("data-ship-next", { waiting: "다음 탑승", boarding: "마감까지", closed: "출발까지" }[ship.phase]);
     text("data-ship-remain", transportCountdown(ship.changesAt, now));
     text("data-ship-close", transportTime(ship.closesAt));
     text("data-ship-depart", transportTime(ship.departsAt));
     text("data-helios-mini", miniHelios);
-    text("data-ship-mini", { waiting: "대기", boarding: "탑승", closed: "마감" }[ship.phase]);
-    text("data-helios-mini-remain", `${helios.waiting ? "출발" : "다음 상태"} ${transportCountdown(helios.changesAt, now)}`);
-    text("data-ship-mini-remain", `${{ waiting: "탑승", boarding: "마감", closed: "출발" }[ship.phase]} ${transportCountdown(ship.changesAt, now)}`);
+    text("data-ship-mini", shipLabel);
+    text("data-helios-mini-remain", `${nextHeliosLabel} ${transportCountdown(nextHeliosAt, now)}`);
+    text("data-ship-mini-remain", `${{ waiting: "다음 탑승", boarding: "마감까지", closed: "출발까지" }[ship.phase]} ${transportCountdown(ship.changesAt, now)}`);
     host.dataset.shipPhase = ship.phase;
     host.dataset.heliosDirection = helios.direction;
-    button.setAttribute("aria-label", `교통 시간표: 헬리오스탑 ${helios.label}, 배 ${shipLabel}`);
+    button.setAttribute("aria-label", `교통 시간표: 헬리오스탑 ${miniHelios}, 배 ${shipLabel}`);
     if (!document.hidden) timer = setTimeout(update, 1000 - (now % 1000));
   }
   function setOpen(open, focusBack = false) {

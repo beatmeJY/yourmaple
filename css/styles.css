@@ -14531,6 +14531,24 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 /* 배 시간표: 사용자 제공 비행선 그림 (2026-10-21) */
 .transport-widget img.transport-icon { width: 24px; height: 24px; flex: none; object-fit: contain; image-rendering: pixelated; }
 
-/* 메이커·퀘스트 그림은 아이콘 칸 안에 여백을 둔다. */
-.glyph-icon[src="img/maker-icon.png"], .glyph-icon[src="img/quest-icon.png"] { padding: 4px; box-sizing: border-box; transform: none; }
-.nav-glyph.is-icon .glyph-icon[src="img/maker-icon.png"], .nav-glyph.is-icon .glyph-icon[src="img/quest-icon.png"], .feature-search-glyph.is-icon .glyph-icon[src="img/maker-icon.png"], .feature-search-glyph.is-icon .glyph-icon[src="img/quest-icon.png"] { transform: none; }
+/* 메뉴 아이콘은 같은 자리를 쓰고, PNG 투명 여백만 보정해 실제 그림 크기를 맞춘다. */
+.nav-glyph { width: 36px; height: 36px; }
+:is(.nav-glyph, .feature-search-glyph, .ym-feature-glyph).is-icon {
+  padding: 0; border: 0; border-radius: 0; overflow: visible;
+  background: transparent; box-shadow: none;
+}
+.nav-glyph.is-icon > .glyph-icon { width: 36px; height: 36px; }
+.feature-search-glyph.is-icon > .glyph-icon { width: 30px; height: 30px; }
+.ym-feature-glyph.is-icon > .glyph-icon { width: 38px; height: 38px; }
+:is(.nav-glyph, .feature-search-glyph, .ym-feature-glyph).is-icon > .glyph-icon {
+  max-width: none; padding: 0; object-fit: contain;
+  transform: translate(var(--icon-x, 0%), var(--icon-y, 0%)) scale(var(--icon-scale, 1));
+}
+/* alpha > 64인 그림 경계 실측 기준. 원본 PNG는 변형하지 않는다. */
+.glyph-icon[src="img/maker-icon.png"] { --icon-scale: 1.333; --icon-y: -0.2%; }
+.glyph-icon[src="img/quest-icon.png"] { --icon-scale: 1.241; }
+.glyph-icon[src="img/trade-icon.png"] { --icon-scale: 1.046; --icon-x: -0.85%; --icon-y: 1.15%; }
+.glyph-icon[src="img/monster-icon.png"] { --icon-scale: 1.197; --icon-x: -2.4%; --icon-y: -1.45%; }
+
+/* 계정 메뉴 얼굴: 업로드한 그림 비율을 유지하며 전체 얼굴을 보여 준다. */
+.glyph-icon.account-menu-face { object-fit: contain; --icon-scale: 1; }

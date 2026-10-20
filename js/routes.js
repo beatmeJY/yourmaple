@@ -4,16 +4,18 @@
 // quick: true는 페이지 이동 대신 버튼으로 동작합니다(예: 링크 패널).
 // dev: true는 개발 중이라 운영 주소에서는 숨깁니다(주소에 ?dev 를 붙이면 보임, js/dev-mode.js).
 import { devMode } from "./dev-mode.js";
+import { accountMenuFaceUrl } from "./profile.js";
+import { escapeHtml } from "./format.js";
 
 export const homeRoute = { id: "dashboard", label: "홈", glyph: "⌂" };
 
 const allCategories = [
-  { id: "account", label: "계정·캐릭", glyph: "캐", hue: 295, routes: [{ id: "characters", label: "캐릭터 관리", auth: true }, { id: "homework", label: "숙제 체크리스트", auth: true }] },
+  { id: "account", label: "계정·캐릭", glyph: "캐", icon: "img/account-default-1.png", hue: 295, routes: [{ id: "characters", label: "캐릭터 관리", auth: true }, { id: "homework", label: "숙제 체크리스트", auth: true }] },
   { id: "hunt", label: "경험치·사냥터", glyph: "EXP", hue: 150, routes: [{ id: "hunts", label: "사냥 기록", auth: true }, { id: "level-plan", label: "레벨업 계산" }] },
   { id: "dojo", label: "무릉도장", glyph: "武", icon: "img/dojo-icon.png", hue: 25, routes: [{ id: "dojo", label: "층별 기록 · 허리띠 시세" }] },
   { id: "maker", label: "메이커·강화", glyph: "◆", icon: "img/maker-icon.png", hue: 210, routes: [{ id: "maker", label: "메이커 계산" }, { id: "enhance", label: "강화 계산", dev: true }] },
-  { id: "trade", label: "거래", glyph: "⇄", hue: 180, routes: [{ id: "trades", label: "거래 장부", auth: true }] },
-  { id: "quest", label: "퀘스트", glyph: "Q", icon: "img/quest-icon.png", hue: 85, routes: [{ id: "quests", label: "퀘스트", auth: true }] },
+  { id: "trade", label: "거래 내역", glyph: "⇄", icon: "img/trade-icon.png", hue: 180, routes: [{ id: "trades", label: "거래 내역", auth: true }] },
+  { id: "quest", label: "퀘스트 정보", glyph: "Q", icon: "img/quest-icon.png", hue: 85, routes: [{ id: "quests", label: "퀘스트 정보", auth: true }] },
   { id: "monster", label: "몬스터 정보", glyph: "M", icon: "img/monster-icon.png", hue: 65, routes: [{ id: "monsters", label: "몬스터 도감", auth: true }] },
   { id: "memo", label: "메모", glyph: "✎", hue: 340, routes: [{ id: "notes", label: "메모", auth: true }] },
   // 링크는 화면이 아니라 떠 있는 패널(quick). 2026-10-21 메모와 분리해 한 줄 메뉴로.
@@ -41,5 +43,6 @@ export function needsLogin(routeId) {
 
 /** 메뉴·홈·검색에 쓰는 분류 아이콘 안쪽: 그림(icon)이 있으면 그림, 없으면 글자(glyph) */
 export function glyphInner(item) {
+  if (item?.id === "account") return `<img class="glyph-icon account-menu-face" data-account-face src="${escapeHtml(accountMenuFaceUrl())}" alt="" width="36" height="36" />`;
   return item?.icon ? `<img class="glyph-icon" src="${item.icon}" alt="" width="36" height="36" />` : String(item?.glyph ?? "");
 }

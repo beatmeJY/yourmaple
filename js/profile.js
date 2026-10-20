@@ -3,7 +3,7 @@ import { translateDbError } from "./db-error.js";
 import { burstAt, sfx } from "./effects.js";
 import { escapeHtml, formatCount } from "./format.js";
 import { jobRecord } from "./job-label.js";
-import { isLoggedIn } from "./session.js";
+import { currentSession, isLoggedIn } from "./session.js";
 import { getSupabase } from "./supabase-client.js";
 import { notify } from "./toast.js";
 
@@ -107,6 +107,21 @@ export async function setMainCharacter(id) {
   return true;
 }
 
+// 기본 이미지는 사용자가 선택한 1번 캐릭터를 쓴다(2026-10-21).
+export const DEFAULT_ACCOUNT_FACE = "img/account-default-1.png";
+
+export function accountMenuFaceUrl() {
+  if (!isLoggedIn() || state.userId !== currentSession()?.user?.id) return DEFAULT_ACCOUNT_FACE;
+  return state.characters.find((row) => row.id === state.mainId)?.face_url || DEFAULT_ACCOUNT_FACE;
+}
+
+function paintAccountFaces() {
+  const url = accountMenuFaceUrl();
+  for (const img of document.querySelectorAll("[data-account-face]")) {
+    if (img.getAttribute("src") !== url) img.src = url;
+  }
+}
+
 // ── 헤더 프로필 얼굴 + 대표 캐릭터 고르기 메뉴 ─────────────────────────────
 
 function letterFace(row) {
@@ -123,6 +138,7 @@ function jobColor(row) {
 }
 
 export function paintProfileButton() {
+  paintAccountFaces();
   const button = document.querySelector("[data-profile-toggle]");
   if (!button) return;
   const main = state.characters.find((row) => row.id === state.mainId);
@@ -188,6 +204,10 @@ export function mountProfile() {
   loadMainCharacter(true).then(paintProfileButton);
   if (wired) return;
   wired = true;
+  document.addEventListener("error", (event) => {
+    const img = event.target;
+    if (img instanceof HTMLImageElement && img.hasAttribute("data-account-face") && img.getAttribute("src") !== DEFAULT_ACCOUNT_FACE) img.src = DEFAULT_ACCOUNT_FACE;
+  }, true);
   document.addEventListener("click", async (event) => {
     if (event.target.closest("[data-profile-toggle]")) {
       await toggleMenu();
