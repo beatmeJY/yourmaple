@@ -101,6 +101,8 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 
 035까지 이미 실행했다면 `sql/036_account_deletion_grace.sql` 만 실행합니다(035를 안 했어도 이 파일만으로 됩니다). 회원 탈퇴를 7일 유예로 바꿉니다: "탈퇴 신청"은 `account_deletions` 에 한 줄만 남기고, 7일 안에 취소할 수 있으며, 7일이 지난 신청은 매일 03:00(UTC) pg_cron 작업이 계정을 지웁니다(기록은 cascade). 035의 즉시 삭제 함수는 화면에서 부르지 못하게 막습니다. 이미 이 파일을 실행했다면 같은 파일을 다시 실행합니다.
 
+거래 저장·마지막 저장 취소를 사용하려면 `sql/037_trade_undo.sql`을 실행합니다. 기존 거래 표를 유지하고 원자적 저장·복원 함수를 추가합니다. 이미 실행했다면 같은 파일을 다시 실행해도 됩니다.
+
 `anon` 행이 없고, 표마다 `rls_enabled` 가 true 이면 정상입니다.
 
 ## 로그인 연결
@@ -199,3 +201,8 @@ Secret key 는 Secret 에도 넣지 않습니다.
 배포 설정은 새 정적 파일도 `_site`에 복사합니다. 코드 작성과 Google 계정의 소유권 확인은 별개이며, 이번 변경만으로 Search Console에 자동 등록되지 않습니다.
 
 공식 안내: [DNS TXT 소유권 확인](https://support.google.com/webmasters/answer/9008080), [사이트맵 작성](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap), [URL 구조와 해시](https://developers.google.com/search/docs/crawling-indexing/url-structure).
+
+
+## 거래의 마지막 저장 취소
+
+`sql/037_trade_undo.sql`을 Supabase SQL Editor에서 실행하세요(재실행 가능). 매수·매도·통합·목록 직접 수정 저장을 한 트랜잭션으로 처리하며, 같은 화면에서 마지막 성공 저장 1건을 취소할 수 있습니다. 합산 전 수량·평균가·등록/수정 시각도 복원합니다. 이후 다른 곳에서 수정된 거래는 덮어쓰지 않습니다. 새로고침·페이지 이동 시 취소 기록은 사라지고, 명시적인 삭제는 취소 대상이 아닙니다.

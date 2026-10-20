@@ -92,6 +92,7 @@ export async function render(root) {
           <div class="button-row span-all">
             <button class="primary-button" type="submit" data-save>통합 저장</button>
             <button class="secondary-button" type="button" data-cancel>입력 초기화</button>
+            <button class="secondary-button" type="button" data-undo-save disabled>↶ 마지막 저장 취소</button>
           </div>
         </form>
       </aside>
@@ -108,6 +109,43 @@ export async function render(root) {
   let loadId = 0;
   let selectedId = "";
   let sort = "total-desc";
+  let lastSave = null;
+  let changing = false;
+  const undoButton = root.querySelector("[data-undo-save]");
+
+  function paintUndo() {
+    undoButton.disabled = changing || !lastSave;
+    undoButton.title = lastSave ? `${lastSave.name} 저장 직전으로 되돌리기` : "이 화면에서 저장한 마지막 작업을 취소합니다.";
+  }
+
+  function saveError(error) {
+    if (/replace_my_trades|PGRST202/.test(`${error?.message} ${error?.code}`)) {
+      return "거래 저장·취소를 사용하려면 Supabase에서 sql/037_trade_undo.sql을 실행해 주세요.";
+    }
+    if (error?.code === "40001" || /다른 곳에서.*변경/.test(error?.message ?? "")) {
+      return "다른 곳에서 거래가 변경되어 처리하지 않았습니다. 새로고침 후 최신 거래를 확인해 주세요.";
+    }
+    return translateDbError(error);
+  }
+
+  async function undoSave() {
+    if (changing || !lastSave) return;
+    changing = true;
+    paintUndo();
+    const saved = lastSave;
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase.rpc("replace_my_trades", { expected: saved.after, replacement: saved.before, restore_times: true });
+      if (error) { showStatus(saveError(error), "error"); return; }
+      lastSave = null;
+      form.dataset.editingId = "";
+      title.textContent = "거래 추가";
+      await loadRows({ merge: false });
+      sfx("uncheck");
+      showStatus(`${saved.name}의 마지막 저장을 취소했습니다.`, "info");
+    } catch (error) { showStatus(saveError(error), "error"); }
+    finally { changing = false; paintUndo(); }
+  }
 
   function showStatus(text, kind) {
     notify(text, kind);
@@ -372,27 +410,24 @@ export async function render(root) {
             isCompleteTrade(row) === complete &&
             tradeName(row.name) === stored.name,
         );
-    if (sameLot) {
-      const updated = await supabase.from("trades").update(combineLots([sameLot, stored])).eq("id", sameLot.id);
-      if (updated.error) return { error: updated.error };
-      if (id) {
-        const removed = await supabase.from("trades").delete().eq("id", id);
-        if (removed.error) return { error: removed.error };
-      }
-      return { merged: true };
+    const before = [sameLot, id ? rows.find((row) => row.id === id) : null].filter(Boolean).map((row) => ({ ...row }));
+    const target = sameLot ?? before[0];
+    const after = { ...(target ?? {}), ...(sameLot ? combineLots([sameLot, stored]) : stored), id: target?.id ?? crypto.randomUUID() };
+    const { data, error } = await supabase.rpc("replace_my_trades", { expected: before, replacement: [after] });
+    if (!error && data) {
+      lastSave = { ...data, name: stored.name };
+      paintUndo();
     }
-    const query = id
-      ? supabase.from("trades").update(stored).eq("id", id)
-      : supabase.from("trades").insert(stored);
-    const { error } = await query;
-    return { error, merged: false };
+    return { error, merged: Boolean(sameLot) };
   }
 
   const savingIds = new Set();
 
   async function saveInline(input) {
     const row = rows.find((item) => item.id === input.dataset.tradeId);
-    if (!row || savingIds.has(row.id)) return;
+    if (!row || changing || savingIds.has(row.id)) return;
+    changing = true;
+    paintUndo();
     savingIds.add(row.id);
     try {
       const inputs = tradeInputs(row.id);
@@ -410,15 +445,20 @@ export async function render(root) {
       showStatus("저장하는 중입니다.", "info");
       const saved = await persistTrade(row.id, parsed.value);
       if (saved.error) {
-        showStatus(translateDbError(saved.error), "error");
+        showStatus(saveError(saved.error), "error");
         restoreTradeInputs(row);
         return;
       }
       if (form.dataset.editingId === row.id) closeForm();
       showStatus(saved.merged ? "이름이 같은 거래를 한 줄로 합쳤습니다." : "거래를 수정했습니다.", "info");
-      await loadRows();
+      await loadRows({ merge: false });
+    } catch (error) {
+      showStatus(saveError(error), "error");
+      restoreTradeInputs(row);
     } finally {
       savingIds.delete(row.id);
+      changing = false;
+      paintUndo();
     }
   }
   function fillForm(row) {
@@ -514,7 +554,7 @@ export async function render(root) {
     return next ?? [];
   }
 
-  async function loadRows() {
+  async function loadRows({ merge = true } = {}) {
     const current = ++loadId;
     list.innerHTML = `<p class="empty">거래를 불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
@@ -528,7 +568,7 @@ export async function render(root) {
       return;
     }
     try {
-      rows = await collapseOpenTrades(supabase, data ?? []);
+      rows = merge ? await collapseOpenTrades(supabase, data ?? []) : data ?? [];
     } catch (mergeError) {
       rows = data ?? [];
       showStatus(translateDbError(mergeError), "error");
@@ -562,6 +602,7 @@ export async function render(root) {
   });
 
   root.addEventListener("click", async (event) => {
+    if (event.target.closest("[data-undo-save]")) { await undoSave(); return; }
     const viewButton = event.target.closest("[data-view]");
     if (viewButton) {
       view = viewButton.dataset.view;
@@ -595,21 +636,23 @@ export async function render(root) {
     }
 
     const deleteButton = event.target.closest("[data-delete]");
-    if (!deleteButton) return;
+    if (!deleteButton || changing) return;
     const row = rows.find((item) => item.id === deleteButton.dataset.delete);
     if (!row) return;
     if (!window.confirm(`${row.name} 거래를 삭제할까요? 삭제한 내용은 되돌릴 수 없습니다.`)) return;
+    changing = true;
+    paintUndo();
     deleteButton.disabled = true;
-    const supabase = await getSupabase();
-    const { error } = await supabase.from("trades").delete().eq("id", row.id);
-    if (error) {
-      deleteButton.disabled = false;
-      showStatus(translateDbError(error), "error");
-      return;
-    }
-    if (form.dataset.editingId === row.id) closeForm();
-    showStatus("거래를 삭제했습니다.", "info");
-    await loadRows();
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase.from("trades").delete().eq("id", row.id);
+      if (error) { showStatus(translateDbError(error), "error"); return; }
+      if (form.dataset.editingId === row.id) closeForm();
+      lastSave = null;
+      showStatus("거래를 삭제했습니다.", "info");
+      await loadRows();
+    } catch (error) { showStatus(translateDbError(error), "error"); }
+    finally { changing = false; deleteButton.disabled = false; paintUndo(); }
   });
 
   // 저장 연출: 판매분이 이익이면 초록 파티클, 손해면 실패음, 이익으로 모두 팔면 "흑자 완판!"(시안).
@@ -635,13 +678,15 @@ export async function render(root) {
 
   let formSaving = false;
   async function saveForm(mode = "all") {
-    if (formSaving) return;
+    if (formSaving || changing) return;
     const parsed = readForm(mode);
     if (parsed.error) {
       showStatus(parsed.error, "error");
       return;
     }
     formSaving = true;
+    changing = true;
+    paintUndo();
     const buttons = [...form.querySelectorAll("button")];
     buttons.forEach((button) => button.disabled = true);
     try {
@@ -649,7 +694,7 @@ export async function render(root) {
       const id = mode === "buy" ? "" : mode === "sell" ? selectedId : form.dataset.editingId;
       const saved = await persistTrade(id, parsed.value);
       if (saved.error) {
-        showStatus(translateDbError(saved.error), "error");
+        showStatus(saveError(saved.error), "error");
         return;
       }
       form.dataset.editingId = "";
@@ -659,12 +704,14 @@ export async function render(root) {
         saved.merged ? "이름이 같은 거래를 한 줄로 합쳤습니다." : mode === "sell" ? "이번 판매분을 저장했습니다." : id ? "거래를 수정했습니다." : "거래를 저장했습니다.",
         "info",
       );
-      await loadRows();
+      await loadRows({ merge: false });
     } catch (error) {
       showStatus(translateDbError(error), "error");
     } finally {
       formSaving = false;
       buttons.forEach((button) => button.disabled = false);
+      changing = false;
+      paintUndo();
     }
   }
 
