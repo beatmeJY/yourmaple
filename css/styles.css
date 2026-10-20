@@ -14510,3 +14510,6 @@ body.nav-open .transport-widget { visibility: hidden; }
 .transport-widget[data-ship-phase="closed"] [data-ship-state] { color: var(--danger); }
 @keyframes transport-arrive { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .transport-toggle { transition: none; } .transport-toggle:hover { transform: none; } .transport-panel { animation: none; } }
+
+.transport-mini > span { display: grid; gap: 3px; text-align: left; }
+.transport-mini small { color: var(--gold); font-size: 11px; line-height: 1.25; white-space: nowrap; font-variant-numeric: tabular-nums; }

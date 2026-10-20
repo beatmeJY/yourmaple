@@ -26,12 +26,12 @@ export function mountTransportWidget() {
       <p class="transport-note">배는 출발 1분 전 마감 · 기기 시각 기준</p>
     </section>
     <button class="transport-toggle" type="button" aria-controls="transport-panel" aria-expanded="false">
-      <span class="transport-mini" data-mini-helios>${elevatorIcon}<b data-helios-mini></b></span><i></i><span class="transport-mini" data-mini-ship>${shipIcon}<b data-ship-mini></b></span>
+      <span class="transport-mini" data-mini-helios>${elevatorIcon}<span><b data-helios-mini></b><small data-helios-mini-remain></small></span></span><i></i><span class="transport-mini" data-mini-ship>${shipIcon}<span><b data-ship-mini></b><small data-ship-mini-remain></small></span></span>
     </button>`;
   document.body.append(host);
   const button = host.querySelector(".transport-toggle");
   const panel = host.querySelector(".transport-panel");
-  const nodes = Object.fromEntries([...host.querySelectorAll("[data-transit-clock], [data-helios-direction], [data-helios-state], [data-helios-remain], [data-helios-up], [data-helios-down], [data-ship-badge], [data-ship-state], [data-ship-next], [data-ship-remain], [data-ship-close], [data-ship-depart], [data-helios-mini], [data-ship-mini]")].map((node) => [node.attributes[0].name, node]));
+  const nodes = Object.fromEntries([...host.querySelectorAll("[data-transit-clock], [data-helios-direction], [data-helios-state], [data-helios-remain], [data-helios-up], [data-helios-down], [data-ship-badge], [data-ship-state], [data-ship-next], [data-ship-remain], [data-ship-close], [data-ship-depart], [data-helios-mini], [data-ship-mini], [data-helios-mini-remain], [data-ship-mini-remain]")].map((node) => [node.attributes[0].name, node]));
   const text = (key, value) => { if (nodes[key].textContent !== value) nodes[key].textContent = value; };
   let timer = 0;
   function update() {
@@ -55,6 +55,8 @@ export function mountTransportWidget() {
     text("data-ship-depart", transportTime(ship.departsAt));
     text("data-helios-mini", miniHelios);
     text("data-ship-mini", { waiting: "대기", boarding: "탑승", closed: "마감" }[ship.phase]);
+    text("data-helios-mini-remain", `${helios.waiting ? "출발" : "다음 상태"} ${transportCountdown(helios.changesAt, now)}`);
+    text("data-ship-mini-remain", `${{ waiting: "탑승", boarding: "마감", closed: "출발" }[ship.phase]} ${transportCountdown(ship.changesAt, now)}`);
     host.dataset.shipPhase = ship.phase;
     host.dataset.heliosDirection = helios.direction;
     button.setAttribute("aria-label", `교통 시간표: 헬리오스탑 ${helios.label}, 배 ${shipLabel}`);
