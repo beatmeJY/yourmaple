@@ -14471,3 +14471,42 @@ button.account-email:hover { color: var(--text); background: rgba(255, 255, 255,
 .mock-badge b { padding: 2px 6px; border-radius: 6px; background: oklch(0.75 0.17 140); color: #052410; font-size: 11px; letter-spacing: 0.06em; }
 .mock-badge button, .mock-badge a { height: 26px; padding: 0 8px; border: 1px solid rgba(200, 247, 210, 0.3); border-radius: 8px; background: transparent; color: #c8f7d2; font: inherit; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
 .mock-badge button:hover, .mock-badge a:hover { background: rgba(200, 247, 210, 0.12); }
+
+/* 어느 화면에서든 펼쳐 보는 작은 교통 시간표. */
+.transport-widget { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 65; }
+body:has(.mock-badge) .transport-widget { bottom: calc(64px + env(safe-area-inset-bottom)); }
+body:has(.deletion-banner) .transport-widget { bottom: calc(100px + env(safe-area-inset-bottom)); }
+body.nav-open .transport-widget { visibility: hidden; }
+.transport-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--bg-raised); color: var(--text); box-shadow: var(--shadow); cursor: pointer; transition: transform .2s var(--spring), border-color .2s; }
+.transport-toggle:hover { transform: translateY(-2px); border-color: var(--gold); }
+.transport-toggle:focus-visible, .transport-panel button:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+.transport-mini { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 12px; }
+.transport-mini b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.transport-widget svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.transport-toggle > i { height: 18px; width: 1px; background: var(--line); }
+.transport-widget[data-ship-phase="boarding"] [data-mini-ship] { color: var(--gain); }
+.transport-widget[data-ship-phase="closed"] [data-mini-ship] { color: var(--danger); }
+.transport-panel { position: absolute; right: 0; bottom: 56px; width: min(332px, calc(100vw - 32px)); max-height: calc(100dvh - 160px); overflow: auto; padding: 18px; border: 1px solid var(--line); border-radius: 22px; background: var(--bg-raised); box-shadow: var(--shadow); animation: transport-arrive .25s ease-out both; }
+.transport-panel[hidden] { display: none; }
+.transport-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.transport-panel > header > span { display: grid; gap: 5px; }
+.transport-panel small { color: var(--gold); font-size: 10px; letter-spacing: .14em; }
+.transport-panel header strong { font-size: 18px; color: var(--text); }
+.transport-panel header button { width: 44px; height: 44px; border: 0; border-radius: 12px; background: var(--bg); color: var(--muted); font-size: 24px; cursor: pointer; }
+.transport-clock { display: flex; justify-content: space-between; padding: 14px 0; font-size: 12px; color: var(--muted); }
+.transport-clock time { color: var(--text); font-variant-numeric: tabular-nums; }
+.transport-card { padding: 14px; border-radius: 16px; background: var(--bg); margin-bottom: 10px; }
+.transport-card-title { display: flex; align-items: center; gap: 7px; color: var(--accent); margin-bottom: 12px; }
+.transport-card-title h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--text); }
+.transport-card-title > span { margin-left: auto; font-size: 10px; color: var(--muted); }
+.transport-card > strong { display: block; font-size: 19px; color: var(--text); }
+.transport-card > p { font-size: 12px; color: var(--muted); margin: 8px 0 14px; }
+.transport-card b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.transport-times { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--muted); }
+.transport-times > span { display: grid; gap: 4px; }
+.transport-times b { font-size: 14px; }
+.transport-note { margin: 12px 0 0; font-size: 10px; color: var(--muted); text-align: center; }
+.transport-widget[data-ship-phase="boarding"] [data-ship-state] { color: var(--gain); }
+.transport-widget[data-ship-phase="closed"] [data-ship-state] { color: var(--danger); }
+@keyframes transport-arrive { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .transport-toggle { transition: none; } .transport-toggle:hover { transform: none; } .transport-panel { animation: none; } }

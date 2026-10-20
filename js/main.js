@@ -10,9 +10,11 @@ import { mountFeatureSearch } from "./feature-search.js";
 import { mountProfile } from "./profile.js";
 import { clearToasts, notify } from "./toast.js";
 import { applyDarkTheme, applyNavPreference, isDesktopNav, mountAmbient, renderShell, setNavCollapsed, setNavOpen } from "./ui.js";
+import { mountTransportWidget } from "./transport-widget.js";
 
 applyDarkTheme();
 mountAmbient();
+mountTransportWidget();
 applyNavPreference();
 
 const app = document.querySelector("#app");
