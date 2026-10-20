@@ -23,6 +23,7 @@
 - 빌드 도구 없는 순수 HTML/CSS/JavaScript(ES 모듈) SPA. GitHub Pages로 배포(`.github/workflows/pages.yml`). 배포 때만 `tools/stamp_version.py`가 JS·CSS 주소와 상대 import에 커밋 번호(`?v=`)를 붙여 캐시를 깬다. 그래서 상대 import는 `./x.js`·`../x.js` 문자열 그대로 쓰고, 경로를 변수로 조립하지 않는다.
 - 배포 주소는 `https://yourmaple.kr`(가비아 DNS → GitHub Pages 커스텀 도메인, Enforce HTTPS). 예전 `beatmejy.github.io/yourmaple/`은 새 주소로 이동한다. DNS 레코드와 설정 위치는 README "도메인" 절에 있다. 코드에 배포 경로를 고정하지 않는다(상대 경로 유지).
 - 데이터·로그인: Supabase(Postgres + RLS). 설정은 `js/config.js`(커밋 안 함, `config.example.js` 참고).
+- 로컬 가짜 DB: 127.0.0.1·localhost 에서 `?mock`(로그인됨)·`?mock=guest`·`?mock=reset`·`?mock=0`. `js/supabase-client.js` 가 이때만 `js/dev-mock.js`(supabase-js 흉내, localStorage `ym-mock-db`)를 불러온다. 쿼리 흉내가 부족하면 그 파일에 추가한다. 사용법 README "로컬에서 로그인 없이 확인하기". 2026-10-20 (Claude) [실측]
 - 맥 로컬 실행: `python3 -m http.server 5500` → http://127.0.0.1:5500. Windows에서는 `py -3 -m http.server 5500`을 사용한다. `.claude/launch.json`은 현재 저장소에 없다(2026-10-02 Codex 확인 [실측]).
 - 라우팅: 해시 기반(`#/characters`).
   - `js/routes.js`: `homeRoute`와 7개 분류 `categories`(id·이름·아이콘 글자·hue·routes). 평평한 `routes`는 여기서 만든다. `quick: true`는 페이지 이동 대신 버튼으로 동작(예: 링크 패널).
@@ -80,6 +81,8 @@
 - 2026-10-19 (Claude) 무릉에서 이름만으로 캐릭터 만들기(`js/quick-character.js`): 캐릭터 선택의 "＋ 새 캐릭터", 캐릭터가 없으면 칸 자동 표시·저장 시 안내. 자리 남은 계정(없으면 "본계정" 생성)·서버 메이플랜드, 무릉 숙제 표시(homework_members dojo)에 바로 추가, 퀘스트는 기본으로 보임. 적던 기록은 새 캐릭터에 그대로 채움. 2026-10-19 배포 [실측, 가짜 Supabase]
 - 2026-10-19 (Claude) 사고: 사용자가 실제 계정으로 즉시 탈퇴(sql/035, `delete from auth.users` 하드 삭제 + cascade)해 기록을 잃음 — 무료 요금제라 백업 없음 [진술·문서]. 재발 방지로 탈퇴 7일 유예(`sql/036_account_deletion_grace.sql`: account_deletions·서버가 정하는 delete_after·매일 pg_cron purge·035 즉시 삭제 함수 실행 권한 회수)와 계정 이메일 입력 확인, 대기 중 화면 아래 띠·취소. 2026-10-19 배포, sql/036 사용자 실행 완료 [진술] [실측, 가짜 Supabase]
 - 2026-10-20 (Claude) 숙제표 휠 가로 이동: 표 끝에 닿아도 같은 휠 동작(멈춤 0.35초 전까지)은 표에 붙잡아 화면이 따라 스크롤되지 않게, 잠깐 멈춘 뒤 새로 굴리면 화면 스크롤. 2026-10-20 배포 [실측, 가짜 Supabase]
+- 2026-10-20 (Claude) 숙제 체크 소리: 차원의 균열 조각 = 보석 소리(`gem`), 피아누스 = 옥구슬 소리(`jade`, `js/effects.js`). 피아누스는 비늘 받은 시각 기준 — 문구 "비늘 받은 뒤 7일", 연출 "비늘을 받았습니다"(BOSS REWARD, 입장 팡파르 없음, `enterBoss` 옵션 verb·label·sound). 2026-10-21 배포 [실측, 가짜 Supabase]
+- 2026-10-20 (Claude) 로컬 가짜 DB 모드(`?mock`, `js/dev-mock.js`): 실제 폴더를 5503으로 띄워 11개 화면 오류 없음, 숙제 체크·거래 저장 후 새로고침 유지, 로그인 전 무릉 저장 → 로그인 화면 → Google 버튼 → 로그인된 상태로 복귀·입력값 복원 확인. 2026-10-21 배포 [실측]
 - 배포: GitHub Pages. 마지막 배포는 무릉 허리띠 변경(2026-10-08, Pages 실행 성공·공개 사이트 반영 확인). 그 뒤의 강화 계산 개편(보유 메소 vs 바로 구매, 노작 섞기 `bestAttemptMix`, 강화 지도, 같은 상태 비교)과 메이커·거래 UI 변경은 미배포다. 커밋 여부는 git으로 확인한다 [실측]
 - 검증: `node js/*.check.mjs` 11개(homework-calc 무릉 점수 포함), 구문·`git diff --check`. 화면은 가짜 Supabase 검증 페이지로 PC 1024·1280·1440px, 모바일 375px, 다크 모드를 확인한다 [실측]
 - 미검증: 실제 로그인 DB 저장(강화 프로필 schemaVersion 2, 거래 저장, 무릉 점수), 사용자 간 접근 차단 [실측]

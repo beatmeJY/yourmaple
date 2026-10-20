@@ -16,6 +16,7 @@ import { notify } from "../toast.js";
 
 const BOSS_ART = { pianus: "img/pianus.png", papulatus: "img/papulatus.png", rift: "img/rift.png", zakum: "img/zakum.png", horntail: "img/horntail.png", pinkbean: "img/pinkbean.png", "wedding-pq": "img/wedding-pq.png", "crimson-pq": "img/crimson-pq.png", "malaysia-pq": "img/malaysia-pq.png" };
 const BOSS_KIND = { papulatus: "after24h", rift: "after24h", pianus: "after7d" };
+const DONE_SOUND = { rift: "gem", pianus: "jade" };
 const BOSS_ORDER = ["papulatus", "rift", "pianus"];
 const BOSS_BURST = {
   papulatus: ["#ffb703", "#ffd000", "#ff8a1f", "#ffffff"],
@@ -186,7 +187,7 @@ export async function render(root) {
     const builtIn = [
       ...BOSS_ORDER.map((key) => {
         const boss = bosses.find((item) => item.key === key);
-        return { key, name: boss.label, kind: BOSS_KIND[key], boss, img: BOSS_ART[key], sub: key === "pianus" ? "보스 · 입장 후 7일" : "보스 · 입장 후 24시간" };
+        return { key, name: boss.label, kind: BOSS_KIND[key], boss, img: BOSS_ART[key], sub: key === "pianus" ? "보스 · 비늘 받은 뒤 7일" : "보스 · 입장 후 24시간" };
       }),
       ...RAIDS.map((raid) => ({
         key: raid.key,
@@ -678,7 +679,8 @@ export async function render(root) {
     const now = Date.now();
     const doneNow = homeworkState(task.kind, value, now).done;
     if (doneNow) {
-      sfx("check");
+      // 받는 물건이 있는 숙제는 그 느낌의 소리: 차원의 균열 조각 = 보석, 피아누스의 비늘 = 옥구슬(2026-10-20 사용자 요청).
+      sfx(DONE_SOUND[task.key] ?? "check");
       const cell = cardsBox.querySelector(`[data-check="${CSS.escape(task.key)}"][data-character="${character.id}"]`) ?? cardsBox.querySelector(`[data-task-card="${CSS.escape(task.key)}"]`) ?? target;
       burstAt(cell, task.boss ? BOSS_BURST[task.key] : BURST_COLORS.success, task.boss ? 26 : 18, task.boss ? 1.1 : 0.9);
     } else sfx("uncheck");
@@ -699,7 +701,9 @@ export async function render(root) {
     }
     // 실제 클릭으로 입장한 보스만, DB 저장 성공 후 연출한다. 시각 수정·취소에는 띄우지 않는다.
     if (entering) {
-      enterBoss(task.name, character.name, BOSS_ART[bossKey], bossKey);
+      // 피아누스는 입장이 아니라 비늘을 받은 시각이라 "비늘을 받았습니다"로 띄우고, 소리는 체크할 때 낸 옥구슬 소리 하나만 둔다.
+      if (bossKey === "pianus") enterBoss(task.name, character.name, BOSS_ART[bossKey], bossKey, { verb: "비늘을 받았습니다", label: "BOSS REWARD", sound: null });
+      else enterBoss(task.name, character.name, BOSS_ART[bossKey], bossKey);
     } else if (doneNow) cheerIfComplete(character);
   }
 

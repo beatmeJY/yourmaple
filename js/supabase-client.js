@@ -56,8 +56,42 @@ async function readConfig() {
   return { url, key };
 }
 
+// 로컬 전용 가짜 DB(js/dev-mock.js): 127.0.0.1·localhost 에서 ?mock(로그인됨)·?mock=guest(로그인 전)·?mock=reset(샘플로 처음부터)으로 켜고 ?mock=0 으로 끈다.
+// 이 탭을 닫을 때까지 유지한다. 운영 주소에서는 읽지도 않는다.
+const MOCK_KEY = "ym-mock";
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+
+function mockRequest() {
+  if (!LOCAL_HOSTS.includes(location.hostname)) return null;
+  const params = new URLSearchParams(location.search);
+  try {
+    if (params.has("mock")) {
+      const value = params.get("mock");
+      if (value === "0") sessionStorage.removeItem(MOCK_KEY);
+      else sessionStorage.setItem(MOCK_KEY, "1");
+      return value === "0" ? null : value || "in";
+    }
+    return sessionStorage.getItem(MOCK_KEY) === "1" ? "keep" : null;
+  } catch {
+    return params.has("mock") && params.get("mock") !== "0" ? params.get("mock") || "in" : null;
+  }
+}
+
 export async function getSupabase() {
   if (client) return client;
+  const mock = mockRequest();
+  if (mock) {
+    const { createMockClient, mountMockBadge, resetMockDb, setMockAuth } = await import("./dev-mock.js");
+    if (mock === "reset") resetMockDb();
+    if (mock === "guest") setMockAuth(false);
+    else if (mock !== "keep") setMockAuth(true);
+    // 주소의 ?mock=… 은 한 번 읽었으니 지운다(새로 고쳐도 상태 바꾸기가 반복되지 않게).
+    if (mock !== "keep") history.replaceState(null, "", `${location.pathname}${location.hash}`);
+    client = createMockClient();
+    if (document.body) mountMockBadge();
+    else document.addEventListener("DOMContentLoaded", mountMockBadge, { once: true });
+    return client;
+  }
   const { url, key } = await readConfig();
   await loadLibrary();
   client = createClient(url, key, {

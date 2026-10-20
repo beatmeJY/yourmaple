@@ -14466,3 +14466,8 @@ button.account-email:hover { color: var(--text); background: rgba(255, 255, 255,
 .deletion-banner button { flex: none; height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: linear-gradient(180deg, oklch(0.82 0.13 160), oklch(0.66 0.14 160)); color: #052417; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
 @keyframes deletion-banner-in { from { opacity: 0; transform: translate(-50%, 20px); } }
 @media (prefers-reduced-motion: reduce) { .deletion-banner { animation: none; } .account-cancel { transition: none; } }
+/* 로컬 전용 가짜 DB 표시(?mock, js/dev-mock.js) */
+.mock-badge { position: fixed; right: 12px; bottom: 12px; z-index: 80; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: calc(100vw - 24px); padding: 6px 8px; border-radius: 12px; border: 1px dashed oklch(0.8 0.15 140 / 0.7); background: rgba(10, 30, 16, 0.92); color: #c8f7d2; font-size: 12px; box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.8); }
+.mock-badge b { padding: 2px 6px; border-radius: 6px; background: oklch(0.75 0.17 140); color: #052410; font-size: 11px; letter-spacing: 0.06em; }
+.mock-badge button, .mock-badge a { height: 26px; padding: 0 8px; border: 1px solid rgba(200, 247, 210, 0.3); border-radius: 8px; background: transparent; color: #c8f7d2; font: inherit; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.mock-badge button:hover, .mock-badge a:hover { background: rgba(200, 247, 210, 0.12); }
