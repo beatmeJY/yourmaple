@@ -975,15 +975,27 @@ export async function render(root) {
 
   // ── 이벤트 ────────────────────────────────────────────────
 
+  // 휠로 표를 가로로 넘기다 끝에 닿아도, 같은 휠 동작(잠깐 멈추기 전까지)은 표에 붙잡아 화면이 따라 내려가지 않게 한다.
+  // 끝에서 잠깐 멈췄다가 새로 굴리면 그때 화면이 스크롤된다(2026-10-20 사용자 요청).
+  const WHEEL_HOLD_MS = 350;
+  // 표가 다시 그려지면 요소가 바뀌므로 어느 숙제표인지(task key)로 기억한다.
+  let wheelHold = { key: "", until: 0 };
   root.addEventListener("wheel", (event) => {
     const scroller = event.target.closest(".hw-tscroll");
     if (!scroller || event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
     if (event.target.closest("input, textarea, select")) return;
+    if (scroller.scrollWidth <= scroller.clientWidth) return;
+    const now = performance.now();
+    const key = scroller.closest("[data-task-card]")?.dataset.taskCard ?? "";
+    const holding = wheelHold.key === key && now < wheelHold.until;
     const before = scroller.scrollLeft;
     const delta = event.deltaY * (event.deltaMode === 1 ? 20 : event.deltaMode === 2 ? scroller.clientWidth : 1);
     scroller.scrollLeft += delta;
-    // 양 끝에서는 원래 세로 스크롤을 허용한다. 트랙패드 가로 제스처도 그대로 둔다.
-    if (scroller.scrollLeft !== before) event.preventDefault();
+    const moved = scroller.scrollLeft !== before;
+    if (moved || holding) {
+      event.preventDefault();
+      wheelHold = { key, until: now + WHEEL_HOLD_MS };
+    }
   }, { passive: false });
 
   root.addEventListener("click", async (event) => {
