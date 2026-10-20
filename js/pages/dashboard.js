@@ -70,7 +70,7 @@ async function loadCharacters(supabase) {
 // 로그인 전 홈: 소개 + 로그인 없이 쓰는 계산기 + 모든 기능(로그인이 필요한 곳은 자물쇠).
 const OPEN_TOOLS = [
   { id: "level-plan", glyph: "EXP", hue: 150, title: "레벨업 계산", text: "사냥터 효율과 쿠폰으로 목표 레벨까지 걸리는 시간" },
-  { id: "maker", glyph: "◆", hue: 210, title: "메이커 계산", text: "보석 제작 단계별 비용과 기대 이익" },
+  { id: "maker", glyph: "◆", icon: "img/maker-icon.png", hue: 210, title: "메이커 계산", text: "보석 제작 단계별 비용과 기대 이익" },
   { id: "dojo", glyph: "武", icon: "img/dojo-icon.png", hue: 25, title: "무릉도장 루트", text: "구간 기록으로 검은 허리띠까지 가장 빠른 루트" },
 ];
 
@@ -343,12 +343,15 @@ function featureTile(category, index) {
     .join("");
   const first = category.routes.find((route) => !route.quick) ?? category.routes[0];
   const glyph = String(category.glyph);
+  // 링크처럼 화면이 없는(quick) 분류는 타일을 눌러도 패널을 연다.
+  const mainAttrs = first.quick ? `type="button" data-quick-nav="${first.id}"` : `href="#/${first.id}"`;
+  const mainTag = first.quick ? "button" : "a";
   return `
     <div class="ym-feature-tile" style="--hue:${category.hue};--i:${index}">
-      <a class="ym-feature-main" href="#/${first.id}">
+      <${mainTag} class="ym-feature-main" ${mainAttrs}>
         <span class="ym-feature-glyph${category.icon ? " is-icon" : glyph.length > 1 ? " is-small" : ""}" aria-hidden="true">${category.icon ? glyphInner(category) : escapeHtml(glyph)}</span>
         <strong>${escapeHtml(category.label)}</strong>
-      </a>
+      </${mainTag}>
       <div class="ym-feature-subs">${subs}</div>
     </div>
   `;

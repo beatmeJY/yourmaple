@@ -16,8 +16,8 @@ import { notify } from "../toast.js";
 
 const BOSS_ART = { pianus: "img/pianus.png", papulatus: "img/papulatus.png", rift: "img/rift.png", zakum: "img/zakum.png", horntail: "img/horntail.png", pinkbean: "img/pinkbean.png", "wedding-pq": "img/wedding-pq.png", "crimson-pq": "img/crimson-pq.png", "malaysia-pq": "img/malaysia-pq.png" };
 const BOSS_KIND = { papulatus: "after24h", rift: "after24h", pianus: "after7d" };
-// 2026-10-21 사용자 요청으로 둘을 맞바꿈: 조각 = 옥구슬, 피아누스 비늘 = 보석
-const DONE_SOUND = { rift: "jade", pianus: "gem" };
+// 조각 = 마법 구슬 "띠링~"(2026-10-21 사용자 선택), 피아누스 비늘 = 보석
+const DONE_SOUND = { rift: "orb", pianus: "gem" };
 const BOSS_ORDER = ["papulatus", "rift", "pianus"];
 const BOSS_BURST = {
   papulatus: ["#ffb703", "#ffd000", "#ff8a1f", "#ffffff"],
@@ -680,13 +680,13 @@ export async function render(root) {
     const now = Date.now();
     const doneNow = homeworkState(task.kind, value, now).done;
     if (doneNow) {
-      // 받는 물건이 있는 숙제는 전용 소리(DONE_SOUND): 차원의 균열 조각 = 옥구슬, 피아누스의 비늘 = 보석.
+      // 받는 물건이 있는 숙제는 전용 소리(DONE_SOUND): 차원의 균열 조각 = 마법 구슬, 피아누스의 비늘 = 보석.
       sfx(DONE_SOUND[task.key] ?? "check");
       const cell = cardsBox.querySelector(`[data-check="${CSS.escape(task.key)}"][data-character="${character.id}"]`) ?? cardsBox.querySelector(`[data-task-card="${CSS.escape(task.key)}"]`) ?? target;
       burstAt(cell, task.boss ? BOSS_BURST[task.key] : BURST_COLORS.success, task.boss ? 26 : 18, task.boss ? 1.1 : 0.9);
     } else sfx("uncheck");
     const bossKey = task.key.split("-")[0];
-    const entering = doneNow && target && ["pianus", "papulatus", "zakum", "horntail"].includes(bossKey);
+    const entering = doneNow && target && ["pianus", "rift", "papulatus", "zakum", "horntail"].includes(bossKey);
     if (!entering && undoable && value != null) {
       notify(`${character.name} · ${task.name}: ${formatStamp(new Date(value))}에 끝낸 것으로 기록했습니다.`, "info", { label: "취소", onClick: () => undo(task.key, character.id) });
     }
@@ -703,7 +703,10 @@ export async function render(root) {
     // 실제 클릭으로 입장한 보스만, DB 저장 성공 후 연출한다. 시각 수정·취소에는 띄우지 않는다.
     if (entering) {
       // 피아누스는 입장이 아니라 비늘을 받은 시각이라 "비늘을 받았습니다"로 띄우고, 소리는 체크할 때 낸 소리 하나만 둔다.
-      if (bossKey === "pianus") enterBoss(task.name, character.name, BOSS_ART[bossKey], bossKey, { verb: "비늘을 받았습니다", label: "BOSS REWARD", sound: null });
+      // 연출 그림은 피아누스가 아니라 받은 비늘(숙제표 카드는 피아누스 그림 그대로, 2026-10-21 사용자 요청).
+      if (bossKey === "pianus") enterBoss("피아누스의 비늘", character.name, "img/pianus-scale.png", bossKey, { verb: "비늘을 받았습니다", label: "BOSS REWARD", sound: null });
+      // 차원의 균열 조각도 받은 것을 보여 주되, 입장 연출보다 조금 빨리 사라지게(2026-10-21 사용자 요청).
+      else if (bossKey === "rift") enterBoss(task.name, character.name, BOSS_ART.rift, bossKey, { verb: "조각을 받았습니다", label: "REWARD", sound: null, duration: 1800 });
       else enterBoss(task.name, character.name, BOSS_ART[bossKey], bossKey);
     } else if (doneNow) cheerIfComplete(character);
   }

@@ -103,7 +103,7 @@ document.body.addEventListener("click", async (event) => {
     toggleNavCategory(navCategory);
     return;
   }
-  if (event.target.closest(".nav-sub, .nav-home")) sfx("tick");
+  if (event.target.closest(".nav-sub, .nav-home, .nav-single")) sfx("tick");
   if (event.target.closest("[data-sound-toggle]")) {
     const on = !isSoundOn();
     setSoundOn(on);

@@ -37,8 +37,9 @@ const SOUNDS = {
   fanfare: [[392, 0, 0.16, "triangle", 0.13], [523, 0.12, 0.16, "triangle", 0.13], [659, 0.24, 0.16, "triangle", 0.13], [784, 0.36, 0.6, "triangle", 0.15]],
   // 보석을 주운 듯 높은 음이 빠르게 반짝이며 올라간다. 피아누스의 비늘 받기에 쓴다(2026-10-21 조각과 맞바꿈).
   gem: [[1568, 0, 0.16, "sine", 0.07], [2093, 0.05, 0.18, "sine", 0.06], [2637, 0.1, 0.22, "sine", 0.055], [3136, 0.16, 0.32, "sine", 0.045], [4186, 0.22, 0.45, "sine", 0.035], [2637, 0.3, 0.5, "triangle", 0.02]],
-  // 옥구슬 두세 알이 맞부딪히는 맑은 소리(기본음 + 어긋난 배음을 짧게). 차원의 균열 조각 받기에 쓴다.
-  jade: [[2349, 0, 0.28, "sine", 0.07], [5870, 0, 0.12, "sine", 0.02], [2794, 0.11, 0.32, "sine", 0.065], [6985, 0.11, 0.1, "sine", 0.018], [3136, 0.24, 0.55, "sine", 0.06], [7840, 0.24, 0.14, "sine", 0.016], [1568, 0.24, 0.6, "triangle", 0.025]],
+  // 차원의 균열 조각 받기: 마법 구슬 "띠링~"(2026-10-21 사용자 선택, 후보 2번 원래 길이 약 0.9초 — 길게 한 버전은 별로라 되돌림).
+  // 두 음이 올라가며 위에 작은 반짝임.
+  orb: [[988, 0, 0.5, "sine", 0.07], [1480, 0.09, 0.8, "sine", 0.075], [2960, 0.09, 0.3, "sine", 0.015], [4440, 0.15, 0.25, "sine", 0.012], [5920, 0.2, 0.2, "sine", 0.008]],
 };
 
 let audio = null;
@@ -216,8 +217,8 @@ export function celebrate(title, subtitle = "") {
 
 // 보스 입장: 조작을 가리지 않는 보스별 문양·초상·저음 팡파르.
 let entranceTimer = 0;
-// verb·label·sound 로 문구와 소리를 바꿀 수 있다(피아누스: 비늘 받기, 소리는 체크 때 이미 냄 → null).
-export function enterBoss(name, characterName, art, key, { verb = "입장했습니다", label = "BOSS ENCOUNTER", sound = "entrance" } = {}) {
+// verb·label·sound 로 문구와 소리를 바꿀 수 있다(피아누스: 비늘 받기, 소리는 체크 때 이미 냄 → null). duration: 떠 있는 시간(ms).
+export function enterBoss(name, characterName, art, key, { verb = "입장했습니다", label = "BOSS ENCOUNTER", sound = "entrance", duration = 2600 } = {}) {
   clearTimeout(entranceTimer);
   document.querySelector(".fx-boss-entry")?.remove();
   const overlay = document.createElement("div");
@@ -235,5 +236,5 @@ export function enterBoss(name, characterName, art, key, { verb = "입장했습�
   entranceTimer = setTimeout(() => {
     overlay.classList.add("is-leaving");
     setTimeout(() => overlay.remove(), 350);
-  }, 2600);
+  }, duration);
 }

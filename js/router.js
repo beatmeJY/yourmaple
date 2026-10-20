@@ -88,9 +88,25 @@ export function renderNav(nav, activeId) {
   nav.innerHTML = `${home}<div class="nav-groups">${categories.map((category, index) => {
     const open = !collapsedCategories.has(category.id) || category.id === current?.id;
     const active = category.id === current?.id;
+    const glyph = `<span class="nav-glyph${category.icon ? " is-icon" : category.glyph.length > 2 ? " is-long" : ""}" aria-hidden="true">${glyphInner(category)}</span>`;
+    // 메뉴가 하나뿐인 분류(무릉도장·거래 등)는 펼칠 것 없이 분류 줄을 누르면 바로 그 화면으로 간다(2026-10-21 사용자 요청).
+    // 링크처럼 화면 없이 패널을 여는 메뉴(quick)는 링크 대신 버튼으로 둔다.
+    const [only] = category.routes;
+    if (category.routes.length === 1) {
+      const attrs = only.quick
+        ? `type="button" data-quick-nav="${only.id}"`
+        : `href="#/${only.id}" data-route="${only.id}"${active ? ` aria-current="page"` : ""}`;
+      const tag = only.quick ? "button" : "a";
+      return `<section class="nav-group is-single${active ? " is-active" : ""}" style="--hue:${category.hue};--cat:${hueColor(category.hue)};--i:${index}">
+      <${tag} class="nav-cat nav-single" ${attrs} title="${only.label}">
+        ${glyph}
+        <span class="nav-cat-name">${category.label}</span>
+      </${tag}>
+    </section>`;
+    }
     return `<section class="nav-group${open ? " is-open" : ""}${active ? " is-active" : ""}" style="--hue:${category.hue};--cat:${hueColor(category.hue)};--i:${index}">
       <button type="button" class="nav-cat" data-nav-cat="${category.id}" aria-expanded="${open}" aria-controls="nav-subs-${category.id}">
-        <span class="nav-glyph${category.icon ? " is-icon" : category.glyph.length > 2 ? " is-long" : ""}" aria-hidden="true">${glyphInner(category)}</span>
+        ${glyph}
         <span class="nav-cat-name">${category.label}</span>
         <span class="nav-count">${category.routes.length}</span>
         <span class="nav-chev" aria-hidden="true">›</span>
@@ -99,7 +115,7 @@ export function renderNav(nav, activeId) {
     </section>`;
   }).join("")}</div>`;
   // 메뉴를 다 펼치면 세로가 짧은 화면에서 사이드바가 스크롤된다. 지금 화면 메뉴가 보이게 사이드바 안에서만 맞춘다.
-  const active = nav.querySelector(".nav-sub.is-active");
+  const active = nav.querySelector(".nav-sub.is-active, .nav-single[aria-current]");
   const panel = nav.closest(".sidebar-panel");
   if (active && panel && panel.scrollHeight > panel.clientHeight) {
     const top = active.getBoundingClientRect().top - panel.getBoundingClientRect().top;
