@@ -220,7 +220,11 @@ let entranceTimer = 0;
 // verb·label·sound 로 문구와 소리를 바꿀 수 있다(피아누스: 비늘 받기, 소리는 체크 때 이미 냄 → null). duration: 떠 있는 시간(ms).
 export function enterBoss(name, characterName, art, key, { verb = "입장했습니다", label = "BOSS ENCOUNTER", sound = "entrance", duration = 2600 } = {}) {
   clearTimeout(entranceTimer);
-  document.querySelector(".fx-boss-entry")?.remove();
+  // 연달아 누르면 앞 연출은 부드럽게 사라지게 두고 새 연출을 띄운다(2026-10-21 사용자 요청).
+  for (const previous of document.querySelectorAll(".fx-boss-entry:not(.is-leaving)")) {
+    previous.classList.add("is-leaving");
+    setTimeout(() => previous.remove(), 350);
+  }
   const overlay = document.createElement("div");
   overlay.className = "fx-boss-entry";
   overlay.dataset.boss = key;
