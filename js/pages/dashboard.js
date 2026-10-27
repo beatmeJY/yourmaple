@@ -1,3 +1,6 @@
+import { signInWithProvider, translateAuthError } from "../auth.js";
+import { providerButtons } from "./login.js";
+import { notify } from "../toast.js";
 import { bosses, formatPossible, formatRemain, formatStamp, todaySlot } from "../boss-cooldown.js";
 import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face.js";
 import { translateDbError } from "../db-error.js";
@@ -8,7 +11,7 @@ import { formatMinutes } from "../hunt-calc.js";
 import { jobLabel, jobRecord } from "../job-label.js";
 import { loadMainCharacter, mainCharacterId, setMainCharacter } from "../profile.js";
 import { categories, glyphInner, routes } from "../routes.js";
-import { isLoggedIn } from "../session.js";
+import { isLoggedIn, rememberNext } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 
 // 대표 캐릭터는 js/profile.js 가 profiles.main_character_id 로 저장한다(헤더 프로필과 같다).
@@ -83,7 +86,8 @@ function renderGuest(root) {
           <span class="ym-guest-kicker">메이플랜드 도우미</span>
           <h2>계산은 바로, 기록은 로그인해서</h2>
           <p>레벨업·메이커·무릉 계산은 로그인 없이 써 보세요. 저장 버튼을 누를 때만 로그인하면 되고, 입력한 값은 로그인 뒤에도 그대로 남아요.</p>
-          <button class="ym-guest-login" type="button" data-login-open>Google·Discord로 로그인</button>
+          <div class="ym-guest-providers" role="group" aria-label="로그인 방법 선택">${providerButtons("data-home-oauth")}</div>
+          <p class="ym-guest-legal">계속하면 <a href="./terms.html">이용약관</a>과 <a href="./privacy.html">개인정보 처리방침</a>에 동의합니다.</p>
         </section>
         <section class="ym-home-panel ym-glass ym-home-features">
           <header class="ym-home-head"><h2>모든 기능</h2><span>🔒 = 로그인하면 열려요</span></header>
@@ -111,7 +115,30 @@ function renderGuest(root) {
         </section>
       </div>
     </div>`;
-  root.addEventListener("click", (event) => {
+  let signingIn = false;
+  root.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-home-oauth]");
+    if (button) {
+      if (signingIn) return;
+      signingIn = true;
+      const buttons = [...root.querySelectorAll("[data-home-oauth]")];
+      for (const item of buttons) item.disabled = true;
+      button.classList.add("is-busy");
+      button.setAttribute("aria-busy", "true");
+      rememberNext("dashboard", "");
+      try {
+        const result = await signInWithProvider(button.dataset.homeOauth);
+        if (result.error) throw new Error(result.error);
+      } catch (error) {
+        if (!root.isConnected) return;
+        notify(translateAuthError(error), "error");
+        signingIn = false;
+        for (const item of buttons) item.disabled = false;
+        button.classList.remove("is-busy");
+        button.removeAttribute("aria-busy");
+      }
+      return;
+    }
     if (event.target.closest(".ym-guest-tool, .ym-feature-tile a, .ym-feature-tile button")) sfx("tick");
   });
 }

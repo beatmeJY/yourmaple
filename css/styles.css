@@ -14746,3 +14746,10 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 /* 숙제표: 직업 때문에 참여 불가인 캐릭터(크림슨 파퀘의 시그너스·배틀메이지, 2026-10-28) */
 .hw-person.is-blocked { opacity: 0.5; filter: grayscale(0.8); }
 .hw-tcell.is-blocked .hw-left { color: var(--muted); }
+/* 홈에서 서비스별 로그인으로 바로 연결한다. */
+.ym-guest-providers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+.ym-guest-providers .auth-provider { height: 54px; padding: 0 12px; font-size: 14px; box-shadow: var(--shadow); }
+.ym-guest-providers .auth-provider:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.ym-guest-hero .ym-guest-legal { margin-top: 12px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+.ym-guest-legal a { color: var(--text); text-underline-offset: 3px; }
+@media (max-width: 600px) { .ym-guest-providers { grid-template-columns: 1fr; gap: 10px; } }
