@@ -1,4 +1,4 @@
-import { checkPendingDeletion, openAccountDialog } from "./account.js";
+import { cancelPendingDeletion, loadPendingDeletion, openAccountDialog, renderDeletionScreen } from "./account.js";
 import { signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
@@ -21,6 +21,7 @@ const app = document.querySelector("#app");
 let mode = "loading";
 let shellUser = null;
 let pendingAuthError = "";
+let appTicket = 0; // showApp 이 탈퇴 대기 확인을 기다리는 동안 다른 화면으로 바뀌었으면 늦은 결과를 버린다
 
 function renderLoading() {
   app.innerHTML = `<p class="boot">로그인 상태를 확인하고 있습니다.</p>`;
@@ -59,11 +60,21 @@ function syncSoundToggle() {
 }
 
 // 로그인 없이도 앱을 연다(2026-10-19). session 이 없으면 계산기·홈 소개만 쓰고, 저장하거나 내 기록 화면을 열 때 로그인 화면을 띄운다.
-function showApp(session) {
+async function showApp(session) {
   const userId = session?.user?.id ?? "";
   // 처음 열 때, 로그인 화면에서 돌아올 때, 로그인·로그아웃으로 사용자가 바뀔 때는 틀부터 다시 그린다.
   const entered = mode !== "app" || shellUser !== userId;
   setSession(session);
+  const ticket = ++appTicket;
+  // 탈퇴 대기 중인 계정은 앱 대신 탈퇴 대기 화면만 본다(2026-10-28 사용자 요청).
+  if (entered && userId) {
+    const pending = await loadPendingDeletion();
+    if (ticket !== appTicket) return;
+    if (pending) {
+      showDeletion(pending, userId);
+      return;
+    }
+  }
   if (entered) {
     clearToasts();
     renderShell();
@@ -77,15 +88,35 @@ function showApp(session) {
   for (const node of document.querySelectorAll("[data-logged-in]")) node.hidden = !userId;
   for (const node of document.querySelectorAll("[data-logged-out]")) node.hidden = Boolean(userId);
   if (!entered) return;
-  // 탈퇴 대기 중이면 화면 아래에 남은 날과 "탈퇴 취소" 띠를 보인다(로그아웃이면 띠를 지운다).
-  checkPendingDeletion();
   // 로그인하고 돌아왔으면 저장하려던 화면으로 간다(그 화면이 맡겨 둔 입력값을 되살린다).
   const next = userId ? takeNext() : null;
   if (next?.route && `#/${next.route}` !== location.hash.split("?")[0]) location.hash = `#/${next.route}`;
   else showPage();
 }
 
+function showDeletion(pending, userId) {
+  clearToasts();
+  renderDeletionScreen(app, pending);
+  mountTransportWidget();
+  mode = "deletion";
+  shellUser = userId;
+}
+
+// 탈퇴 신청(내 계정 창)·탈퇴 취소(탈퇴 대기 화면) 뒤 화면을 바꾼다.
+window.addEventListener("account-deletion-change", (event) => {
+  const userId = currentSession()?.user?.id;
+  if (!userId) return;
+  if (event.detail?.pending) {
+    appTicket += 1;
+    showDeletion(event.detail.pending, userId);
+    return;
+  }
+  mode = "loading";
+  showApp(currentSession());
+});
+
 function showLogin({ failure = "", reason = "" } = {}) {
+  appTicket += 1;
   renderLogin(app, { failure, reason });
   mountTransportWidget();
   mode = "login";
@@ -94,6 +125,7 @@ function showLogin({ failure = "", reason = "" } = {}) {
 function showSetup(error) {
   const message = translateAuthError(error);
   const title = message.includes("라이브러리") ? "연결할 수 없습니다" : "설정이 필요합니다";
+  appTicket += 1;
   renderSetup(app, message, title);
   mountTransportWidget();
   mode = "setup";
@@ -130,6 +162,11 @@ document.body.addEventListener("click", async (event) => {
       return;
     }
     openLinkPanel();
+    return;
+  }
+  const deletionCancel = event.target.closest("[data-deletion-cancel]");
+  if (deletionCancel) {
+    await cancelPendingDeletion(deletionCancel);
     return;
   }
   if (event.target.closest("[data-account-open]")) {

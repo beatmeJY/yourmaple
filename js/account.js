@@ -9,6 +9,8 @@ import { notify } from "./toast.js";
 // 탈퇴는 7일 유예(2026-10-19, 실수로 즉시 탈퇴해 기록을 잃은 일 뒤 사용자 요청, sql/036):
 //   본인 이메일을 똑같이 적어야 "탈퇴 신청" → account_deletions 에 한 줄(7일 뒤 삭제 예정) → 그 사이 "탈퇴 취소"로 되돌림.
 //   7일이 지나면 매일 예약 작업이 계정을 지우고, 모든 기록은 cascade 로 함께 지워진다.
+// 탈퇴 대기 중인 계정은 앱 대신 탈퇴 대기 화면(renderDeletionScreen)만 본다(2026-10-28 사용자 요청, 화면에서만 막음).
+//   그 화면에서는 탈퇴 취소와 로그아웃만 할 수 있다. 상태가 바뀌면 "account-deletion-change" 이벤트로 main.js 에 알린다.
 
 const PROVIDER_LABEL = { google: "Google", discord: "Discord", email: "이메일" };
 
@@ -41,34 +43,68 @@ function confirmWord(user) {
   return user?.email || "탈퇴";
 }
 
-/** 로그인할 때마다 부른다: 탈퇴 대기 중인지 읽고, 대기 중이면 화면 위에 띠를 보인다. */
-export async function checkPendingDeletion() {
+/** 로그인할 때마다 부른다: 탈퇴 대기 중이면 { requested_at, delete_after }, 아니면 null. 표가 없거나 못 읽으면 null(앱을 막지 않는다). */
+export async function loadPendingDeletion() {
   pending = null;
-  if (!currentSession()?.user) {
-    paintBanner();
-    return;
-  }
+  if (!currentSession()?.user) return null;
   const supabase = await getSupabase();
   const { data, error } = await supabase.from("account_deletions").select("requested_at, delete_after").maybeSingle();
   ready = !(error && tableMissing(error));
   pending = error ? null : (data ?? null);
-  paintBanner();
+  return pending;
 }
 
-function paintBanner() {
-  let banner = document.querySelector("[data-deletion-banner]");
-  if (!pending) {
-    banner?.remove();
-    return;
+function announce() {
+  window.dispatchEvent(new CustomEvent("account-deletion-change", { detail: { pending } }));
+}
+
+// ── 탈퇴 대기 화면 ─────────────────────────────────────────────
+
+const GRACE_MS = 7 * 86_400_000;
+
+/** 탈퇴 대기 중인 계정의 화면: 남은 날 고리, 지워지는 날, 탈퇴 취소·로그아웃만. */
+export function renderDeletionScreen(root, info) {
+  const user = currentSession()?.user;
+  const left = Math.max(0, new Date(info.delete_after).getTime() - Date.now());
+  const ratio = Math.min(1, left / GRACE_MS);
+  const days = daysLeft(info.delete_after);
+  root.innerHTML = `
+    <section class="auth-screen deletion-screen">
+      <div class="auth-card deletion-card">
+        <span class="deletion-ring" style="--deg:${(ratio * 360).toFixed(1)}deg" aria-hidden="true"><span><b>${days}</b><small>일 남음</small></span></span>
+        <h1>탈퇴 대기 중</h1>
+        <p class="deletion-email">${escapeHtml(user?.email || "로그인한 계정")}</p>
+        <p class="deletion-when"><b>${escapeHtml(stamp(info.delete_after))}</b> 이후 계정이 지워져요.</p>
+        <ul class="deletion-list">
+          <li>캐릭터·숙제·사냥·무릉·거래·메모 등 <b>모든 기록과 얼굴 이미지</b>가 함께 지워져요.</li>
+          <li>지워진 뒤에는 되돌릴 수 없어요. 그 전에는 언제든 취소할 수 있어요.</li>
+          <li>탈퇴 대기 중에는 기록을 보거나 고칠 수 없어요. 로그아웃하면 로그인 없이 쓰는 계산기는 쓸 수 있어요.</li>
+        </ul>
+        <button class="deletion-cancel" type="button" data-deletion-cancel>탈퇴 취소하고 계속 쓰기</button>
+        <button class="deletion-logout" type="button" data-logout>로그아웃</button>
+      </div>
+    </section>`;
+}
+
+/** 탈퇴 대기 화면의 "탈퇴 취소". 성공하면 true(앱으로 돌아가는 것은 이벤트를 받은 main.js 가 한다). */
+export async function cancelPendingDeletion(button) {
+  if (button) button.disabled = true;
+  const supabase = await getSupabase();
+  const userId = currentSession()?.user?.id;
+  const { error } = await supabase.from("account_deletions").delete().eq("user_id", userId);
+  if (button) button.disabled = false;
+  if (error) {
+    sfx("fail");
+    notify(translateDbError(error), "error");
+    return false;
   }
-  if (!banner) {
-    banner = document.createElement("div");
-    banner.className = "deletion-banner";
-    banner.dataset.deletionBanner = "";
-    banner.setAttribute("role", "status");
-    document.body.append(banner);
-  }
-  banner.innerHTML = `<span><b>탈퇴 대기 중</b> · ${escapeHtml(stamp(pending.delete_after))} 이후 계정과 모든 기록이 지워져요 (${daysLeft(pending.delete_after)}일 남음)</span><button type="button" data-account-open>탈퇴 취소하기</button>`;
+  pending = null;
+  sfx("fanfare");
+  burstAt(button, ["#9ff0c4", "#ffe28a", "#ffffff"], 26, 1);
+  notify("탈퇴를 취소했어요. 계정과 기록이 그대로 남아요.", "info");
+  // 축하 파티클을 잠깐 보여 준 뒤 앱으로 돌아간다.
+  setTimeout(announce, 650);
+  return true;
 }
 
 async function requestDeletion(dialog) {
@@ -91,10 +127,11 @@ async function requestDeletion(dialog) {
     return;
   }
   pending = data;
-  paintBanner();
   sfx("uncheck");
-  paint(dialog);
+  dialog.close();
   notify(`탈퇴를 신청했어요. ${stamp(data.delete_after)} 전까지는 언제든 취소할 수 있어요.`, "info");
+  // 신청하면 바로 탈퇴 대기 화면으로 바뀐다.
+  announce();
 }
 
 async function cancelDeletion(dialog) {
@@ -109,7 +146,6 @@ async function cancelDeletion(dialog) {
     return;
   }
   pending = null;
-  paintBanner();
   sfx("check");
   paint(dialog);
   burstAt(dialog.querySelector(".account-head h2"), ["#9ff0c4", "#ffe28a", "#ffffff"], 18, 0.8);
@@ -185,7 +221,12 @@ export async function openAccountDialog() {
   paint(dialog);
   sfx("tick");
   if (!dialog.open) dialog.showModal();
-  // 열 때마다 대기 상태를 새로 읽는다(다른 기기에서 취소했을 수 있다).
-  await checkPendingDeletion();
+  // 열 때마다 대기 상태를 새로 읽는다(다른 기기에서 신청했을 수 있다). 대기 중이면 탈퇴 대기 화면으로.
+  await loadPendingDeletion();
+  if (pending) {
+    if (dialog.open) dialog.close();
+    announce();
+    return;
+  }
   if (dialog.open) paint(dialog);
 }
