@@ -14699,3 +14699,11 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .char-page .char-account span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* 레벨순 카드의 계정 줄: 카드 폭 전체를 써서 긴 계정 이름도 한 줄로 */
 .char-page .char-account-line { grid-column: 1 / -1; display: flex; min-width: 0; }
+
+/* 레벨업: 계정을 먼저 고르고 그 계정의 캐릭터만 펼친다. */
+.lp-accounts { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.lp-accounts[hidden] { display: none; }
+.lp-accounts .lp-chip { max-width: 100%; overflow-wrap: anywhere; }
+.lp-characters { animation: ym-fade-up 0.24s var(--spring) both; }
+.lp-characters .lp-chip { max-width: 100%; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .lp-characters { animation: none; } }

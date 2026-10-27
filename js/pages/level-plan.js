@@ -90,7 +90,9 @@ export async function render(root) {
         <div class="lp-main">
           <section class="lp-hero">
             <input type="hidden" name="character_pick" value="" />
-            <div class="lp-chips" data-character-chips></div>
+            <input type="hidden" name="account_pick" value="" />
+            <div class="lp-chips lp-accounts" data-account-chips role="group" aria-label="계정 선택"></div>
+            <div class="lp-chips lp-characters" data-character-chips role="group" aria-label="캐릭터 선택"></div>
             <div class="lp-steps">
               <div class="lp-step">
                 <span class="lp-label">현재 레벨</span>
@@ -272,6 +274,7 @@ export async function render(root) {
       exp_coupon_3: planForm.elements.exp_coupon_3.value,
       day_hours: planForm.elements.day_hours.value,
       character_pick: planForm.elements.character_pick.value,
+      account_pick: planForm.elements.account_pick.value,
       expSource: planExpSource,
     };
     try {
@@ -524,16 +527,36 @@ export async function render(root) {
     return [`<option value="">${placeholder}</option>`, ...groups].join("");
   }
 
+  function accountGroups() {
+    const groups = accounts.map((account) => ({ ...account, members: characters.filter((row) => row.account_id === account.id) }));
+    const known = new Set(accounts.map((account) => account.id));
+    const loose = characters.filter((row) => !known.has(row.account_id));
+    if (loose.length) groups.push({ id: "unassigned", name: "계정 없음", members: loose });
+    return groups;
+  }
+
   function paintCharacterPick() {
     const input = planForm.elements.character_pick;
     if (input.value && !characters.some((character) => character.id === input.value)) input.value = "";
+    const accountInput = planForm.elements.account_pick;
+    const groups = accountGroups();
+    const selected = groups.find((group) => group.members.some((row) => row.id === input.value));
+    if (selected) accountInput.value = selected.id;
+    if (!groups.some((group) => group.id === accountInput.value)) accountInput.value = groups[0]?.id || "";
+    const accountBox = root.querySelector("[data-account-chips]");
+    accountBox.hidden = !groups.length;
+    accountBox.innerHTML = groups.map((group) => {
+      const on = group.id === accountInput.value;
+      return `<button type="button" class="lp-chip${on ? " is-on" : ""}" data-account-pick="${escapeHtml(group.id)}" aria-pressed="${on}">${escapeHtml(group.name)}<span>${group.members.length}명</span></button>`;
+    }).join("");
     const box = root.querySelector("[data-character-chips]");
     const chip = (id, name, sub, style) => {
       const on = input.value === id;
-      return `<button type="button" class="lp-chip${on ? " is-on" : ""}" data-character-pick="${id}" aria-pressed="${on}"${style ? ` style="${style}"` : ""}>${escapeHtml(name)}${sub ? `<span>${escapeHtml(sub)}</span>` : ""}</button>`;
+      return `<button type="button" class="lp-chip${on ? " is-on" : ""}" data-character-pick="${escapeHtml(id)}" aria-pressed="${on}"${style ? ` style="${style}"` : ""}>${escapeHtml(name)}${sub ? `<span>${escapeHtml(sub)}</span>` : ""}</button>`;
     };
-    const list = [...characters].sort(compareCharacter);
-    box.innerHTML = list.map((character) => chip(character.id, character.name, character.level ? `Lv.${character.level}` : "", jobStyle(findJob(jobs, character.job)))).join("") + chip("", "직접 입력", "", "");
+    const group = groups.find((item) => item.id === accountInput.value);
+    const list = [...(group?.members ?? [])].sort(compareCharacter);
+    box.innerHTML = (group && !list.length ? `<p class="lp-muted">이 계정에는 캐릭터가 없어요.</p>` : "") + list.map((character) => chip(character.id, character.name, character.level ? `Lv.${character.level}` : "", jobStyle(findJob(jobs, character.job)))).join("") + chip("", "직접 입력", "", "");
   }
 
   function pickedCharacter() {
@@ -832,6 +855,14 @@ export async function render(root) {
   });
 
   root.addEventListener("click", (event) => {
+    const account = event.target.closest("[data-account-pick]");
+    if (account) {
+      if (planForm.elements.account_pick.value === account.dataset.accountPick) return;
+      sfx("tick");
+      planForm.elements.account_pick.value = account.dataset.accountPick;
+      pickCharacter("");
+      return;
+    }
     const chip = event.target.closest("[data-character-pick]");
     if (chip) {
       sfx("tick");
