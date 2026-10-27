@@ -1,3 +1,4 @@
+import { normalizeMonsterDrops } from "./monster-drops.js";
 // 엑셀·붙여넣기 표를 같은 검증 경로로 보냅니다. 확률/약어를 추측하지 않습니다.
 export const monsterHeaders = ['몹 이름', '레벨', 'HP', '경험치', '명중률', '1 경험치 당 HP', '드랍 템'];
 export const monsterExample = [monsterHeaders,
@@ -31,7 +32,7 @@ export function parseMonsterSheet(matrix) {
       }
       row[field] = number;
     }
-    row.drop_items = /^x$/i.test(String(values.drop_items).trim()) ? null : String(values.drop_items).trim() || null;
+    row.drop_items = normalizeMonsterDrops(values.drop_items);
     if ((row.drop_items?.length ?? 0)>2000) errors.push(`${prefix}: 드랍템 설명은 2,000자까지 적어 주세요.`);
     rows.push(row);
   });
@@ -43,9 +44,11 @@ export function classifyMonsterRows(rows, existing) {
   const byName = new Map(existing.map(row => [compact(row.name),row]));
   return rows.map(row => {
     const old = byName.get(row.name);
-    const same = old && ['level','hp','exp','required_accuracy'].every(k => old[k] != null && Number(old[k])===row[k]) &&
-      (String(old.drop_items ?? '').trim() || null) === row.drop_items;
-    return {...row, status:!old?'new':same?'same':'conflict'};
+    const matchingStats = old && ['level','hp','exp','required_accuracy'].every(k => old[k] != null && Number(old[k])===row[k]);
+    const previousDrops = normalizeMonsterDrops(old?.drop_items);
+    const same = matchingStats && previousDrops === row.drop_items;
+    const fill = matchingStats && previousDrops == null && row.drop_items != null;
+    return {...row, status:!old?'new':same?'same':fill?'fill':'conflict'};
   });
 }
 

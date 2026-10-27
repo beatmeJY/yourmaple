@@ -1,3 +1,5 @@
+import { formatExpPerHp, sortMonsterRows } from "../monster-view.js";
+import { splitMonsterDrops } from "../monster-drops.js";
 import { mountMonsterImport } from "../monster-import.js";
 import { sfx } from "../effects.js";
 import { escapeHtml, formatCount } from "../format.js";
@@ -118,12 +120,6 @@ export function render(root) {
   let accLevel = "";
   let accMine = readAccuracy();
 
-  function splitDrops(text) {
-    return String(text || "")
-      .split(/\n|,|·|\//)
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
 
   // 오른쪽 상세: 공용 그림·수치·속성·명중 계산·드랍템(읽기 전용).
   function paintDetail() {
@@ -136,7 +132,7 @@ export function render(root) {
     }
     const ratio = hpPerExp(row.hp, row.exp);
     const tags = elementTags(row);
-    const drops = splitDrops(row.drop_items);
+    const drops = splitMonsterDrops(row.drop_items);
     box.innerHTML = `
       <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${row.image_url?.startsWith("https://") ? `<img class="catalog-monster-image" src="${escapeHtml(row.image_url)}" alt="" loading="lazy" />` : `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
       <div class="mo-d-title"><strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
@@ -144,6 +140,7 @@ export function render(root) {
         <div><span>HP</span><strong>${num(row.hp)}</strong></div>
         <div><span>EXP</span><strong>${num(row.exp)}</strong></div>
         <div><span>1 EXP당 HP</span><strong>${hpCell(ratio)}</strong></div>
+        <div><span>1 HP당 EXP</span><strong>${escapeHtml(formatExpPerHp(row.hp,row.exp))}</strong></div>
       </div>
       <div class="mo-d-tags">${tags || `<span class="mo-tag is-resist">속성 없음</span>`}</div>
       <div class="mo-accbox" data-accbox>
@@ -273,16 +270,7 @@ export function render(root) {
       return range;
     },
     sortRows(rows) {
-      if (sortMode !== "eff") return rows;
-      // 1 EXP당 HP가 낮을수록 효율이 좋다. 값이 없으면 뒤로.
-      return [...rows].sort((left, right) => {
-        const a = hpPerExp(left.hp, left.exp);
-        const b = hpPerExp(right.hp, right.exp);
-        if (a == null && b == null) return (left.level ?? 0) - (right.level ?? 0);
-        if (a == null) return 1;
-        if (b == null) return -1;
-        return a - b || (left.level ?? 0) - (right.level ?? 0);
-      });
+      return sortMonsterRows(rows, sortMode);
     },
     renderList(rows, every) {
       allRows = every;
@@ -298,11 +286,12 @@ export function render(root) {
           const el = firstElement(row);
           return `<button type="button" class="mo-card${row.id === selectedId ? " is-on" : ""}" data-pick-monster="${row.id}" aria-pressed="${row.id === selectedId}" style="--i:${Math.min(index, 16)}">
             <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${row.image_url?.startsWith("https://") ? `<img class="catalog-monster-image" src="${escapeHtml(row.image_url)}" alt="" loading="lazy" />` : `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중">명중 ${num(accuracy)}</span>` : ""}</span>
-            <span class="mo-name"><strong>${escapeHtml(row.name)}</strong>${row.drop_items ? `<span title="${escapeHtml(row.drop_items)}">${escapeHtml(row.drop_items)}</span>` : ""}</span>
+            <span class="mo-name"><strong>${escapeHtml(row.name)}</strong>${row.drop_items ? `<span title="${escapeHtml(splitMonsterDrops(row.drop_items).join(" · "))}">${escapeHtml(splitMonsterDrops(row.drop_items).join(" · "))}</span>` : ""}</span>
             <span class="mo-stats"><span><small>HP</small><strong>${num(row.hp)}</strong></span><span><small>EXP</small><strong>${num(row.exp)}</strong></span></span>
             <span class="mo-eff">
               <span class="mo-eff-top"><span>1 EXP당 HP</span>${hpCell(ratio)}</span>
               <span class="mo-eff-bar"><i style="width:${width}%"></i></span>
+              <span class="mo-eff-top"><span>1 HP당 EXP</span><span>${escapeHtml(formatExpPerHp(row.hp,row.exp))}</span></span>
             </span>
             <span class="mo-tags">${elementTags(row)}</span>
           </button>`;

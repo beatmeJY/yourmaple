@@ -13632,7 +13632,7 @@ a.ym-hero-exp-time,
 .mo-d-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .mo-d-title strong { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
 .mo-badge { padding: 3px 9px; border-radius: var(--radius-pill); background: oklch(0.86 0.15 85 / 0.14); color: oklch(0.9 0.12 85); font-size: 13px; font-weight: 800; }
-.mo-d-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mo-d-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .mo-d-stats div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.07); min-width: 0; }
 .mo-d-stats span { font-size: 11px; font-weight: 700; color: #a59dbd; }
 .mo-d-stats strong { font-size: 16px; font-weight: 900; overflow-wrap: anywhere; }

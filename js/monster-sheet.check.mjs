@@ -3,7 +3,7 @@ import {parseMonsterSheet, classifyMonsterRows, monsterExample, readMonsterText,
 import * as XLSX from './vendor/xlsx-0.20.3.mjs';
 const parsed=parseMonsterSheet(monsterExample);
 assert.deepEqual(parsed.errors,[]); assert.equal(parsed.rows.length,5);assert.equal(parsed.rows[2].drop_items,null);
-assert.equal(parsed.rows[3].drop_items,'신민10 망행100 금');assert.ok(!('hp_per_exp' in parsed.rows[4]));
+assert.equal(parsed.rows[3].drop_items,'신민10, 망행100, 금');assert.ok(!('hp_per_exp' in parsed.rows[4]));
 for(const value of ['', 'abc','-1','2.2','1e3',Number.MAX_SAFE_INTEGER+1]) {
  const bad=structuredClone(monsterExample);bad[1][2]=value;assert.ok(parseMonsterSheet(bad).errors.length);
 }
@@ -22,3 +22,14 @@ ws.C2={t:'n',f:'1+1',v:2};await assert.rejects(()=>readMonsterFile(file()),/수�
 await assert.rejects(()=>readMonsterFile({name:'a.xlsx',size:3*1024*1024}),/2MB/);
 assert.ok(parseMonsterSheet([monsterExample[0],...Array(501).fill(monsterExample[1])]).errors.length);
 console.log('몬스터 표: 예시5행·0/빈값·소수/범위·열/이름중복·충돌분류·CSV/TSV/XLSX·수식/크기제한 통과');
+
+import { splitMonsterDrops, normalizeMonsterDrops } from './monster-drops.js';
+assert.deepEqual(splitMonsterDrops('신민10 망행100 금'),['신민10','망행100','금']);
+assert.deepEqual(splitMonsterDrops('신점10　흰색고무신\t금\n금'),['신점10','흰색고무신','금','금']);
+assert.deepEqual(splitMonsterDrops('금, 은 · 동/철'),['금','은','동','철']);
+assert.deepEqual(splitMonsterDrops('X'),[]);
+assert.equal(normalizeMonsterDrops('  금   금 '),'금, 금');
+assert.equal(classifyMonsterRows([parsed.rows[3]],[{...parsed.rows[3],drop_items:'신민10 망행100 금'}])[0].status,'same');
+assert.equal(classifyMonsterRows([parsed.rows[3]],[{...parsed.rows[3],drop_items:null}])[0].status,'fill');
+assert.equal(classifyMonsterRows([parsed.rows[3]],[{...parsed.rows[3],hp:999,drop_items:null}])[0].status,'conflict');
+console.log('공백 드랍 구분·반복 보존·기존 구분자 호환·빈 드랍 채우기 분류 통과');
