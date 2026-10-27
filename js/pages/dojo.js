@@ -62,11 +62,11 @@ const BELT_ICONS = {
 
 /** 상세 옵션 호버 이미지 */
 const BELT_DETAILS = {
-  white: "img/dojo-belt-white-detail.png",
-  yellow: "img/dojo-belt-yellow-detail.png",
-  blue: "img/dojo-belt-blue-detail.png",
-  red: "img/dojo-belt-red-detail.png",
-  black: "img/dojo-belt-black-detail.png",
+  white: "img/dojo-belt-white-detail-transparent.png",
+  yellow: "img/dojo-belt-yellow-detail-transparent.png",
+  blue: "img/dojo-belt-blue-detail-transparent.png",
+  red: "img/dojo-belt-red-detail-transparent.png",
+  black: "img/dojo-belt-black-detail-transparent.png",
 };
 
 function beltName(id) {
