@@ -107,6 +107,31 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 
 개인 표는 본인 행만, 공용 도감은 `anon`·`authenticated` SELECT만 허용되고 모든 표의 RLS가 켜져 있어야 합니다.
 
+## 운영자 몬스터 엑셀 등록
+
+`sql/038_shared_game_catalog.sql` 적용 뒤 **`sql/039_monster_sheet_import.sql` 전체를 Supabase SQL Editor에서 실행**합니다. 이 파일만 실행하면 운영자 지정이 비어 있으므로 아무도 등록할 수 없습니다. 이후 SQL Editor에서 아래의 이메일 자리만 실제 운영자 이메일로 바꿔 실행합니다. 해당 계정은 먼저 소셜 로그인을 완료해 Auth에 있어야 하며 이메일이 인증되어 있어야 합니다. 개인정보를 채운 SQL은 공개 저장소에 저장하지 않습니다.
+
+```sql
+do $$
+declare target uuid; matches integer;
+begin
+  select count(*), (array_agg(id))[1] into matches, target
+  from auth.users where lower(email)=lower('운영자 이메일로 교체') and email_confirmed_at is not null;
+  if matches<>1 then raise exception '인증된 운영자 계정을 하나만 찾을 수 있어야 합니다. 먼저 로그인과 이메일을 확인하세요.'; end if;
+  insert into public.catalog_monster_import_admin(singleton,user_id,verified_email)
+  select true,target,email from auth.users where id=target
+  on conflict(singleton) do update set user_id=excluded.user_id,verified_email=excluded.verified_email;
+end $$;
+```
+
+- 운영자는 한 계정만 지정됩니다. 이메일 문자열을 브라우저에서 비교하지 않고, 서버의 비공개 등록표에 Auth UUID와 지정 이메일을 연결하고 현재 인증 이메일도 대조합니다. 이메일이 바뀌면 권한이 차단됩니다. 사용자가 메타데이터를 바꿔도 권한을 얻지 못합니다. 운영자 계정을 삭제·재가입하면 새 UUID이므로 다시 지정해야 합니다. 해제는 SQL Editor에서 `delete from public.catalog_monster_import_admin;`로 처리합니다.
+- 지정 후 그 계정으로 몬스터 도감을 다시 열면 **엑셀로 몬스터 등록** 버튼이 보입니다. 비로그인·일반 계정은 버튼이 없으며 서버 등록 요청도 차단합니다. 기존 공용 테이블의 브라우저 직접 쓰기는 계속 금지입니다. 이번 예외는 몬스터 일괄 추가 RPC에만 적용되며 아이템 도감 수정 권한은 열지 않습니다.
+- `.xlsx`·UTF-8 `.csv`·`.tsv`의 첫 시트 또는 엑셀 복사/붙여넣기를 받습니다. 파일 2MB·최대500행입니다. 첫 줄은 `몹 이름 / 레벨 / HP / 경험치 / 명중률 / 1 경험치 당 HP / 드랍 템` 형태입니다. 비율 열은 생략해도 되고 입력값 대신 HP÷경험치로 계산합니다. 경험치0의 비율은 미정입니다. 나머지 입력 열의 수식은 값으로 변환한 뒤 올립니다.
+- 미리보기에서 신규·동일·충돌을 구분하고 신규만 저장합니다. 기존 값은 덮어쓰지 않습니다. 서버에서도 중복/숫자/범위/길이와 권한을 다시 검사하며 잘못된 행은 전체 요청을 롤백합니다. 서버에 추가 데이터가 생기면 미리보기와 실제 등록 개수가 다를 수 있으며 최종 결과를 표시합니다.
+- 드랍 약어는 문자열 그대로 보존하고 X는 없음으로 처리합니다. 엑셀에서 필요 명중을 읽되 레벨별 추가 명중은 추측하지 않습니다. 기존 이름은 공백 제거 기준입니다. 서로 다른 뜻을 가진 같은 이름은 운영자 검토가 필요합니다.
+- Excel 판독은 로컬에 포함한 SheetJS CE 0.20.3(`js/vendor/`, Apache-2.0)을 등록 시에만 불러옵니다. 파일 내용은 브라우저에서 읽고 검증된 행만 RPC에 전송합니다. 이미지 다운로드나 외부 사이트 수집은 포함하지 않습니다.
+- 검증: `node js/monster-sheet.check.mjs`, `tools/monster-import-db.check.mjs`(PGLite), `tools/monster-import-ui.check.mjs`(Playwright/Chrome). 가짜 UI·임시 DB 결과는 실제 로그인 운영 검증을 대신하지 않습니다.
+
 ## 로그인 연결
 
 1. `js/config.example.js` 를 복사해 `js/config.js` 를 만듭니다.

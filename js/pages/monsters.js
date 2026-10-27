@@ -1,3 +1,4 @@
+import { mountMonsterImport } from "../monster-import.js";
 import { sfx } from "../effects.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { matchesText, parseBound } from "../filters.js";
@@ -215,7 +216,7 @@ export function render(root) {
       <div class="mo-page">
         <header class="ym-page-head mo-head">
           <div><h1>몬스터 도감</h1><p>레벨·약점으로 찾고, 1 EXP당 HP로 사냥 효율을 비교해요.</p></div>
-          <span class="ym-badge">모두가 함께 보는 공용 도감</span>
+          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><div data-monster-import></div></div>
         </header>
         <div class="mo-layout">
           <div class="mo-main">
@@ -318,6 +319,7 @@ export function render(root) {
     extraHtml: `<p class="hint" data-level-range hidden></p>`,
     fields: [],
     bind({ root: page, reload, showStatus, repaint }) {
+      void mountMonsterImport(page, reload, () => allRows).catch(() => { /* 권한 조회 실패 시 등록 UI를 열지 않습니다. */ });
       // 처음 내 레벨은 대표 캐릭터 레벨(명중 계산 칸). 필터의 "내 레벨"을 적으면 그 값을 따른다.
       loadMainCharacter().then((state) => {
         if (accLevel) return;

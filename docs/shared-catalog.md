@@ -67,3 +67,9 @@ PostgreSQL 검증은 임시 DB에서 재실행·충돌 이전·원본 보존·�
 - 라우팅·스타일·로컬 데이터: `js/routes.js`, `js/router.js`, `css/styles.css`, `js/dev-mock.js`
 - 검증: `js/catalog.check.mjs`, `js/item-options.check.mjs`, `tools/shared-catalog-db.check.mjs`, `tools/shared-catalog-ui.check.mjs`
 - 문서: `AGENTS.md`, `README.md`, `docs/domain.md`, `docs/shared-catalog.md`
+
+## 운영자 엑셀 등록 예외 (2026-10-27)
+
+사용자가 지정한 단일 계정에만 몬스터 일괄 추가를 허용합니다. 기존 SQL Editor 전용 원칙의 예외는 `sql/039_monster_sheet_import.sql`의 `import_catalog_monsters` RPC뿐입니다. 운영자 Auth UUID는 비공개 단일행 표에서 SQL Editor로만 관리하며, 서버가 로그인 UID와 인증된 계정인지 확인합니다. 브라우저 직접 INSERT/UPDATE/DELETE 및 아이템 도감 쓰기는 열지 않습니다. 이메일·UUID를 공개 파일에 넣지 않습니다. 운영 적용은 README의 039 실행·계정 지정 후 실제 운영자/일반 계정 검증 순서입니다. [진술·문서]
+
+엑셀 입력은 `js/monster-sheet.js`, UI는 `js/monster-import.js`입니다. 새 이름만 추가하고 기존과 같은 값은 건너뛰며 다른 값은 보류합니다. 파일 안 중복 이름과 잘못된 숫자는 거절하고, 서버에서도 동일 검증과 전체 요청 롤백을 보장합니다. HP/EXP는 DB 생성 열로 유지하고, 입력 표의 반올림 비율과 레벨별 명중 증가값은 저장/추정하지 않습니다. [문서]
