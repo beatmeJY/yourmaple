@@ -1,5 +1,4 @@
 import { translateDbError } from "../db-error.js";
-import { devMode } from "../dev-mode.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
 import { rollRefine } from "../sim.js";
 import { escapeHtml, formatCount, readBig } from "../format.js";
@@ -50,12 +49,12 @@ function tierLabel(tierId) {
   return TIERS.find((tier) => tier.id === tierId)?.label ?? tierId;
 }
 
-// 리버스 제작은 개발 중이라 운영 주소에서는 탭을 숨긴다(주소에 ?dev, js/dev-mode.js).
+// 메이커의 세 기능은 운영 주소에서도 공개한다.
 const TABS = [
   { id: "gem", label: "보석 제작", icon: "◆", description: "제련 원가와 거래 손익" },
-  { id: "craft", label: "리버스 제작", icon: "⚒", description: "재료비와 옵션 기대값", dev: true },
+  { id: "craft", label: "리버스 제작", icon: "⚒", description: "재료비와 옵션 기대값" },
   { id: "enchant", label: "장비 옵션 부여", icon: "✦", description: "보석 옵션 계산" },
-].filter((tab) => devMode || !tab.dev);
+];
 
 function formatWhen(value) {
   const date = new Date(value);
