@@ -12,7 +12,7 @@ export const homeRoute = { id: "dashboard", label: "홈", glyph: "⌂" };
 
 const allCategories = [
   { id: "account", label: "계정·캐릭", glyph: "캐", icon: "img/account-default-1.png", hue: 295, routes: [{ id: "characters", label: "캐릭터 관리", auth: true }, { id: "homework", label: "숙제 체크리스트", auth: true }] },
-  { id: "hunt", label: "경험치·사냥터", glyph: "EXP", hue: 150, routes: [{ id: "hunts", label: "사냥 기록", auth: true }, { id: "level-plan", label: "레벨업 계산" }] },
+  { id: "hunt", label: "경험치·사냥터", glyph: "EXP", icon: "img/exp-coupon-3x.png", hue: 150, routes: [{ id: "hunts", label: "사냥 기록", auth: true }, { id: "level-plan", label: "레벨업 계산" }] },
   { id: "event", label: "몬스터 파크", glyph: "MP", icon: "img/monster-park.png", hue: 120, routes: [{ id: "monster-park", label: "몬스터파크 계산", until: "2026-11-30" }] },
   { id: "dojo", label: "무릉도장", glyph: "武", icon: "img/dojo-icon.png", hue: 25, routes: [{ id: "dojo", label: "층별 기록 · 허리띠 시세" }] },
   { id: "maker", label: "메이커·강화", glyph: "◆", icon: "img/maker-icon.png", hue: 210, routes: [{ id: "maker", label: "메이커 계산" }, { id: "enhance", label: "강화 계산", dev: true }] },

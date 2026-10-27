@@ -165,11 +165,11 @@ export async function render(root) {
             </div>
             <div class="lp-coupons">
               <div class="lp-coupon">
-                <span><strong>15분 2배 경쿠</strong><small>장수만큼 15분씩 2배</small></span>
+                <img class="lp-coupon-icon" src="img/exp-coupon-2x.png" alt="" width="36" height="36" /><span class="lp-coupon-copy"><strong>15분 2배 경쿠</strong><small>장수만큼 15분씩 2배</small></span>
                 <span class="lp-mini-step"><button type="button" data-step="exp_coupon" data-delta="-1" aria-label="2배 경쿠 줄이기">−</button><input name="exp_coupon" inputmode="numeric" placeholder="0" aria-label="15분 2배 경쿠 장수" /><button type="button" data-step="exp_coupon" data-delta="1" aria-label="2배 경쿠 늘리기">+</button></span>
               </div>
               <div class="lp-coupon">
-                <span><strong>15분 3배 경쿠</strong><small>3배를 먼저 써요</small></span>
+                <img class="lp-coupon-icon" src="img/exp-coupon-3x.png" alt="" width="36" height="36" /><span class="lp-coupon-copy"><strong>15분 3배 경쿠</strong><small>3배를 먼저 써요</small></span>
                 <span class="lp-mini-step"><button type="button" data-step="exp_coupon_3" data-delta="-1" aria-label="3배 경쿠 줄이기">−</button><input name="exp_coupon_3" inputmode="numeric" placeholder="0" aria-label="15분 3배 경쿠 장수" /><button type="button" data-step="exp_coupon_3" data-delta="1" aria-label="3배 경쿠 늘리기">+</button></span>
               </div>
             </div>

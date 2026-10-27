@@ -13267,7 +13267,7 @@ a.ym-hero-exp-time,
 .lp-well.is-sum { background: rgba(255, 255, 255, 0.05); border-style: dashed; }
 .lp-coupons { display: flex; flex-direction: column; gap: 8px; }
 .lp-coupon { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04); }
-.lp-coupon > span:first-child { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lp-coupon > .lp-coupon-copy { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .lp-coupon strong { font-size: 14px; }
 .lp-coupon small { font-size: 12px; color: #a59dbd; }
 .lp-mini-step { display: flex; align-items: center; gap: 4px; }
@@ -14922,3 +14922,7 @@ body:has(.deletion-banner) .transport-widget.is-docked { position: relative; ins
 @media (prefers-reduced-motion: reduce) {
   .topbar .feature-search-open .ym-search-icon, .topbar .login-open::before { transition: none; }
 }
+
+/* 사용자 제공 경험치 쿠폰 원본을 계산기와 메뉴에 사용한다. */
+.lp-coupon-icon { width: 36px; height: 36px; flex: none; object-fit: contain; image-rendering: pixelated; }
+@media (max-width: 400px) { .lp-coupon { gap: 8px; padding-inline: 10px; } .lp-coupon-icon { width: 30px; height: 30px; } }
