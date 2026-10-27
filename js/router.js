@@ -6,6 +6,7 @@ const pages = {
   homework: () => import("./pages/homework.js"),
   hunts: () => import("./pages/hunts.js"),
   "level-plan": () => import("./pages/level-plan.js"),
+  "monster-park": () => import("./pages/monster-park.js"),
   dojo: () => import("./pages/dojo.js"),
   maker: () => import("./pages/maker.js"),
   enhance: () => import("./pages/enhance.js"),

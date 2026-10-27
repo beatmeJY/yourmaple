@@ -3,6 +3,7 @@
 // hue는 분류 색(oklch(0.8 0.13 hue))이고, glyph는 사이드바 아이콘 글자입니다. icon(그림 경로)이 있으면 글자 대신 그림을 씁니다(무릉도장, 2026-10-21).
 // quick: true는 페이지 이동 대신 버튼으로 동작합니다(예: 링크 패널).
 // dev: true는 개발 중이라 운영 주소에서는 숨깁니다(주소에 ?dev 를 붙이면 보임, js/dev-mode.js).
+// until: "YYYY-MM-DD"는 이벤트 화면이라 그날(서울)이 지나면 운영 주소에서 숨깁니다(몬스터파크, 2026-10-27).
 import { devMode } from "./dev-mode.js";
 import { accountMenuFaceUrl } from "./profile.js";
 import { escapeHtml } from "./format.js";
@@ -12,6 +13,7 @@ export const homeRoute = { id: "dashboard", label: "홈", glyph: "⌂" };
 const allCategories = [
   { id: "account", label: "계정·캐릭", glyph: "캐", icon: "img/account-default-1.png", hue: 295, routes: [{ id: "characters", label: "캐릭터 관리", auth: true }, { id: "homework", label: "숙제 체크리스트", auth: true }] },
   { id: "hunt", label: "경험치·사냥터", glyph: "EXP", hue: 150, routes: [{ id: "hunts", label: "사냥 기록", auth: true }, { id: "level-plan", label: "레벨업 계산" }] },
+  { id: "event", label: "이벤트", glyph: "MP", icon: "img/monster-park.png", hue: 120, routes: [{ id: "monster-park", label: "몬스터파크 계산", until: "2026-11-30" }] },
   { id: "dojo", label: "무릉도장", glyph: "武", icon: "img/dojo-icon.png", hue: 25, routes: [{ id: "dojo", label: "층별 기록 · 허리띠 시세" }] },
   { id: "maker", label: "메이커·강화", glyph: "◆", icon: "img/maker-icon.png", hue: 210, routes: [{ id: "maker", label: "메이커 계산" }, { id: "enhance", label: "강화 계산", dev: true }] },
   { id: "trade", label: "거래 내역", glyph: "⇄", icon: "img/trade-icon.png", hue: 180, routes: [{ id: "trades", label: "거래 내역", auth: true }] },
@@ -23,13 +25,16 @@ const allCategories = [
   { id: "link", label: "링크", glyph: "↗", hue: 260, routes: [{ id: "links", label: "링크", quick: true, auth: true }] },
 ];
 
+const seoulToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const hiddenRoute = (route) => !devMode && (route.dev || (route.until && seoulToday > route.until));
+
 export const categories = allCategories
-  .map((category) => ({ ...category, routes: category.routes.filter((route) => devMode || !route.dev) }))
+  .map((category) => ({ ...category, routes: category.routes.filter((route) => !hiddenRoute(route)) }))
   .filter((category) => category.routes.length);
 
-/** 숨긴 화면인지(운영 주소에서 dev 없이 연 경우) */
+/** 숨긴 화면인지(운영 주소에서 dev 없이 연 경우, 기간이 끝난 이벤트 화면) */
 export function isHiddenRoute(id) {
-  return !devMode && allCategories.some((category) => category.routes.some((route) => route.id === id && route.dev));
+  return allCategories.some((category) => category.routes.some((route) => route.id === id && hiddenRoute(route)));
 }
 
 export const routes = [homeRoute, ...categories.flatMap((category) => category.routes)];

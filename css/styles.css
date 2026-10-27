@@ -14586,3 +14586,112 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .mi-footer { margin-top: 16px; }
 @media (max-width: 600px) { .monster-import-dialog { padding: 16px; } .mi-footer .primary-button { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .monster-import-dialog[open] { animation: none; } }
+
+/* ===== 몬스터파크 계산(이벤트 화면, 2026-10-27) ===== */
+.mp-page { display: grid; gap: 16px; max-width: 1080px; }
+.mp-event { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; min-height: 76px; padding: 14px 120px 14px 20px; overflow: hidden; }
+/* 몬스터파크 그림(Codex가 받은 사용자 그림, 숙제표와 같은 파일): 띠 오른쪽에서 살짝 흔들린다 */
+.mp-event-art { position: absolute; right: 14px; bottom: -6px; width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); animation: mo-bob 2.8s ease-in-out infinite; pointer-events: none; }
+.mp-event strong { font-size: 17px; }
+.mp-event-sub { color: var(--muted); font-size: 13px; }
+.mp-login { margin: 0; color: var(--muted); }
+.mp-char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.mp-char { --job-color: var(--violet); position: relative; display: grid; grid-template-columns: 44px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; min-height: 64px; padding: 10px 12px; border: 1px solid var(--glass-line); border-radius: 18px; background: var(--glass); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: transform 0.45s var(--spring), border-color 0.2s, box-shadow 0.2s, background-color 0.2s; }
+.mp-char:hover { transform: translateY(-3px); border-color: color-mix(in oklch, var(--job-color) 55%, transparent); }
+.mp-char.is-on { border-color: var(--job-color); background: color-mix(in oklch, var(--job-color) 16%, var(--glass)); box-shadow: 0 0 0 1px var(--job-color), 0 10px 26px color-mix(in oklch, var(--job-color) 30%, transparent); }
+.mp-char.is-out { opacity: 0.55; }
+.mp-char-face { grid-row: 1 / 3; display: grid; place-items: center; width: 44px; height: 44px; overflow: hidden; border-radius: 14px; background: rgba(255, 255, 255, 0.07); }
+.mp-char-face img { width: 100%; height: 100%; object-fit: cover; }
+.mp-char-face b { color: var(--job-color); font-size: 18px; }
+.mp-char-name { overflow: hidden; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; }
+.mp-char-lv { color: var(--muted); font-size: 12px; font-weight: 700; }
+.mp-char-lv small { color: var(--text-soft); }
+.mp-input { display: grid; grid-template-columns: repeat(3, minmax(0, auto)); justify-content: start; gap: 18px 32px; padding: 18px 20px; }
+.mp-field { display: grid; align-content: start; gap: 8px; }
+.mp-label { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; }
+.mp-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.mp-stepper button, .mp-ticket { min-width: 40px; height: 40px; padding: 0 10px; border: 1px solid var(--glass-line); border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: var(--text); font: inherit; font-weight: 800; cursor: pointer; transition: transform 0.4s var(--spring), background-color 0.2s, border-color 0.2s; }
+.mp-stepper button:hover, .mp-ticket:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.11); }
+.mp-stepper button:active, .mp-ticket:active { transform: scale(0.94); }
+.mp-lv { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 12px; height: 46px; align-items: center; border: 1px solid var(--glass-line); border-radius: 14px; background: rgba(0, 0, 0, 0.18); }
+.mp-lv span { color: var(--muted); font-weight: 800; }
+.mp-lv input { width: 3.2ch; border: 0; background: none; color: var(--gold); font: inherit; font-size: 24px; font-weight: 900; text-align: center; outline: none; }
+.mp-zone { color: var(--gain); font-size: 12px; font-weight: 700; }
+.mp-zone.is-unknown { color: var(--gold); }
+.mp-percent { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mp-percent-input { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 10px; border: 1px solid var(--glass-line); border-radius: 12px; background: rgba(0, 0, 0, 0.18); }
+.mp-percent-input input { width: 6ch; border: 0; background: none; color: var(--text); font: inherit; font-size: 17px; font-weight: 800; text-align: right; outline: none; }
+.mp-percent-input span { color: var(--muted); }
+.mp-percent .ym-chip { height: 34px; padding: 0 11px; }
+.mp-exp-exact { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mp-tickets { display: inline-flex; gap: 6px; }
+.mp-ticket { min-width: 58px; height: 46px; font-size: 16px; }
+.mp-ticket.is-on { border-color: oklch(0.8 0.13 120 / 0.8); background: oklch(0.8 0.13 120 / 0.2); box-shadow: 0 0 16px oklch(0.8 0.13 120 / 0.3); }
+.mp-lv:focus-within, .mp-percent-input:focus-within { border-color: var(--accent); }
+.mp-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.mp-result { display: grid; align-content: start; gap: 8px; padding: 18px 20px; }
+.mp-results.is-first .mp-result { animation: ym-pop-in 0.45s var(--spring) both; }
+.mp-result-label { color: var(--muted); font-size: 12px; font-weight: 800; }
+.mp-result strong { font-size: 28px; font-weight: 900; line-height: 1.15; }
+.mp-result p { margin: 0; color: var(--text-soft); font-size: 13px; }
+.mp-result.is-reach { border-color: oklch(0.86 0.15 85 / 0.6); box-shadow: 0 0 30px oklch(0.86 0.15 85 / 0.25), var(--shadow); }
+.mp-result.is-reach strong { color: var(--gold); }
+.mp-warnings { display: grid; gap: 8px; }
+.mp-warnings:empty { display: none; }
+.mp-warning { display: flex; gap: 10px; margin: 0; padding: 12px 16px; border: 1px solid oklch(0.86 0.15 85 / 0.3); border-radius: 16px; background: oklch(0.86 0.15 85 / 0.08); color: var(--text-soft); font-size: 14px; }
+.mp-warning > span:first-child { color: var(--gold); font-weight: 900; }
+.mp-warning.is-today { border-color: color-mix(in oklch, var(--danger) 55%, transparent); background: color-mix(in oklch, var(--danger) 12%, transparent); color: var(--text); }
+.mp-warning.is-today > span:first-child { color: var(--danger); }
+.mp-warning b { color: var(--text); }
+.mp-timeline { padding: 18px 20px; }
+.mp-timeline h2 { margin: 0 0 12px; font-size: 15px; }
+.mp-days { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mp-day { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; }
+.mp-day-date { color: var(--muted); font-size: 13px; font-weight: 800; }
+.mp-day.is-today .mp-day-date { color: var(--gold); }
+.mp-day-runs { display: flex; flex-wrap: wrap; gap: 6px; }
+.mp-run { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--glass-line); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.05); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mp-run small { color: var(--muted); font-size: 11px; }
+.mp-run em { padding: 0 6px; border-radius: 6px; background: oklch(0.8 0.13 120 / 0.25); color: oklch(0.88 0.13 120); font-size: 10px; font-style: normal; font-weight: 900; }
+.mp-run.is-up { border-color: oklch(0.8 0.13 120 / 0.45); }
+.mp-run.is-warn { border-color: oklch(0.86 0.15 85 / 0.6); }
+.mp-run.is-lost { border-style: dashed; color: var(--danger); background: none; }
+.mp-run.is-idle, .mp-run.is-done { color: var(--muted); background: none; }
+.mp-muted { margin: 0; color: var(--muted); }
+.mp-zones { padding: 14px 20px; }
+.mp-zone-open { justify-self: start; }
+.mp-zones summary { font-weight: 800; cursor: pointer; }
+.mp-zones p { margin: 8px 0 12px; color: var(--muted); font-size: 13px; }
+.mp-zone-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mp-zone-field { display: grid; gap: 6px; }
+.mp-zone-field span { color: var(--muted); font-size: 12px; font-weight: 800; }
+.mp-zone-field input { height: 40px; padding: 0 12px; border: 1px solid var(--glass-line); border-radius: 12px; background: rgba(0, 0, 0, 0.18); color: var(--text); font: inherit; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .mp-input { grid-template-columns: 1fr; }
+  .mp-results { grid-template-columns: 1fr; }
+  .mp-zone-grid { grid-template-columns: 1fr; }
+  .mp-char-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mp-event { padding-right: 92px; }
+  .mp-event-art { right: 8px; width: 76px; height: 76px; }
+  /* 35일을 한 줄씩: 날짜 좁게, 판 번호 숨기고 알약을 작게 */
+  .mp-timeline { padding: 16px 12px; }
+  .mp-day { grid-template-columns: 62px 1fr; gap: 6px; }
+  .mp-day-date { font-size: 11px; letter-spacing: -0.02em; white-space: nowrap; }
+  .mp-day-runs { flex-wrap: nowrap; gap: 4px; }
+  .mp-run { gap: 4px; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
+  .mp-run small { display: none; }
+  .mp-run em { padding: 0 4px; }
+  .mp-stepper button { min-width: 36px; padding: 0 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-char, .mp-stepper button, .mp-ticket { transition: none; }
+  .mp-event-art { animation: none; }
+  .mp-results.is-first .mp-result { animation: none; }
+}
+
+/* 캐릭터 관리 보기 방식(계정별 / 레벨순, 2026-10-27) */
+.char-view { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--glass-line); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.04); }
+.char-view .ym-chip { height: 36px; border-color: transparent; background: none; }
+.char-view .ym-chip[aria-pressed="true"] { border-color: oklch(0.78 0.16 40 / 0.6); background: oklch(0.78 0.16 40 / 0.2); color: #fff; }
+.character-accounts.is-level { grid-template-columns: minmax(0, 1fr); }
+.char-account-tag { margin-left: 6px; }

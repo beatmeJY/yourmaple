@@ -70,6 +70,10 @@ export async function render(root) {
             <i aria-hidden="true">~</i>
             <input data-level-max inputmode="numeric" placeholder="최대" aria-label="레벨 최대" />
           </label>
+          <span class="char-view" role="group" aria-label="보기 방식">
+            <button class="ym-chip" type="button" data-char-view="account">계정별</button>
+            <button class="ym-chip" type="button" data-char-view="level">레벨순</button>
+          </span>
         </div>
         <div data-list></div>
       </div>
@@ -351,7 +355,39 @@ export async function render(root) {
       .join("")}</a>`;
   }
 
-  function characterCard(row, index) {
+  // 보기 방식: 계정별(기본) / 레벨순(모든 계정을 한 판에 레벨 높은 순, 2026-10-27 사용자 요청). 이 기기에 기억한다.
+  const VIEW_KEY = "maple-note-characters-view";
+  let viewMode = "account";
+  try {
+    if (localStorage.getItem(VIEW_KEY) === "level") viewMode = "level";
+  } catch {
+    // 저장소를 못 쓰면 계정별로 시작한다.
+  }
+
+  function paintViewToggle() {
+    for (const button of root.querySelectorAll("[data-char-view]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.charView === viewMode));
+    }
+  }
+
+  function expOf(row) {
+    try {
+      return BigInt(row.exp ?? 0);
+    } catch {
+      return 0n;
+    }
+  }
+
+  // 레벨 높은 순 → 같은 레벨이면 경험치 많은 순 → 이름순
+  function compareLevel(a, b) {
+    const level = (b.level ?? -1) - (a.level ?? -1);
+    if (level) return level;
+    const exp = expOf(b) - expOf(a);
+    if (exp) return exp > 0n ? 1 : -1;
+    return a.name.localeCompare(b.name, "ko");
+  }
+
+  function characterCard(row, index, { accountName = "" } = {}) {
     const job = jobRecord(row) || findJob(jobs, row.job);
     const style = [jobStyle(job), `--i:${Math.min(index, 12)}`].filter(Boolean).join(";");
     const jobText = job ? jobLabel(jobDisplayName(job), job) : escapeHtml(row.job || "직업 없음");
@@ -372,7 +408,7 @@ export async function render(root) {
           ${faceHtml(row)}
           <span class="character-copy">
             <span class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong><span class="character-level">Lv.${escapeHtml(formatCount(row.level))}</span></span>
-            <span class="character-job">${jobText}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
+            <span class="character-job">${jobText}${accountName ? `<span class="tag char-account-tag">${escapeHtml(accountName)}</span>` : ""}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
           </span>
         </button>
         ${expBar(row)}
@@ -471,6 +507,18 @@ export async function render(root) {
         root.querySelector("[data-level-min]").value.trim() ||
         root.querySelector("[data-level-max]").value.trim(),
     );
+    paintViewToggle();
+    if (viewMode === "level") {
+      const accountName = new Map(accounts.map((account) => [account.id, account.name]));
+      const ranked = [...visibleRows].sort(compareLevel);
+      list.innerHTML = ranked.length
+        ? `<div class="character-accounts is-level"><section class="account-block ym-glass char-level-block">
+            <div class="account-head"><h2>레벨순</h2><span class="char-pips-count">${ranked.length}명</span></div>
+            <ul class="character-rows">${ranked.map((row, index) => characterCard(row, index, { accountName: accountName.get(row.account_id) ?? "" })).join("")}</ul>
+          </section></div>`
+        : `<p class="empty">${searching ? "검색 결과가 없습니다. 검색어나 레벨 범위를 바꿔 보세요." : "이 서버에는 아직 캐릭터가 없습니다. 캐릭터 추가로 넣어 주세요."}</p>`;
+      return;
+    }
     let cardIndex = 0;
     const blocks = accounts
       .map((account, accountIndex) => {
@@ -731,6 +779,19 @@ export async function render(root) {
   });
 
   root.addEventListener("click", async (event) => {
+    const viewButton = event.target.closest("[data-char-view]");
+    if (viewButton) {
+      if (viewButton.dataset.charView === viewMode) return;
+      viewMode = viewButton.dataset.charView === "level" ? "level" : "account";
+      try {
+        localStorage.setItem(VIEW_KEY, viewMode);
+      } catch {
+        // 기억만 못 한다.
+      }
+      sfx("tick");
+      paintList();
+      return;
+    }
     const openServerButton = event.target.closest("[data-open-server]");
     if (openServerButton) openServer(openServerButton.dataset.openServer);
     if (event.target.closest("[data-servers]")) paintGate();
