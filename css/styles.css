@@ -14753,3 +14753,13 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .ym-guest-hero .ym-guest-legal { margin-top: 12px; font-size: 11px; line-height: 1.7; color: var(--muted); }
 .ym-guest-legal a { color: var(--text); text-underline-offset: 3px; }
 @media (max-width: 600px) { .ym-guest-providers { grid-template-columns: 1fr; gap: 10px; } }
+
+/* 사냥 기록: 입력을 목록 위에 두고 비용을 항상 확인한다. */
+.hu-layout { grid-template-columns: minmax(0, 1fr); }
+.hu-measure { display: grid; gap: 8px; margin: 12px 0; color: var(--muted); font-size: 12px; }
+.hu-measure-presets { display: flex; gap: 8px; }
+.hu-costs { margin-top: 10px; }
+.hu-page .hu-well select { width: 100%; min-width: 0; }
+.hu-page .hu-form-panel[hidden] { display: none; }
+
+.hu-page .hu-well select { padding: 4px 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; }

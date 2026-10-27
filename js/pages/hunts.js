@@ -2,8 +2,7 @@ import { translateDbError } from "../db-error.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
 import { matchesPointLevel, matchesText, readLevelFilter } from "../filters.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
-import { expProgress } from "../exp-progress.js";
-import { asBig, formatMinutes, formatPerMinute, formatSigned, hourMeso, mulDivRound, perHour, shortCount } from "../hunt-calc.js";
+import { asBig, formatPerMinute, formatSigned, hourMeso, perHour, shortCount } from "../hunt-calc.js";
 import { findJob, jobDisplayName, jobStyle, normalizeJobName } from "../job-label.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { getSupabase } from "../supabase-client.js";
@@ -75,7 +74,7 @@ function consumePendingAdd() {
 
 // 사냥 타이머: 다른 화면에 갔다 오거나 새로고침해도 이어지도록 시작 시각을 브라우저에 기억한다.
 const TIMER_KEY = "maple-note-hunt-timer";
-const blankTimer = { running: false, startedAt: 0, before: 0, title: "", exp: "", meso: "" };
+const blankTimer = { running: false, startedAt: 0, before: 0, title: "", exp: "", meso: "", potion: "", leech: "" };
 
 function readTimer() {
   try {
@@ -124,7 +123,7 @@ export async function render(root) {
     <div class="hu-page">
       <header class="ym-page-head hu-head">
         <h1>사냥 기록</h1>
-        <p>타이머로 재거나 1시간 기준으로 적으면 EXP/h·메소/h로 비교하고, 다음 레벨까지 걸릴 시간을 알려 줘요.</p>
+        <p>직접 잰 시간과 획득량을 적거나 타이머로 기록하고, 1시간 기준 효율로 비교해요.</p>
       </header>
       <div class="hu-layout">
         <div class="hu-main">
@@ -140,10 +139,20 @@ export async function render(root) {
                 <h2>사냥 타이머</h2>
                 <span data-timer-hint>시작을 누르고 사냥하세요. 1시간 기준 효율로 자동 환산해요.</span>
               </div>
+              <label class="hu-well"><span>기록할 캐릭터</span><select data-timer-character aria-label="기록할 캐릭터"></select></label>
+              <div class="hu-measure" role="group" aria-label="직접 측정 시간">
+                <span>직접 잰 시간</span>
+                <div class="hu-measure-presets">${[15,30,60].map(minutes => `<button type="button" class="hu-act" data-measured-minutes="${minutes}">${minutes}분</button>`).join("")}</div>
+                <label class="hu-well"><span>측정 시간(분)</span><input data-measured-time inputmode="numeric" type="number" min="1" max="1440" placeholder="직접 입력" /></label>
+              </div>
               <div class="hu-wells">
                 <label class="hu-well is-wide"><span>사냥터</span><input data-timer-field="title" autocomplete="off" placeholder="예: 엘나스 헥터" /></label>
                 <label class="hu-well"><span>획득 EXP</span><input data-timer-field="exp" inputmode="numeric" data-grouped autocomplete="off" placeholder="0" /></label>
                 <label class="hu-well"><span>획득 메소</span><input data-timer-field="meso" inputmode="numeric" data-grouped autocomplete="off" placeholder="0" /></label>
+              </div>
+              <div class="hu-wells hu-costs">
+                <label class="hu-well"><span>측정 동안 쓴 물약값</span><input data-timer-field="potion" inputmode="numeric" data-grouped placeholder="없으면 0" /></label>
+                <label class="hu-well"><span>측정 동안 쩔값 (+받음 / −지불)</span><input data-timer-field="leech" inputmode="text" data-grouped data-signed placeholder="내가 내면 -" /></label>
               </div>
               <p class="hu-timer-who" data-timer-who></p>
               <div class="hu-timer-actions">
@@ -154,28 +163,6 @@ export async function render(root) {
             </div>
           </section>
 
-          <section class="hu-panel hu-records">
-            <div class="hu-records-head">
-              <div class="hu-records-title">
-                <h2>사냥 기록</h2>
-                <span>1시간 기준으로 환산 · 쩔비는 받으면 +, 내면 −</span>
-              </div>
-              <button class="hu-add" type="button" data-add-hunt>+ 직접 적기</button>
-            </div>
-            <div class="hu-filters">
-              <label class="hu-search"><span class="sr-only">검색</span><input data-hunt-search placeholder="사냥터, 캐릭터, 직업, 메모" autocomplete="off" /></label>
-              <label class="hu-lv"><span>Lv</span><input data-hunt-min inputmode="numeric" placeholder="최소" aria-label="레벨 최소" /><i aria-hidden="true">~</i><input data-hunt-max inputmode="numeric" placeholder="최대" aria-label="레벨 최대" /></label>
-            </div>
-            <div class="hu-jobs" data-hunt-jobs>
-              <div data-hunt-job-list>
-                <p class="hunt-pick-empty">직업을 불러오는 중입니다.</p>
-              </div>
-            </div>
-            <div class="hu-list" data-hunt-list></div>
-          </section>
-        </div>
-
-        <aside class="hu-side">
           <section class="hu-panel hu-form-panel" data-hunt-form-panel hidden>
             <form class="hu-form" id="hunt-form">
               <div class="hu-form-head">
@@ -206,12 +193,29 @@ export async function render(root) {
             </form>
           </section>
 
-          <section class="hu-panel hu-predict" data-predict>
-            <h2>레벨업 예측</h2>
-            <div class="hu-chips" data-predict-chars></div>
-            <div data-predict-body><p class="hu-muted">불러오는 중입니다.</p></div>
+
+          <section class="hu-panel hu-records">
+            <div class="hu-records-head">
+              <div class="hu-records-title">
+                <h2>사냥 기록</h2>
+                <span>1시간 기준으로 환산 · 쩔비는 받으면 +, 내면 −</span>
+              </div>
+              <button class="hu-add" type="button" data-add-hunt>+ 직접 적기</button>
+            </div>
+            <div class="hu-filters">
+              <label class="hu-search"><span class="sr-only">검색</span><input data-hunt-search placeholder="사냥터, 캐릭터, 직업, 메모" autocomplete="off" /></label>
+              <label class="hu-lv"><span>Lv</span><input data-hunt-min inputmode="numeric" placeholder="최소" aria-label="레벨 최소" /><i aria-hidden="true">~</i><input data-hunt-max inputmode="numeric" placeholder="최대" aria-label="레벨 최대" /></label>
+            </div>
+            <div class="hu-jobs" data-hunt-jobs>
+              <div data-hunt-job-list>
+                <p class="hunt-pick-empty">직업을 불러오는 중입니다.</p>
+              </div>
+            </div>
+            <div class="hu-list" data-hunt-list></div>
           </section>
-        </aside>
+        </div>
+
+
       </div>
       <dialog class="quest-dialog" data-hunt-dialog>
         <div class="quest-dialog-head">
@@ -242,9 +246,8 @@ export async function render(root) {
   let pickedJobKey = "";
   let huntExpSource = "minute";
   let loadId = 0;
-  let curve = new Map();
-  // 레벨업 예측과 타이머 기록에 쓰는 캐릭터. 처음에는 대표 캐릭터.
-  let predictId = "";
+  // 타이머 기록에 쓰는 캐릭터. 처음에는 대표 캐릭터.
+  let timerCharacterId = "";
 
   function syncExp(form, source) {
     const minute = form.elements.exp_minute;
@@ -679,91 +682,14 @@ export async function render(root) {
     </article>`;
   }
 
-  // ── 레벨업 예측 ─────────────────────────────────────────────
+  // ── 기록 캐릭터 ─────────────────────────────────────────────
 
   function sortedCharacters() {
     return [...characters].sort(compareCharacter);
   }
 
-  function predictCharacter() {
-    return characters.find((character) => character.id === predictId) ?? null;
-  }
-
-  function paintPredict() {
-    const chips = root.querySelector("[data-predict-chars]");
-    const body = root.querySelector("[data-predict-body]");
-    if (!chips || !body) return;
-    const list = sortedCharacters();
-    if (!list.length) {
-      chips.innerHTML = "";
-      body.innerHTML = `<p class="hu-muted">캐릭터를 추가하면 다음 레벨까지 걸릴 시간을 보여 줘요.</p><a class="hu-link" href="#/characters">캐릭터 추가하러 가기</a>`;
-      return;
-    }
-    chips.innerHTML = list
-      .map((character) => {
-        const on = character.id === predictId;
-        const style = jobStyle(findJob(jobs, character.job));
-        return `<button type="button" class="hu-chip${on ? " is-on" : ""}" data-predict-pick="${character.id}" aria-pressed="${on}"${style ? ` style="${style}"` : ""}>${escapeHtml(character.name)}</button>`;
-      })
-      .join("");
-    const character = predictCharacter();
-    if (!character) return;
-    const level = Number(character.level || 0);
-    if (!level) {
-      body.innerHTML = `<p class="hu-muted">${escapeHtml(character.name)}의 레벨이 비어 있어요. 캐릭터 화면에서 레벨을 적어 주세요.</p>`;
-      return;
-    }
-    if (level >= 200) {
-      body.innerHTML = `<p class="hu-lv-line"><span>Lv.200</span><span>만렙</span></p><p class="hu-muted">더 올릴 레벨이 없어요.</p>`;
-      return;
-    }
-    const progress = expProgress({ level, exp: character.exp, curve });
-    if (progress.state === "no-curve") {
-      body.innerHTML = `<p class="hu-muted">${level}레벨의 다음 레벨 경험치 정보가 없어요.</p>`;
-      return;
-    }
-    const need = asBig(curve.get(level));
-    const noExp = progress.state === "no-exp";
-    const over = progress.state === "over";
-    const remaining = noExp || over ? (over ? 0n : need) : progress.remaining;
-    const ratio = noExp ? 0 : over ? 1 : progress.ratio;
-    const percent = noExp ? "0.00" : over ? "100.00" : progress.percent;
-    const own = hunts.filter((row) => row.character_id === character.id && hourRate(row) > 0n);
-    const rates = own.map(hourRate);
-    const bestRate = rates.reduce((max, rate) => (rate > max ? rate : max), 0n);
-    const avgRate = rates.length ? rates.reduce((sum, rate) => sum + rate, 0n) / BigInt(rates.length) : 0n;
-    const timeFor = (rate) => (rate > 0n ? (remaining === 0n ? "바로" : formatMinutes(mulDivRound(60n, remaining, rate))) : "—");
-    const chartSource = (own.length ? own : hunts.filter((row) => hourRate(row) > 0n))
-      .slice()
-      .sort((left, right) => String(left.created_at || "").localeCompare(String(right.created_at || "")))
-      .slice(-6);
-    const chartMax = chartSource.reduce((max, row) => (hourRate(row) > max ? hourRate(row) : max), 0n);
-    const bars = chartSource
-      .map((row, index) => {
-        const rate = hourRate(row);
-        const top = rate === chartMax;
-        const height = Math.max(8, ratioPercent(rate, chartMax) * 0.78);
-        return `<span class="hu-chart-col" title="${escapeHtml(String(row.title || row.character_name || ""))}"><small>${escapeHtml(shortCount(rate))}</small><i class="${top ? "is-top" : ""}" style="height:${height}%;--i:${index}"></i></span>`;
-      })
-      .join("");
-    const note = noExp
-      ? `현재 경험치를 적지 않아 레벨 처음부터 계산했어요. <a class="hu-link" href="#/characters">경험치 적기</a>`
-      : `남은 경험치 ${escapeHtml(formatCount(remaining))}`;
-    body.innerHTML = `
-      <div class="hu-level">
-        <p class="hu-lv-line"><span>Lv.${level} → ${level + 1}</span><span>${percent}%</span></p>
-        <div class="hu-lv-bar"><i style="width:${(ratio * 100).toFixed(2)}%"></i></div>
-        <p class="hu-muted">${note}</p>
-      </div>
-      <div class="hu-eta">
-        <div><span>최고 기록으로</span><strong class="is-best">${escapeHtml(timeFor(bestRate))}</strong></div>
-        <div><span>평균 기록으로</span><strong>${escapeHtml(timeFor(avgRate))}</strong></div>
-      </div>
-      ${own.length ? "" : `<p class="hu-muted">${escapeHtml(character.name)}의 사냥 기록이 없어 시간을 계산할 수 없어요.</p>`}
-      <div class="hu-chart-wrap">
-        <span class="hu-chart-title">최근 기록 EXP/h${own.length ? "" : " (전체)"}</span>
-        ${chartSource.length ? `<div class="hu-chart">${bars}</div>` : `<p class="hu-muted">아직 기록이 없어요.</p>`}
-      </div>`;
+  function timerCharacter() {
+    return characters.find((character) => character.id === timerCharacterId) ?? null;
   }
 
   // ── 타이머 ─────────────────────────────────────────────────
@@ -771,9 +697,11 @@ export async function render(root) {
   function paintTimerWho() {
     const who = root.querySelector("[data-timer-who]");
     if (!who) return;
-    const character = predictCharacter();
+    const character = timerCharacter();
+    root.querySelector("[data-timer-character]").innerHTML = characterSelectHtml("캐릭터 직접 입력");
+    root.querySelector("[data-timer-character]").value = timerCharacterId;
     who.innerHTML = character
-      ? `기록할 캐릭터 <b>${escapeHtml(character.name)}</b>${character.level ? ` · Lv.${escapeHtml(formatCount(character.level))}` : ""} <span>(레벨업 예측에서 바꿀 수 있어요)</span>`
+      ? `기록할 캐릭터 <b>${escapeHtml(character.name)}</b>${character.level ? ` · Lv.${escapeHtml(formatCount(character.level))}` : ""}`
       : `캐릭터가 없으면 기록 남기기에서 직접 적어요.`;
   }
 
@@ -796,6 +724,7 @@ export async function render(root) {
   }
 
   function fillTimerFields() {
+    if (!timer.running && timer.before > 0 && timer.before % 60 === 0) root.querySelector("[data-measured-time]").value = String(timer.before / 60);
     for (const input of root.querySelectorAll("[data-timer-field]")) input.value = timer[input.dataset.timerField] || "";
   }
 
@@ -826,12 +755,15 @@ export async function render(root) {
   function resetTimer() {
     if (elapsedSeconds() >= 60 && !window.confirm("타이머를 0으로 되돌릴까요? 적어 둔 획득량은 남겨 둡니다.")) return;
     timer = { ...timer, running: false, startedAt: 0, before: 0 };
+    root.querySelector("[data-measured-time]").value = "";
     saveTimer();
     sfx("tick");
     paintTimer();
   }
 
   async function finishTimer(button) {
+    const measuredInput = root.querySelector("[data-measured-time]");
+    if (!measuredInput.checkValidity()) { measuredInput.reportValidity(); return; }
     const seconds = elapsedSeconds();
     if (!seconds) return;
     const exp = readBig(timer.exp, "획득 EXP", 1n);
@@ -849,41 +781,16 @@ export async function render(root) {
     const mesoHour = perHour(meso.value ?? 0n, seconds);
     const title = String(timer.title || "").trim() || "새 사냥";
     const memo = `타이머 ${spanText(seconds)} · EXP ${formatCount(exp.value)} · 메소 ${formatCount(meso.value ?? 0n)}`;
-    const character = predictCharacter();
-    if (!character?.level) {
-      // 캐릭터를 모르면 폼에 채워서 확인받는다.
-      fillHuntForm({ id: "", title, exp_per_hour: expHour.toString(), meso_per_hour: mesoHour.toString(), memo });
-      notify("캐릭터를 고르고 저장해 주세요.", "info");
-      return;
-    }
-    const value = {
-      character_id: character.id,
-      character_name: character.name,
-      job: character.job || null,
-      level: character.level,
-      potion_cost: "0",
-      leech_fee: "0",
-      exp_per_hour: expHour.toString(),
-      meso_per_hour: mesoHour.toString(),
-      title,
-      memo,
-    };
-    button.disabled = true;
-    const previousBest = hunts.reduce((max, row) => (hourRate(row) > max ? hourRate(row) : max), 0n);
-    const supabase = await getSupabase();
-    const { error } = await supabase.from("hunts").insert(value);
-    if (!root.isConnected) return;
-    button.disabled = false;
-    if (error) {
-      notify(translateDbError(error), "error");
-      return;
-    }
-    timer = { ...blankTimer, title: timer.title };
-    saveTimer();
-    fillTimerFields();
-    paintTimer();
-    cheer(button, expHour, previousBest, title);
-    await loadAll();
+    const potion = readBig(timer.potion, "물약값", 0n);
+    const leech = readLeech(timer.leech);
+    if (potion.error || leech.error) { notify(potion.error || leech.error, "error"); return; }
+    if (timer.running) { timer = { ...timer, running: false, before: seconds, startedAt: 0 }; saveTimer(); paintTimer(); }
+    const character = timerCharacter();
+    openForm({ id: "", character_id: character?.id, job: character?.job, level: character?.level,
+      title, exp_per_hour: expHour.toString(), meso_per_hour: mesoHour.toString(),
+      potion_cost: perHour(potion.value ?? 0n, seconds).toString(), leech_fee: perHour(leech.value ?? 0n, seconds).toString(),
+      memo: `${memo} · 물약 ${formatCount(potion.value ?? 0n)} · 쩔비 ${formatSigned(leech.value ?? 0n)}` });
+    notify("1시간 기준으로 환산했습니다. 내용을 확인하고 저장해 주세요.", "info");
   }
 
   function cheer(target, rate, previousBest, title) {
@@ -948,15 +855,14 @@ export async function render(root) {
     const current = ++loadId;
     if (!hunts.length) huntList.innerHTML = `<p class="hu-empty">불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
-    const [huntResult, firstCharacters, accountResult, jobResult, curveResult] = await Promise.all([
+    const [huntResult, firstCharacters, accountResult, jobResult] = await Promise.all([
       supabase.from("hunts").select(huntColumns).order("created_at", { ascending: false }),
       supabase.from("characters").select("id, account_id, name, job, level, exp"),
       supabase.from("accounts").select("id, name").order("name"),
       supabase.from("jobs").select("id, family, name, color, color_dark, sort_order").order("sort_order"),
-      supabase.from("level_exp").select("level, exp_to_next"),
       loadMainCharacter(),
     ]);
-    // sql/029 실행 전이면 exp 칸이 없다. 빼고 다시 읽는다(예측은 레벨 처음부터 기준).
+    // sql/029 실행 전이면 exp 칸을 빼고 캐릭터를 읽는다.
     const characterResult = firstCharacters.error && /\bexp\b/i.test(`${firstCharacters.error.message || ""}`)
       ? await supabase.from("characters").select("id, account_id, name, job, level")
       : firstCharacters;
@@ -976,15 +882,13 @@ export async function render(root) {
     accounts = sortByName(accountResult.data ?? []);
     jobs = jobResult.error ? [] : (jobResult.data ?? []);
     if (jobResult.error) notify(translateDbError(jobResult.error), "error");
-    curve = new Map((curveResult.error ? [] : (curveResult.data ?? [])).map((row) => [row.level, row.exp_to_next]));
-    if (!characters.some((character) => character.id === predictId)) {
+    if (!characters.some((character) => character.id === timerCharacterId)) {
       const main = mainCharacterId();
-      predictId = characters.some((character) => character.id === main) ? main : (sortedCharacters()[0]?.id ?? "");
+      timerCharacterId = characters.some((character) => character.id === main) ? main : (sortedCharacters()[0]?.id ?? "");
     }
     paintJobButtons();
     paintCharacterOptions();
     paintHunts();
-    paintPredict();
     paintTimerWho();
   }
 
@@ -1019,7 +923,17 @@ export async function render(root) {
     if (event.target.closest("[data-hunt-search], [data-hunt-min], [data-hunt-max]")) paintHunts();
   });
 
+  function setMeasuredMinutes(value) {
+    const minutes = Number(value);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) { notify("측정 시간은 1~1440분으로 입력해 주세요.", "error"); return; }
+    timer = { ...timer, running: false, startedAt: 0, before: minutes * 60 };
+    root.querySelector("[data-measured-time]").value = String(minutes);
+    saveTimer(); paintTimer();
+  }
+
   root.addEventListener("change", (event) => {
+    if (event.target.matches("[data-timer-character]")) { timerCharacterId = event.target.value; paintTimerWho(); }
+    if (event.target.matches("[data-measured-time]")) setMeasuredMinutes(event.target.value);
     if (event.target === huntForm.elements.character_id) {
       const character = characters.find((item) => item.id === event.target.value);
       showNameField(!character);
@@ -1030,10 +944,12 @@ export async function render(root) {
   });
 
   root.addEventListener("click", async (event) => {
+    const measured = event.target.closest("[data-measured-minutes]");
+    if (measured) setMeasuredMinutes(measured.dataset.measuredMinutes);
     if (event.target.closest("[data-add-hunt]")) {
       notify("", "info");
       sfx("tick");
-      const character = predictCharacter();
+      const character = timerCharacter();
       openForm(character ? { id: "", character_id: character.id, job: character.job, level: character.level } : { id: "" });
     }
     if (event.target.closest("[data-cancel-hunt]")) closeHuntForm();
@@ -1042,14 +958,6 @@ export async function render(root) {
     if (event.target.closest("[data-timer-reset]")) resetTimer();
     const finish = event.target.closest("[data-timer-finish]");
     if (finish) await finishTimer(finish);
-
-    const pick = event.target.closest("[data-predict-pick]");
-    if (pick && pick.dataset.predictPick !== predictId) {
-      predictId = pick.dataset.predictPick;
-      sfx("tick");
-      paintPredict();
-      paintTimerWho();
-    }
 
     const memoButton = event.target.closest("[data-open-memo]");
     if (memoButton) openMemo(memoButton.dataset.openMemo);
@@ -1143,7 +1051,7 @@ export async function render(root) {
   startTicking();
   await loadAll();
   if (shouldOpenAdd && root.isConnected) {
-    const character = predictCharacter();
+    const character = timerCharacter();
     openForm(character ? { id: "", character_id: character.id, job: character.job, level: character.level } : { id: "" });
   }
 }
