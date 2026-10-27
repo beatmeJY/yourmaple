@@ -3,6 +3,7 @@ import { translateDbError } from "./db-error.js";
 import { burstAt, sfx } from "./effects.js";
 import { escapeHtml, formatCount } from "./format.js";
 import { jobRecord } from "./job-label.js";
+import { accountLabel } from "./auth.js";
 import { currentSession, isLoggedIn } from "./session.js";
 import { getSupabase } from "./supabase-client.js";
 import { notify } from "./toast.js";
@@ -147,12 +148,25 @@ export function paintProfileButton() {
   button.innerHTML = main
     ? `${faceOf(main)}<span class="topbar-profile-name">${escapeHtml(main.name)}</span>`
     : `<span class="char-face is-letter">?</span><span class="topbar-profile-name">대표 캐릭터</span>`;
-  button.setAttribute("aria-label", main ? `대표 캐릭터 ${main.name}, 바꾸기` : "대표 캐릭터 고르기");
+  button.setAttribute("aria-label", main ? `대표 캐릭터 ${main.name} · 계정 메뉴` : "대표 캐릭터 · 계정 메뉴");
+}
+
+// 로그인 계정과 로그아웃은 대표 캐릭터 메뉴 위·아래에 함께 둔다(2026-10-28 사용자 요청, 예전엔 헤더에 이메일·로그아웃 버튼).
+function accountBlock() {
+  const label = accountLabel(currentSession());
+  return `<div class="profile-menu-account"><span class="profile-menu-account-dot" aria-hidden="true"></span><span class="profile-menu-copy"><span>로그인 계정</span><strong title="${escapeHtml(label)}">${escapeHtml(label)}</strong></span></div>`;
+}
+
+function actionsBlock() {
+  return `<div class="profile-menu-actions">
+    <button type="button" class="profile-menu-act" data-account-open data-profile-close>내 계정</button>
+    <button type="button" class="profile-menu-act is-logout" data-logout>로그아웃</button>
+  </div>`;
 }
 
 function paintMenu(menu) {
   if (!state.characters.length) {
-    menu.innerHTML = `<p class="profile-menu-empty">캐릭터가 없습니다.</p><a class="profile-menu-link" href="#/characters" data-profile-close>캐릭터 추가하러 가기</a>`;
+    menu.innerHTML = `${accountBlock()}<p class="profile-menu-empty">캐릭터가 없습니다.</p><a class="profile-menu-link" href="#/characters" data-profile-close>캐릭터 추가하러 가기</a>${actionsBlock()}`;
     return;
   }
   const items = state.characters
@@ -167,7 +181,7 @@ function paintMenu(menu) {
     })
     .join("");
   const note = state.saved ? "모든 기기에서 같은 대표 캐릭터가 보입니다." : "sql/029 실행 전이라 이 브라우저에만 기억합니다.";
-  menu.innerHTML = `<p class="profile-menu-title">대표 캐릭터</p><div class="profile-menu-list" role="menu">${items}</div><p class="profile-menu-note">${note}</p>`;
+  menu.innerHTML = `${accountBlock()}<p class="profile-menu-title">대표 캐릭터</p><div class="profile-menu-list" role="menu">${items}</div><p class="profile-menu-note">${note}</p>${actionsBlock()}`;
 }
 
 function closeMenu() {
@@ -188,7 +202,7 @@ async function toggleMenu() {
   sfx("tick");
   menu.hidden = false;
   button.setAttribute("aria-expanded", "true");
-  menu.innerHTML = `<p class="profile-menu-empty">불러오는 중입니다.</p>`;
+  menu.innerHTML = `${accountBlock()}<p class="profile-menu-empty">불러오는 중입니다.</p>${actionsBlock()}`;
   await loadMainCharacter(true);
   if (menu.hidden) return;
   paintMenu(menu);

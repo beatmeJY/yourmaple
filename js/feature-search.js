@@ -3,7 +3,8 @@ import { escapeHtml } from "./format.js";
 import { categories, glyphInner, homeRoute } from "./routes.js";
 
 // 헤더 기능 검색: 화면 이름·분류 이름으로 찾아 이동한다. "/" 키로 어디서든 검색칸에 들어간다.
-// 좁은 화면에서는 돋보기 버튼만 보이고, 누르면 헤더 위로 검색칸이 펼쳐진다.
+// 평소에는 돋보기 버튼만 보이고(그 자리에 교통 위젯), 누르거나 "/" 를 누르면 검색칸이 펼쳐지고 교통 위젯은 잠깐 숨는다.
+// 기능을 고르거나 Esc·바깥 클릭으로 닫으면 다시 접힌다(2026-10-28 사용자 요청). 좁은 화면에서는 헤더 위로 펼쳐진다.
 
 const items = [
   { id: homeRoute.id, label: homeRoute.label, category: "", hue: 40, glyph: homeRoute.glyph },
@@ -126,6 +127,8 @@ export function mountFeatureSearch() {
     const typing = event.target.closest?.("input, textarea, select, [contenteditable='true']");
     if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault();
+      // 접힌 검색칸은 보이지 않아 포커스를 못 받으므로 먼저 펼친다.
+      open();
       input.focus();
       return;
     }

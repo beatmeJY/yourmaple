@@ -82,6 +82,7 @@ export function renderShell() {
         <header class="topbar">
           <button class="nav-toggle" type="button" data-open-nav aria-controls="sidebar" aria-expanded="true" aria-label="메뉴 닫기">${NAV_CHEVRON}</button>
           <nav class="topbar-crumb" data-crumb aria-label="현재 위치"></nav>
+          <div class="topbar-transit" data-transport-slot></div>
           <div class="feature-search" data-feature-search>
             <label class="feature-search-field">
               <span class="ym-search-icon" aria-hidden="true"></span>
@@ -91,14 +92,12 @@ export function renderShell() {
             <div class="feature-search-results" id="feature-results" data-feature-results role="listbox" aria-label="기능 목록"></div>
           </div>
           <div class="topbar-actions">
-            <button class="feature-search-open" type="button" data-feature-search-open aria-label="기능 찾기"><span class="ym-search-icon" aria-hidden="true"></span></button>
+            <button class="feature-search-open" type="button" data-feature-search-open aria-label="기능 찾기" title="기능 찾기 ( / )"><span class="ym-search-icon" aria-hidden="true"></span></button>
             <div class="topbar-profile-wrap" data-logged-in hidden>
               <button class="topbar-profile" type="button" data-profile-toggle aria-haspopup="menu" aria-expanded="false" aria-label="대표 캐릭터 고르기"></button>
               <div class="profile-menu ym-glass" data-profile-menu hidden></div>
             </div>
-            <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><i aria-hidden="true"></i><span>효과음 켜짐</span></button>
-            <button class="account-email" id="account-email" type="button" data-account-open data-logged-in hidden title="내 계정 · 회원 탈퇴"></button>
-            <button class="icon-button" type="button" data-logout data-logged-in hidden>로그아웃</button>
+            <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><svg class="sound-note" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V5.8l10-2.3v11.7" /><circle cx="6.5" cy="17.5" r="2.6" /><circle cx="16.5" cy="15.2" r="2.6" /><path class="sound-slash" d="M4 4l16 16" /></svg><span class="sr-only">효과음 켜짐</span></button>
             <button class="login-open" type="button" data-login-open data-logged-out hidden>로그인</button>
           </div>
         </header>

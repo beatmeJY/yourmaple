@@ -3,9 +3,20 @@ import { transportState, transportTime, transportCountdown } from "./transport-c
 const elevatorIcon = `<img class="transport-icon" src="img/helios-icon.png" alt="" width="24" height="24" />`;
 const shipIcon = `<img class="transport-icon transport-ship-icon" src="img/ship-icon.png" alt="" width="24" height="24" />`;
 
-// #app 밖에 한 번만 붙여 화면 전환·로그인 화면에서도 시간을 유지한다.
+// 위젯은 한 번만 만들고, 헤더에 자리([data-transport-slot])가 있으면 그 안에 둔다(2026-10-28 사용자 요청).
+// 헤더가 없는 로그인·설정 화면에서는 예전처럼 화면 오른쪽 아래에 떠 있다. 헤더를 다시 그릴 때마다 다시 부른다.
+let mounted = null;
+
 export function mountTransportWidget() {
-  if (document.querySelector(".transport-widget")) return;
+  if (!mounted) mounted = createTransportWidget();
+  const slot = document.querySelector("[data-transport-slot]");
+  mounted.host.classList.toggle("is-docked", Boolean(slot));
+  if (slot) slot.append(mounted.host);
+  else if (mounted.host.parentElement !== document.body) document.body.append(mounted.host);
+  mounted.update();
+}
+
+function createTransportWidget() {
   const host = document.createElement("aside");
   host.className = "transport-widget";
   host.setAttribute("aria-label", "메이플랜드 교통 시간표");
@@ -26,12 +37,12 @@ export function mountTransportWidget() {
       <p class="transport-note">배는 출발 1분 전 마감 · 기기 시각 기준</p>
     </section>
     <button class="transport-toggle" type="button" aria-controls="transport-panel" aria-expanded="false">
-      <span class="transport-mini" data-mini-helios>${elevatorIcon}<span><b data-helios-mini></b><small data-helios-mini-remain></small></span></span><i></i><span class="transport-mini" data-mini-ship>${shipIcon}<span><b data-ship-mini></b><small data-ship-mini-remain></small></span></span>
+      <span class="transport-mini" data-mini-helios>${elevatorIcon}<span><b data-helios-mini></b><small><span data-helios-mini-next></span> <span data-helios-mini-remain></span></small></span></span><i></i><span class="transport-mini" data-mini-ship>${shipIcon}<span><b data-ship-mini></b><small><span data-ship-mini-next></span> <span data-ship-mini-remain></span></small></span></span>
     </button>`;
   document.body.append(host);
   const button = host.querySelector(".transport-toggle");
   const panel = host.querySelector(".transport-panel");
-  const nodes = Object.fromEntries([...host.querySelectorAll("[data-transit-clock], [data-helios-direction], [data-helios-state], [data-helios-remain], [data-helios-next], [data-helios-up], [data-helios-down], [data-ship-badge], [data-ship-state], [data-ship-next], [data-ship-remain], [data-ship-close], [data-ship-depart], [data-helios-mini], [data-ship-mini], [data-helios-mini-remain], [data-ship-mini-remain]")].map((node) => [node.attributes[0].name, node]));
+  const nodes = Object.fromEntries([...host.querySelectorAll("[data-transit-clock], [data-helios-direction], [data-helios-state], [data-helios-remain], [data-helios-next], [data-helios-up], [data-helios-down], [data-ship-badge], [data-ship-state], [data-ship-next], [data-ship-remain], [data-ship-close], [data-ship-depart], [data-helios-mini], [data-ship-mini], [data-helios-mini-next], [data-ship-mini-next], [data-helios-mini-remain], [data-ship-mini-remain]")].map((node) => [node.attributes[0].name, node]));
   const text = (key, value) => { if (nodes[key].textContent !== value) nodes[key].textContent = value; };
   let timer = 0;
   function update() {
@@ -39,8 +50,9 @@ export function mountTransportWidget() {
     if (!host.isConnected) return;
     const now = Date.now();
     const { helios, ship } = transportState(now);
-    const shipLabel = { waiting: "출발함", boarding: "탑승 중", closed: "탑승 마감" }[ship.phase];
-    const miniHelios = helios.waiting ? "대기 중" : helios.direction === "up" ? "올라감" : "내려감";
+    // 탑승할 수 있는 때는 "탑승 가능"(2026-10-28 사용자 요청, 이전 "탑승 중"·"대기 중")
+    const shipLabel = { waiting: "출발함", boarding: "탑승 가능", closed: "탑승 마감" }[ship.phase];
+    const miniHelios = helios.waiting ? "탑승 가능" : helios.direction === "up" ? "올라감" : "내려감";
     const nextUp = helios.upAt < helios.downAt;
     const nextHeliosLabel = `${nextUp ? "↑ 올라감" : "↓ 내려감"}까지`;
     const nextHeliosAt = nextUp ? helios.upAt : helios.downAt;
@@ -59,8 +71,11 @@ export function mountTransportWidget() {
     text("data-ship-depart", transportTime(ship.departsAt));
     text("data-helios-mini", miniHelios);
     text("data-ship-mini", shipLabel);
-    text("data-helios-mini-remain", `${nextHeliosLabel} ${transportCountdown(nextHeliosAt, now)}`);
-    text("data-ship-mini-remain", `${{ waiting: "다음 탑승", boarding: "마감까지", closed: "출발까지" }[ship.phase]} ${transportCountdown(ship.changesAt, now)}`);
+    // 모바일 헤더에서는 남은 시간 숫자만 보이도록 이름과 시간을 나눠 둔다.
+    text("data-helios-mini-next", nextHeliosLabel);
+    text("data-helios-mini-remain", transportCountdown(nextHeliosAt, now));
+    text("data-ship-mini-next", { waiting: "다음 탑승", boarding: "마감까지", closed: "출발까지" }[ship.phase]);
+    text("data-ship-mini-remain", transportCountdown(ship.changesAt, now));
     host.dataset.shipPhase = ship.phase;
     host.dataset.heliosDirection = helios.direction;
     button.setAttribute("aria-label", `교통 시간표: 헬리오스탑 ${miniHelios}, 배 ${shipLabel}`);
@@ -82,5 +97,5 @@ export function mountTransportWidget() {
   document.addEventListener("visibilitychange", update);
   window.addEventListener("pageshow", update);
   window.addEventListener("pagehide", () => clearTimeout(timer));
-  update();
+  return { host, update };
 }

@@ -1,5 +1,5 @@
 import { checkPendingDeletion, openAccountDialog } from "./account.js";
-import { accountLabel, signOut, startAuth, translateAuthError } from "./auth.js";
+import { signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
 import { getRouteId, renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
@@ -53,7 +53,9 @@ function syncSoundToggle() {
   if (!button) return;
   const on = isSoundOn();
   button.setAttribute("aria-pressed", String(on));
-  button.querySelector("span").textContent = on ? "효과음 켜짐" : "효과음 꺼짐";
+  const label = on ? "효과음 켜짐" : "효과음 꺼짐";
+  button.querySelector("span").textContent = label;
+  button.title = `${label} · 누르면 ${on ? "끄기" : "켜기"}`;
 }
 
 // 로그인 없이도 앱을 연다(2026-10-19). session 이 없으면 계산기·홈 소개만 쓰고, 저장하거나 내 기록 화면을 열 때 로그인 화면을 띄운다.
@@ -65,14 +67,13 @@ function showApp(session) {
   if (entered) {
     clearToasts();
     renderShell();
+    mountTransportWidget();
     syncSoundToggle();
     mountFeatureSearch();
     if (userId) mountProfile();
     mode = "app";
     shellUser = userId;
   }
-  const email = document.querySelector("#account-email");
-  if (email) email.textContent = accountLabel(session);
   for (const node of document.querySelectorAll("[data-logged-in]")) node.hidden = !userId;
   for (const node of document.querySelectorAll("[data-logged-out]")) node.hidden = Boolean(userId);
   if (!entered) return;
@@ -86,6 +87,7 @@ function showApp(session) {
 
 function showLogin({ failure = "", reason = "" } = {}) {
   renderLogin(app, { failure, reason });
+  mountTransportWidget();
   mode = "login";
 }
 
@@ -93,6 +95,7 @@ function showSetup(error) {
   const message = translateAuthError(error);
   const title = message.includes("라이브러리") ? "연결할 수 없습니다" : "설정이 필요합니다";
   renderSetup(app, message, title);
+  mountTransportWidget();
   mode = "setup";
 }
 

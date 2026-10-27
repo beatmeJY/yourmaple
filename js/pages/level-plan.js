@@ -1,4 +1,5 @@
 import { sfx } from "../effects.js";
+import { attachFaceUrls, faceMarkup } from "../character-face.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
 import { applyExpCoupons, asBig, buildPlan, formatMinutes, formatPerMinute, formatSigned, hourMeso, mulDivRound, shortCount } from "../hunt-calc.js";
 import { findJob, jobStyle, normalizeJobName } from "../job-label.js";
@@ -78,6 +79,10 @@ function showMessage(target, text, kind) {
   target.textContent = text;
   target.className = `form-message is-${kind}`;
 }
+
+// 계정 색(캐릭터 관리 레벨순 배지와 같은 팔레트)
+const ACCOUNT_HUES = [295, 25, 150, 210, 85, 340, 180, 260];
+const seedCurve = new Map(levelExpSeed.map(([level, exp]) => [level, BigInt(exp)]));
 
 export async function render(root) {
   root.innerHTML = `
@@ -527,6 +532,8 @@ export async function render(root) {
     return [`<option value="">${placeholder}</option>`, ...groups].join("");
   }
 
+  let shownAccount = null; // 캐릭터 카드를 마지막으로 그린 계정
+
   function accountGroups() {
     const groups = accounts.map((account) => ({ ...account, members: characters.filter((row) => row.account_id === account.id) }));
     const known = new Set(accounts.map((account) => account.id));
@@ -545,18 +552,35 @@ export async function render(root) {
     if (!groups.some((group) => group.id === accountInput.value)) accountInput.value = groups[0]?.id || "";
     const accountBox = root.querySelector("[data-account-chips]");
     accountBox.hidden = !groups.length;
-    accountBox.innerHTML = groups.map((group) => {
+    // 계정 탭: 계정마다 색(캐릭터 관리 레벨순 배지와 같은 팔레트), 고른 계정은 그 색으로 빛난다.
+    accountBox.innerHTML = groups.map((group, index) => {
       const on = group.id === accountInput.value;
-      return `<button type="button" class="lp-chip${on ? " is-on" : ""}" data-account-pick="${escapeHtml(group.id)}" aria-pressed="${on}">${escapeHtml(group.name)}<span>${group.members.length}명</span></button>`;
+      const hue = group.id === "unassigned" ? 260 : ACCOUNT_HUES[index % ACCOUNT_HUES.length];
+      return `<button type="button" class="lp-account${on ? " is-on" : ""}" data-account-pick="${escapeHtml(group.id)}" aria-pressed="${on}" style="--acc:${hue}"><i aria-hidden="true"></i><span class="lp-account-name">${escapeHtml(group.name)}</span><b>${group.members.length}</b></button>`;
     }).join("");
     const box = root.querySelector("[data-character-chips]");
-    const chip = (id, name, sub, style) => {
-      const on = input.value === id;
-      return `<button type="button" class="lp-chip${on ? " is-on" : ""}" data-character-pick="${escapeHtml(id)}" aria-pressed="${on}"${style ? ` style="${style}"` : ""}>${escapeHtml(name)}${sub ? `<span>${escapeHtml(sub)}</span>` : ""}</button>`;
+    // 캐릭터 카드: 얼굴·이름·직업·레벨과 경험치 막대. 고른 카드는 직업 색 테두리와 ✓.
+    const card = (character, index) => {
+      const on = input.value === character.id;
+      const need = character.level ? seedCurve.get(character.level) : null;
+      const ratio = need && character.exp != null ? Math.min(100, Number((asBig(character.exp) * 10000n) / need) / 100) : null;
+      const face = faceMarkup(character.face_url) || `<b>${escapeHtml([...String(character.name || "?").trim()][0] || "?")}</b>`;
+      return `<button type="button" class="lp-char${on ? " is-on" : ""}" data-character-pick="${escapeHtml(character.id)}" aria-pressed="${on}" style="--i:${index};${jobStyle(findJob(jobs, character.job))}">
+        <span class="lp-char-face">${face}</span>
+        <span class="lp-char-text"><strong>${escapeHtml(character.name)}</strong><small>${escapeHtml(character.job || "직업 없음")}</small></span>
+        <span class="lp-char-foot"><em>${character.level ? `Lv.${character.level}` : "레벨 없음"}</em>${ratio != null ? `<span class="lp-char-bar" title="경험치 ${ratio}%"><i style="width:${ratio}%"></i></span>` : ""}</span>
+        <span class="lp-char-check" aria-hidden="true">✓</span>
+      </button>`;
     };
     const group = groups.find((item) => item.id === accountInput.value);
     const list = [...(group?.members ?? [])].sort(compareCharacter);
-    box.innerHTML = (group && !list.length ? `<p class="lp-muted">이 계정에는 캐릭터가 없어요.</p>` : "") + list.map((character) => chip(character.id, character.name, character.level ? `Lv.${character.level}` : "", jobStyle(findJob(jobs, character.job)))).join("") + chip("", "직접 입력", "", "");
+    const manualOn = input.value === "";
+    const manual = `<button type="button" class="lp-char is-manual${manualOn ? " is-on" : ""}" data-character-pick="" aria-pressed="${manualOn}" style="--i:${list.length}"><span class="lp-char-face"><b>✎</b></span><span class="lp-char-text"><strong>직접 입력</strong><small>레벨 적기</small></span><span class="lp-char-check" aria-hidden="true">✓</span></button>`;
+    // 계정을 바꿨을 때만 카드가 차례로 떠오른다(캐릭터를 누를 때마다 다시 튀지 않게).
+    const entering = accountInput.value !== shownAccount;
+    shownAccount = accountInput.value;
+    box.classList.toggle("is-enter", entering);
+    box.innerHTML = (group && !list.length ? `<p class="lp-muted lp-char-empty">이 계정에는 캐릭터가 없어요.</p>` : "") + list.map(card).join("") + manual;
   }
 
   function pickedCharacter() {
@@ -756,14 +780,14 @@ export async function render(root) {
     const [huntResult, curveResult, firstCharacters, accountResult, questResult, progressResult] = await Promise.all([
       supabase.from("hunts").select("id, character_id, character_name, job, level, potion_cost, leech_fee, exp_per_hour, meso_per_hour, title, memo, created_at").order("created_at", { ascending: false }),
       supabase.from("level_exp").select("id, level, exp_to_next").order("level", { ascending: true }),
-      supabase.from("characters").select("id, account_id, name, job, level, exp"),
+      supabase.from("characters").select("id, account_id, name, job, level, exp, face_path"),
       supabase.from("accounts").select("id, name").order("name"),
       supabase.from("quests").select("id, name, start_level, exp_reward"),
       supabase.from("character_quests").select("quest_id, character_id, completed"),
       loadMainCharacter(),
     ]);
-    // sql/029 실행 전이면 exp 칸이 없다. 빼고 다시 읽는다.
-    const characterResult = firstCharacters.error && /\bexp\b/i.test(`${firstCharacters.error.message || ""}`)
+    // sql/029 실행 전이면 exp 칸이, 예전 DB면 얼굴 칸이 없다. 빼고 다시 읽는다.
+    const characterResult = firstCharacters.error && /\bexp\b|face_path/i.test(`${firstCharacters.error.message || ""}`)
       ? await supabase.from("characters").select("id, account_id, name, job, level")
       : firstCharacters;
     const jobResult = await supabase.from("jobs").select("id, family, name, color, color_dark, sort_order").order("sort_order");
@@ -784,6 +808,8 @@ export async function render(root) {
     hunts = huntResult.data ?? [];
     curveRows = curveResult.data ?? [];
     characters = characterResult.data ?? [];
+    await attachFaceUrls(supabase, characters);
+    if (!root.isConnected) return;
     accounts = accountResult.error ? [] : sortByName(accountResult.data ?? []);
     jobs = jobResult.error ? [] : (jobResult.data ?? []);
     const seeded = await saveMissingLevels(supabase);

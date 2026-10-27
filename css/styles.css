@@ -14701,12 +14701,55 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .char-page .char-account-line { grid-column: 1 / -1; display: flex; min-width: 0; }
 
 /* 레벨업: 계정을 먼저 고르고 그 계정의 캐릭터만 펼친다. */
-.lp-accounts { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .lp-accounts[hidden] { display: none; }
-.lp-accounts .lp-chip { max-width: 100%; overflow-wrap: anywhere; }
 .lp-characters { animation: ym-fade-up 0.24s var(--spring) both; }
-.lp-characters .lp-chip { max-width: 100%; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .lp-characters { animation: none; } }
+
+/* 레벨업 계정 탭·캐릭터 카드(2026-10-28 다듬기) */
+.lp-hero .lp-accounts { flex-wrap: nowrap; gap: 8px; margin: -4px -4px 0; padding: 4px 4px 14px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.lp-hero .lp-accounts::-webkit-scrollbar { display: none; }
+.lp-account { --acc: 295; flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; max-width: 220px; padding: 0 8px 0 14px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.04); color: var(--text-soft); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; transition: transform 0.45s var(--spring), background-color 0.25s, border-color 0.25s, box-shadow 0.25s, color 0.25s; }
+.lp-account i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: oklch(0.78 0.13 var(--acc)); box-shadow: 0 0 8px oklch(0.78 0.13 var(--acc) / 0.7); }
+.lp-account-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.lp-account b { flex: none; min-width: 24px; height: 24px; padding: 0 7px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.08); color: var(--muted); font-size: 12px; line-height: 24px; text-align: center; transition: background-color 0.25s, color 0.25s; }
+.lp-account:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.lp-account:active { transform: scale(0.94); }
+.lp-account.is-on { border-color: oklch(0.78 0.13 var(--acc) / 0.75); background: linear-gradient(180deg, oklch(0.78 0.13 var(--acc) / 0.28), oklch(0.78 0.13 var(--acc) / 0.12)); color: #fff; box-shadow: 0 6px 20px -6px oklch(0.78 0.13 var(--acc) / 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.lp-account.is-on b { background: oklch(0.78 0.13 var(--acc) / 0.4); color: #fff; }
+
+.lp-hero .lp-characters { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.lp-char-empty { grid-column: 1 / -1; margin: 0; }
+.lp-char { --job-color: oklch(0.8 0.13 295); position: relative; display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; column-gap: 10px; row-gap: 8px; min-height: 64px; padding: 10px 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 18px; background: rgba(255, 255, 255, 0.04); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: transform 0.45s var(--spring), border-color 0.25s, background-color 0.25s, box-shadow 0.25s; }
+.lp-characters.is-enter .lp-char { animation: ym-fade-up 0.4s var(--spring) both; animation-delay: calc(min(var(--i, 0), 10) * 35ms); }
+.lp-char:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--job-color) 50%, transparent); background: rgba(255, 255, 255, 0.07); }
+.lp-char:active { transform: scale(0.96); }
+.lp-char.is-on { border-color: var(--job-color); background: linear-gradient(150deg, color-mix(in srgb, var(--job-color) 24%, transparent), color-mix(in srgb, var(--job-color) 8%, transparent)); box-shadow: 0 0 0 1px var(--job-color), 0 10px 26px -8px color-mix(in srgb, var(--job-color) 70%, transparent); }
+.lp-char-face { display: grid; place-items: center; width: 42px; height: 42px; overflow: hidden; border-radius: 14px; background: color-mix(in srgb, var(--job-color) 16%, rgba(255, 255, 255, 0.05)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--job-color) 35%, transparent); }
+.lp-char-face img { width: 100%; height: 100%; object-fit: cover; }
+.lp-char-face b { color: var(--job-color); font-size: 18px; font-weight: 900; }
+.lp-char-text { display: grid; gap: 2px; min-width: 0; }
+.lp-char-text strong { overflow: hidden; font-size: 14px; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; }
+.lp-char-text small { overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
+.lp-char-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lp-char-foot em { flex: none; color: var(--gold); font-size: 12px; font-style: normal; font-weight: 900; font-variant-numeric: tabular-nums; }
+.lp-char.is-manual .lp-char-foot { display: none; }
+.lp-char-bar { flex: 1; min-width: 0; height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.07); }
+.lp-char-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--job-color) 70%, #fff), var(--job-color)); }
+.lp-char-check { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--job-color); color: #14101f; font-size: 11px; font-weight: 900; opacity: 0; transform: scale(0.4); transition: opacity 0.2s, transform 0.4s var(--spring); }
+.lp-char.is-on .lp-char-check { opacity: 1; transform: scale(1); }
+.lp-char.is-on .lp-char-text { padding-right: 18px; }
+.lp-char.is-manual { border-style: dashed; background: none; }
+.lp-char.is-manual .lp-char-face { background: rgba(255, 255, 255, 0.05); box-shadow: none; }
+.lp-char.is-manual .lp-char-face b { color: var(--muted); }
+@media (max-width: 760px) {
+  .lp-hero .lp-characters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .lp-char { grid-template-columns: 36px minmax(0, 1fr); column-gap: 8px; padding: 9px 10px; }
+  .lp-char-face { width: 36px; height: 36px; border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-account, .lp-char, .lp-char-check { transition: none; }
+  .lp-characters.is-enter .lp-char { animation: none; }
+}
 
 /* 몬스터파크: 한 판 끝·캐릭터 저장, 못 가는 캐릭터 접기, 시그너스 만렙 표시(2026-10-28) */
 .mp-char-more { margin-top: 10px; }
@@ -14763,3 +14806,72 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .hu-page .hu-form-panel[hidden] { display: none; }
 
 .hu-page .hu-well select { padding: 4px 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; }
+
+/* ==========================================================================
+   헤더 정리(2026-10-28 사용자 요청)
+   - 기능 찾기는 돋보기 버튼, 그 자리에 교통 위젯. 검색을 열면 교통 위젯이 잠깐 숨고 검색칸이 펼쳐진다.
+   - 효과음은 작은 음표 버튼. 로그인 계정·로그아웃은 대표 캐릭터 메뉴 안으로.
+   ========================================================================== */
+.topbar .feature-search { display: none; flex: 0 1 340px; }
+.topbar .feature-search-open { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border: 1px solid var(--glass-line); border-radius: 14px; background: rgba(255, 255, 255, 0.06); color: var(--text); cursor: pointer; transition: transform 0.45s var(--spring), background-color 0.2s, border-color 0.2s; }
+.topbar .feature-search-open:hover { transform: translateY(-1px); border-color: oklch(0.8 0.13 295 / 0.6); background: rgba(255, 255, 255, 0.1); }
+.topbar .feature-search-open:active { transform: scale(0.92); }
+.topbar.is-searching .feature-search { display: block; animation: topbar-search-in 0.32s var(--spring) both; }
+.topbar.is-searching .feature-search-open,
+.topbar.is-searching .topbar-transit { display: none; }
+.topbar-transit { flex: none; min-width: 0; animation: topbar-transit-in 0.4s var(--spring) both; }
+@keyframes topbar-search-in { from { opacity: 0; transform: scaleX(0.6); transform-origin: right center; } to { opacity: 1; transform: none; } }
+@keyframes topbar-transit-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+
+/* 헤더 안 교통 위젯: 떠 있는 위치·그림자를 풀고 헤더 알약 모양으로 */
+body .transport-widget.is-docked,
+body:has(.mock-badge) .transport-widget.is-docked,
+body:has(.deletion-banner) .transport-widget.is-docked { position: relative; inset: auto; z-index: 6; visibility: visible; }
+.transport-widget.is-docked .transport-toggle { min-height: 40px; padding: 4px 14px 4px 10px; border-color: var(--glass-line); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.06); box-shadow: none; }
+.transport-widget.is-docked .transport-toggle:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.1); }
+.transport-widget.is-docked img.transport-icon { width: 22px; height: 22px; }
+.transport-widget.is-docked .transport-mini > span { gap: 1px; }
+.transport-widget.is-docked .transport-mini b { font-size: 12px; line-height: 1.2; }
+.transport-widget.is-docked .transport-mini small { font-size: 10.5px; line-height: 1.2; }
+.transport-widget.is-docked .transport-panel { top: calc(100% + 10px); right: 0; bottom: auto; max-height: calc(100dvh - 100px); }
+
+/* 효과음: 작은 음표 버튼(꺼지면 흐려지고 빗금) */
+.topbar .sound-toggle { display: grid; flex: none; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 50%; color: oklch(0.86 0.12 295); }
+.sound-note { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sound-note circle { fill: currentColor; fill-opacity: 0.25; }
+.sound-note .sound-slash { opacity: 0; transition: opacity 0.2s; }
+.topbar .sound-toggle[aria-pressed="true"] { border-color: oklch(0.8 0.13 295 / 0.45); background: oklch(0.8 0.13 295 / 0.16); box-shadow: 0 0 12px -2px oklch(0.8 0.13 295 / 0.55); }
+.topbar .sound-toggle[aria-pressed="false"] { color: var(--faint); }
+.topbar .sound-toggle[aria-pressed="false"] .sound-slash { opacity: 1; }
+.topbar .sound-toggle[aria-pressed="true"]:active .sound-note { animation: sound-bop 0.35s var(--spring); }
+@keyframes sound-bop { 50% { transform: translateY(-2px) rotate(-10deg) scale(1.12); } }
+
+/* 대표 캐릭터 메뉴 안 로그인 계정·내 계정·로그아웃 */
+.profile-menu-account { display: flex; align-items: center; gap: 10px; margin: -2px -2px 10px; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; background: rgba(255, 255, 255, 0.04); }
+.profile-menu-account-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gain); box-shadow: 0 0 8px var(--gain); }
+.profile-menu-account .profile-menu-copy strong { overflow: hidden; font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+/* 캐릭터가 많아 메뉴가 스크롤돼도 내 계정·로그아웃은 아래에 붙어 보인다 */
+.profile-menu-actions { position: sticky; bottom: -12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px -12px -12px; padding: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); background: rgb(20, 14, 38); }
+.profile-menu-act { height: 38px; border: 1px solid var(--glass-line); border-radius: 12px; background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform 0.4s var(--spring), background-color 0.2s, border-color 0.2s; }
+.profile-menu-act:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.1); }
+.profile-menu-act:active { transform: scale(0.95); }
+.profile-menu-act.is-logout { color: color-mix(in oklch, var(--danger) 80%, white); border-color: color-mix(in oklch, var(--danger) 35%, transparent); }
+.profile-menu-act.is-logout:hover { background: color-mix(in oklch, var(--danger) 14%, transparent); }
+.profile-menu-act:disabled { opacity: 0.6; cursor: default; }
+
+@media (max-width: 800px) {
+  /* 첫 줄: 메뉴 · 위치 · 돋보기·대표 캐릭터·음표, 둘째 줄: 교통 위젯을 폭 가득(문구까지 보이게) */
+  .topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .topbar .topbar-actions { grid-column: 3; grid-row: 1; flex-wrap: nowrap; }
+  .topbar-transit { grid-column: 1 / -1; grid-row: 2; }
+  .topbar.is-searching .topbar-transit { display: block; visibility: hidden; }
+  .topbar.is-searching .feature-search { position: absolute; top: 10px; right: 16px; left: 16px; z-index: 70; }
+  .transport-widget.is-docked .transport-toggle { width: 100%; justify-content: space-around; }
+  /* 헤더의 backdrop-filter 때문에 fixed 가 헤더 기준이 되므로, 교통 줄 바로 아래에 같은 폭으로 펼친다 */
+  .transport-widget.is-docked .transport-panel { top: calc(100% + 8px); right: 0; left: 0; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar.is-searching .feature-search, .topbar-transit { animation: none; }
+  .topbar .feature-search-open, .profile-menu-act, .sound-note .sound-slash { transition: none; }
+  .topbar .sound-toggle[aria-pressed="true"]:active .sound-note { animation: none; }
+}
