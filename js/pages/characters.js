@@ -387,7 +387,16 @@ export async function render(root) {
     return a.name.localeCompare(b.name, "ko");
   }
 
-  function characterCard(row, index, { accountName = "" } = {}) {
+  // 레벨순 카드의 계정 표시: 계정마다 다른 색(계정 순서대로 돌려 씀), 한 줄로 줄이고 전체 이름은 title
+  const ACCOUNT_HUES = [295, 25, 150, 210, 85, 340, 180, 260];
+
+  function accountBadge(account) {
+    if (!account) return "";
+    const order = Math.max(0, accounts.findIndex((item) => item.id === account.id));
+    return `<span class="char-account" style="--acc:${ACCOUNT_HUES[order % ACCOUNT_HUES.length]}" title="${escapeHtml(account.name)}"><i aria-hidden="true"></i><span>${escapeHtml(account.name)}</span></span>`;
+  }
+
+  function characterCard(row, index, { account = null } = {}) {
     const job = jobRecord(row) || findJob(jobs, row.job);
     const style = [jobStyle(job), `--i:${Math.min(index, 12)}`].filter(Boolean).join(";");
     const jobText = job ? jobLabel(jobDisplayName(job), job) : escapeHtml(row.job || "직업 없음");
@@ -408,7 +417,7 @@ export async function render(root) {
           ${faceHtml(row)}
           <span class="character-copy">
             <span class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong><span class="character-level">Lv.${escapeHtml(formatCount(row.level))}</span></span>
-            <span class="character-job">${jobText}${accountName ? `<span class="tag char-account-tag">${escapeHtml(accountName)}</span>` : ""}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
+            <span class="character-job">${jobText}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
           </span>
         </button>
         ${expBar(row)}
@@ -416,6 +425,7 @@ export async function render(root) {
           <button class="text-button" type="button" data-edit="${row.id}">수정</button>
           <button class="text-button is-danger" type="button" data-delete="${row.id}">삭제</button>
         </span>
+        ${account ? `<div class="char-account-line">${accountBadge(account)}</div>` : ""}
         ${homeworkChips(row)}
         ${noteHtml}
       </li>
@@ -509,12 +519,12 @@ export async function render(root) {
     );
     paintViewToggle();
     if (viewMode === "level") {
-      const accountName = new Map(accounts.map((account) => [account.id, account.name]));
+      const accountById = new Map(accounts.map((account) => [account.id, account]));
       const ranked = [...visibleRows].sort(compareLevel);
       list.innerHTML = ranked.length
         ? `<div class="character-accounts is-level"><section class="account-block ym-glass char-level-block">
             <div class="account-head"><h2>레벨순</h2><span class="char-pips-count">${ranked.length}명</span></div>
-            <ul class="character-rows">${ranked.map((row, index) => characterCard(row, index, { accountName: accountName.get(row.account_id) ?? "" })).join("")}</ul>
+            <ul class="character-rows">${ranked.map((row, index) => characterCard(row, index, { account: accountById.get(row.account_id) ?? null })).join("")}</ul>
           </section></div>`
         : `<p class="empty">${searching ? "검색 결과가 없습니다. 검색어나 레벨 범위를 바꿔 보세요." : "이 서버에는 아직 캐릭터가 없습니다. 캐릭터 추가로 넣어 주세요."}</p>`;
       return;

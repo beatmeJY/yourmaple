@@ -7,7 +7,7 @@ await p.route('**/*',r=>{const u=new URL(r.request().url());if(u.origin!=='http:
 await p.emulateMedia({reducedMotion:'reduce'});await p.goto('http://127.0.0.1:5513/?mock#/homework');await p.waitForSelector('[data-task-card="monster-park"]');
 await p.evaluate(async()=>{const {getSupabase}=await import('/js/supabase-client.js');const client=await getSupabase();const {data}=await client.from('characters').select('id,level');await client.from('characters').update({level:data[0].level}).eq('id',data[0].id);const d=JSON.parse(localStorage.getItem('ym-mock-db'));const c=d.characters[0];d.characters=[49,50,129,130].map((level,i)=>({...c,id:`c0000000-0000-4000-8000-00000000000${i+1}`,name:`레벨${level}`,level}));d.homework_members=d.homework_members.filter(x=>x.task_key!=='monster-park');d.homework_checks=d.homework_checks.filter(x=>x.task_key!=='monster-park');localStorage.setItem('ym-mock-db',JSON.stringify(d));});
 await p.reload();await p.waitForSelector('[data-task-card="monster-park"]');await p.addStyleTag({content:'.mock-badge{display:none!important}'});
-const card=p.locator('[data-task-card="monster-park"]');assert.match(await card.innerText(),/50~129레벨 · 하루 2회 · 체크 1번 · 매일 00시/);
+const card=p.locator('[data-task-card="monster-park"]');assert.match(await card.innerText(),/50~129레벨 · 하루 2회 · 매일 00시/);
 assert.equal(await card.locator('img').first().evaluate(img=>img.complete&&img.naturalWidth>0),true);
 await card.locator('[data-manage]').click();assert.equal(await card.locator('[data-enable]').count(),2);
 await card.locator('[data-enable][data-character$="002"]').locator('..').click();await card.locator('[data-enable][data-character$="003"]').locator('..').click();await card.locator('[data-manage]').click();

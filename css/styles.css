@@ -14694,4 +14694,8 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .char-view .ym-chip { height: 36px; border-color: transparent; background: none; }
 .char-view .ym-chip[aria-pressed="true"] { border-color: oklch(0.78 0.16 40 / 0.6); background: oklch(0.78 0.16 40 / 0.2); color: #fff; }
 .character-accounts.is-level { grid-template-columns: minmax(0, 1fr); }
-.char-account-tag { margin-left: 6px; }
+.char-page .char-account { --acc: 295; display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; max-width: 100%; height: 22px; padding: 0 9px 0 7px; border: 1px solid oklch(0.78 0.12 var(--acc) / 0.35); border-radius: var(--radius-pill); background: oklch(0.78 0.12 var(--acc) / 0.12); color: oklch(0.88 0.08 var(--acc)); font-size: 11px; font-weight: 700; line-height: 1; }
+.char-page .char-account i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: oklch(0.8 0.14 var(--acc)); box-shadow: 0 0 6px oklch(0.8 0.14 var(--acc) / 0.7); }
+.char-page .char-account span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 레벨순 카드의 계정 줄: 카드 폭 전체를 써서 긴 계정 이름도 한 줄로 */
+.char-page .char-account-line { grid-column: 1 / -1; display: flex; min-width: 0; }
