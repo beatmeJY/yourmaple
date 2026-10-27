@@ -16,6 +16,8 @@ export const RESET_KINDS = {
 // 자쿰·혼테일은 노말·카오스를 따로 세고 각각 24시간, 핑크빈은 7일(카오스 없음). 혼테일 카오스는 아직 게임에 없어 막아 둔다.
 // 숙제표는 보스마다 카드 하나(key: 표시 캐릭터 기준), 끝낸 시각은 모드마다(homework_checks.task_key = 모드 key).
 export const RAIDS = [
+  // 몬스터파크: 하루 2회를 체크 한 번으로 기록(2026-10-27 사용자 결정).
+  { key: "monster-park", name: "몬스터파크", type: "던전", kind: "daily", minLevel: 50, maxLevel: 129, sub: "50~129레벨 · 하루 2회 · 체크 1번 · 매일 00시 초기화", modes: [{ key: "monster-park", label: "완료", short: "몬파" }] },
   { key: "zakum", name: "자쿰", kind: "after24h", modes: [{ key: "zakum-normal", label: "노말", short: "자쿰" }, { key: "zakum-chaos", label: "카오스", short: "카쿰" }] },
   { key: "horntail", name: "혼테일", kind: "after24h", modes: [{ key: "horntail-normal", label: "노말", short: "혼테일" }, { key: "horntail-chaos", label: "카오스", short: "카혼", disabled: true }] },
   { key: "pinkbean", name: "핑크빈", kind: "after7d", modes: [{ key: "pinkbean", label: "입장", short: "핑크빈" }] },
@@ -24,6 +26,14 @@ export const RAIDS = [
   { key: "crimson-pq", name: "크림슨 파퀘", type: "파티 퀘스트", kind: "after7d", modes: [{ key: "crimson-pq", label: "입장", short: "크림슨" }] },
   { key: "malaysia-pq", name: "말레이시아 파퀘", type: "파티 퀘스트", kind: "after7d", modes: [{ key: "malaysia-pq", label: "입장", short: "말레이" }] },
 ];
+
+/** 레벨 제한은 숙제표·캐릭터 카드에서 함께 사용합니다. */
+export function homeworkLevelAllowed(task, level) {
+  const rule = task.parent ?? task;
+  if (rule.minLevel == null && rule.maxLevel == null) return true;
+  if (level == null || !Number.isFinite(Number(level))) return false;
+  return (rule.minLevel == null || Number(level) >= rule.minLevel) && (rule.maxLevel == null || Number(level) <= rule.maxLevel);
+}
 
 /** 다시 할 수 있기까지 걸리는 시간(ms). daily 는 쓰지 않는다(00시 기준). */
 export function periodMs(kind) {

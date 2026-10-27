@@ -101,3 +101,17 @@ assert.equal(homeworkState("after6h", last, last + 6 * HOUR - 1).done, true);
 assert.equal(homeworkState("after6h", last, last + 6 * HOUR).done, false);
 
 console.log("dojo score log ok");
+
+// 몬스터파크: 50~129레벨, 하루2회를 단일 체크로 기록하고 00시에 다시 가능.
+import { RAIDS, homeworkLevelAllowed } from "./homework-calc.js";
+const park = RAIDS.find(task => task.key === "monster-park");
+assert.equal(park.kind, "daily"); assert.equal(park.modes.length,1);assert.equal(park.modes[0].key,"monster-park");
+for (const [level, allowed] of [[49,false],[50,true],[129,true],[130,false],[null,false]]) {
+  assert.equal(homeworkLevelAllowed(park,level),allowed);
+  assert.equal(homeworkLevelAllowed({parent:park},level),allowed);
+}
+assert.equal(homeworkLevelAllowed(RAIDS.find(task=>task.key==='zakum'),20),true);
+const parkDone=at("2026-10-27T23:59:00");
+assert.equal(homeworkState(park.kind,parkDone,at("2026-10-27T23:59:59")).done,true);
+assert.equal(homeworkState(park.kind,parkDone,at("2026-10-28T00:00:00")).done,false);
+console.log("monster park level / daily reset ok");

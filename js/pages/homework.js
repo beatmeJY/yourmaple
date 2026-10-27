@@ -3,7 +3,7 @@ import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, celebrate, enterBoss, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
-import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, RAIDS, RESET_KINDS, availableDay, periodMs, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
+import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, homeworkLevelAllowed, RAIDS, RESET_KINDS, availableDay, periodMs, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
 import { jobRecord } from "../job-label.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -14,7 +14,7 @@ import { notify } from "../toast.js";
 // 무릉도장과 직접 추가한 숙제는 homework_checks 에 끝낸 시각을 남긴다(sql/030).
 // 숙제마다 "+"로 표시할 캐릭터를 고른다: 보스는 …_enabled, 그 밖은 homework_members(sql/031). 숙제 카드 숨기기는 homework_prefs.
 
-const BOSS_ART = { pianus: "img/pianus.png", papulatus: "img/papulatus.png", rift: "img/rift.png", zakum: "img/zakum.png", horntail: "img/horntail.png", pinkbean: "img/pinkbean.png", "wedding-pq": "img/wedding-pq.png", "crimson-pq": "img/crimson-pq.png", "malaysia-pq": "img/malaysia-pq.png" };
+const BOSS_ART = { "monster-park": "img/monster-park.png", pianus: "img/pianus.png", papulatus: "img/papulatus.png", rift: "img/rift.png", zakum: "img/zakum.png", horntail: "img/horntail.png", pinkbean: "img/pinkbean.png", "wedding-pq": "img/wedding-pq.png", "crimson-pq": "img/crimson-pq.png", "malaysia-pq": "img/malaysia-pq.png" };
 const BOSS_KIND = { papulatus: "after24h", rift: "after24h", pianus: "after7d" };
 // 조각 = 마법 구슬 "띠링~"(2026-10-21 사용자 선택), 피아누스 비늘 = 보석
 const DONE_SOUND = { rift: "orb", pianus: "gem" };
@@ -194,8 +194,9 @@ export async function render(root) {
         key: raid.key,
         name: raid.name,
         kind: raid.kind,
+        minLevel: raid.minLevel, maxLevel: raid.maxLevel,
         img: BOSS_ART[raid.key],
-        sub: `${raid.type ?? "보스"} · 입장 후 ${RESET_KINDS[raid.kind].short}${raid.modes.length > 1 ? " · 노말·카오스 따로" : ""}`,
+        sub: raid.sub ?? `${raid.type ?? "보스"} · 입장 후 ${RESET_KINDS[raid.kind].short}${raid.modes.length > 1 ? " · 노말·카오스 따로" : ""}`,
         needsTable: true,
         modes: raid.modes,
       })),
@@ -206,6 +207,7 @@ export async function render(root) {
   }
 
   function isEligible(task, character) {
+    if (!homeworkLevelAllowed(task, character.level)) return false;
     if (task.boss) return Boolean(character[task.boss.columnEnabled]);
     // sql/031 실행 전에는 예전처럼 모든 캐릭터. 자쿰 노말·카오스처럼 모드는 보스(parent) 기준으로 고른다.
     return !membersReady || members.has(`${character.id}:${task.parent?.key ?? task.key}`);
@@ -415,7 +417,7 @@ export async function render(root) {
     else if (!characters.length) body = `<p class="hw-muted">캐릭터를 추가하면 숙제표가 생겨요. <a href="#/characters">캐릭터 추가하러 가기</a></p>`;
     else if (isManaging) {
       body = `<p class="hw-muted hw-manage-note">이 숙제표에 보일 캐릭터를 켜고 끄세요.${task.boss ? " 레벨과 퀘스트를 맞춘 캐릭터만 켜 주세요." : ""} 다 고르면 ✓를 누르세요.</p>`
-        + table(orderedCharacters(), (character) => personHead(task, character, null, now, true), (character) => switchCell(task, character));
+        + table(orderedCharacters().filter(character => homeworkLevelAllowed(task, character.level)), (character) => personHead(task, character, null, now, true), (character) => switchCell(task, character));
     } else if (!people.length) body = `<p class="hw-muted">이 숙제표에 보일 캐릭터가 없어요. 오른쪽 위 + 버튼으로 캐릭터를 넣어 주세요.</p>`;
     else if (!shown.length) {
       const soonest = states.reduce((best, item) => (item.state.next != null && (!best || item.state.next < best) ? item.state.next : best), null);
@@ -670,6 +672,7 @@ export async function render(root) {
 
   /** 끝낸 시각을 value(ISO 또는 null)로 바꾼다. 실패하면 되돌린다. */
   async function commit(task, character, value, { undoable = true, target = null } = {}) {
+    if (value != null && !homeworkLevelAllowed(task, character.level)) { notify("입장 가능한 레벨이 아닙니다."); return; }
     const key = `${character.id}:${task.key}`;
     const previous = checkedAt(task, character);
     const generation = ++undoEpoch;
@@ -763,6 +766,7 @@ export async function render(root) {
 
   async function setEnabled(task, character, input) {
     const on = input.checked;
+    if (on && !homeworkLevelAllowed(task, character.level)) { input.checked = false; return; }
     const key = `${character.id}:${task.key}`;
     const write = (value) => {
       if (task.boss) character[task.boss.columnEnabled] = value;
