@@ -1,4 +1,5 @@
 import { DAY_MS } from "./boss-cooldown.js";
+import { isBattleMageJob, isCygnusJob, maxLevelOf } from "./job-label.js";
 
 // 숙제 초기화 규칙 (2026-10-10 사용자 결정)
 // - daily: 매일 00시(이 기기 시간)에 초기화. 예: 무릉도장
@@ -16,23 +17,32 @@ export const RESET_KINDS = {
 // 자쿰·혼테일은 노말·카오스를 따로 세고 각각 24시간, 핑크빈은 7일(카오스 없음). 혼테일 카오스는 아직 게임에 없어 막아 둔다.
 // 숙제표는 보스마다 카드 하나(key: 표시 캐릭터 기준), 끝낸 시각은 모드마다(homework_checks.task_key = 모드 key).
 export const RAIDS = [
-  // 몬스터파크: 하루 2회를 체크 한 번으로 기록(2026-10-27 사용자 결정).
-  { key: "monster-park", name: "몬스터파크", type: "던전", kind: "daily", minLevel: 50, maxLevel: 129, sub: "50~129레벨 · 하루 2회 · 매일 00시 초기화", modes: [{ key: "monster-park", label: "완료", short: "몬파" }] },
+  // 몬스터파크: 하루 2회를 1회·2회 칸으로 따로 체크(2026-10-28 사용자 요청, 이전엔 체크 한 번). 1회 칸 key 는 예전 체크와 같다.
+  // 만렙이 되면 못 들어가므로 시그너스는 119까지(belowMaxLevel).
+  { key: "monster-park", name: "몬스터파크", type: "던전", kind: "daily", minLevel: 50, maxLevel: 129, belowMaxLevel: true, sub: "50~129레벨(시그너스 119) · 하루 2회 · 매일 00시 초기화", modes: [{ key: "monster-park", label: "1회", short: "몬파1" }, { key: "monster-park-2", label: "2회", short: "몬파2" }] },
   { key: "zakum", name: "자쿰", kind: "after24h", modes: [{ key: "zakum-normal", label: "노말", short: "자쿰" }, { key: "zakum-chaos", label: "카오스", short: "카쿰" }] },
   { key: "horntail", name: "혼테일", kind: "after24h", modes: [{ key: "horntail-normal", label: "노말", short: "혼테일" }, { key: "horntail-chaos", label: "카오스", short: "카혼", disabled: true }] },
   { key: "pinkbean", name: "핑크빈", kind: "after7d", modes: [{ key: "pinkbean", label: "입장", short: "핑크빈" }] },
   // 파티 퀘스트 (2026-10-11 사용자 요청): 웨딩은 입장 후 6시간, 크림슨·말레이시아는 입장 후 7일.
   { key: "wedding-pq", name: "웨딩 파퀘", type: "파티 퀘스트", kind: "after6h", modes: [{ key: "wedding-pq", label: "입장", short: "웨딩" }] },
-  { key: "crimson-pq", name: "크림슨 파퀘", type: "파티 퀘스트", kind: "after7d", modes: [{ key: "crimson-pq", label: "입장", short: "크림슨" }] },
+  // 크림슨우드는 시그너스·배틀메이지가 못 간다(2026-10-28 사용자). 숙제표에서 빼지 않고 "참여 불가" 칸으로 보인다.
+  { key: "crimson-pq", name: "크림슨 파퀘", type: "파티 퀘스트", kind: "after7d", blocksJob: (job) => isCygnusJob(job) || isBattleMageJob(job), modes: [{ key: "crimson-pq", label: "입장", short: "크림슨" }] },
   { key: "malaysia-pq", name: "말레이시아 파퀘", type: "파티 퀘스트", kind: "after7d", modes: [{ key: "malaysia-pq", label: "입장", short: "말레이" }] },
 ];
 
-/** 레벨 제한은 숙제표·캐릭터 카드에서 함께 사용합니다. */
-export function homeworkLevelAllowed(task, level) {
+/** 레벨 제한은 숙제표·캐릭터 카드에서 함께 사용합니다. job: 직업 이름(만렙이 다른 직업, 예: 시그너스 120). */
+export function homeworkLevelAllowed(task, level, job = null) {
   const rule = task.parent ?? task;
   if (rule.minLevel == null && rule.maxLevel == null) return true;
   if (level == null || !Number.isFinite(Number(level))) return false;
-  return (rule.minLevel == null || Number(level) >= rule.minLevel) && (rule.maxLevel == null || Number(level) <= rule.maxLevel);
+  const max = rule.belowMaxLevel ? Math.min(rule.maxLevel ?? Infinity, maxLevelOf(job) - 1) : rule.maxLevel;
+  return (rule.minLevel == null || Number(level) >= rule.minLevel) && (max == null || Number(level) <= max);
+}
+
+/** 직업 때문에 참여할 수 없는 숙제인가(예: 크림슨 파퀘의 시그너스·배틀메이지). */
+export function homeworkJobBlocked(task, job) {
+  const rule = task.parent ?? task;
+  return Boolean(rule.blocksJob?.(job));
 }
 
 /** 다시 할 수 있기까지 걸리는 시간(ms). daily 는 쓰지 않는다(00시 기준). */

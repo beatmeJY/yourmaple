@@ -3,7 +3,7 @@ import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, celebrate, enterBoss, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
-import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, homeworkLevelAllowed, RAIDS, RESET_KINDS, availableDay, periodMs, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
+import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, homeworkJobBlocked, homeworkLevelAllowed, RAIDS, RESET_KINDS, availableDay, periodMs, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
 import { jobRecord } from "../job-label.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -24,7 +24,7 @@ const BOSS_BURST = {
   rift: ["#7ecbff", "#3aa0ff", "#67e8f9", "#ffffff"],
   pianus: ["#ff5a5a", "#e10600", "#fecaca", "#ffffff"],
 };
-const BASE_COLUMNS = "id, name, level, account_id, accounts(name), jobs(name, color, color_dark), pianus_enabled, pianus_at, papulatus_enabled, papulatus_at, rift_enabled, rift_at";
+const BASE_COLUMNS = "id, name, level, job, account_id, accounts(name), jobs(name, color, color_dark), pianus_enabled, pianus_at, papulatus_enabled, papulatus_at, rift_enabled, rift_at";
 const TABS = [
   { id: "all", label: "전체" },
   { id: "daily", label: "매일 00시" },
@@ -194,7 +194,7 @@ export async function render(root) {
         key: raid.key,
         name: raid.name,
         kind: raid.kind,
-        minLevel: raid.minLevel, maxLevel: raid.maxLevel,
+        minLevel: raid.minLevel, maxLevel: raid.maxLevel, belowMaxLevel: raid.belowMaxLevel, blocksJob: raid.blocksJob,
         img: BOSS_ART[raid.key],
         sub: raid.sub ?? `${raid.type ?? "보스"} · 입장 후 ${RESET_KINDS[raid.kind].short}${raid.modes.length > 1 ? " · 노말·카오스 따로" : ""}`,
         needsTable: true,
@@ -207,7 +207,9 @@ export async function render(root) {
   }
 
   function isEligible(task, character) {
-    if (!homeworkLevelAllowed(task, character.level)) return false;
+    if (!homeworkLevelAllowed(task, character.level, character.job)) return false;
+    // 직업 때문에 못 하는 숙제(크림슨 파퀘의 시그너스·배틀메이지)는 할 일·개수에서 뺀다. 표에는 "참여 불가"로 따로 보인다(blockedPeople).
+    if (homeworkJobBlocked(task, character.job)) return false;
     if (task.boss) return Boolean(character[task.boss.columnEnabled]);
     // sql/031 실행 전에는 예전처럼 모든 캐릭터. 자쿰 노말·카오스처럼 모드는 보스(parent) 기준으로 고른다.
     return !membersReady || members.has(`${character.id}:${task.parent?.key ?? task.key}`);
@@ -284,10 +286,11 @@ export async function render(root) {
     return periodMs(task.kind);
   }
 
-  function personHead(task, character, state, now, managingNow) {
+  function personHead(task, character, state, now, managingNow, blocked = false) {
     let deg = 360;
     let tone = "is-ready";
     if (managingNow) tone = "is-manage";
+    else if (blocked) tone = "is-blocked";
     else if (state.done) {
       const left = state.next - now;
       deg = Math.max(0, Math.min(360, (1 - left / periodOf(task)) * 360));
@@ -325,7 +328,13 @@ export async function render(root) {
     </div>`;
   }
 
+  // 직업 때문에 못 하는 칸: 누를 수 없고 "참여 불가"만 보인다.
+  function blockedCell(task, character) {
+    return `<div class="hw-tcell is-off is-blocked"><span class="hw-cell is-off" aria-label="${escapeHtml(`${character.name} · ${task.name} 참여 불가(직업 제한)`)}" title="이 직업은 참여할 수 없어요"><small>참여 불가</small></span><span class="hw-left">직업 제한</span></div>`;
+  }
+
   function switchCell(task, character) {
+    if (homeworkJobBlocked(task, character.job)) return blockedCell(task, character);
     const on = isEligible(task, character);
     return `<div class="hw-tcell is-switch"><label class="char-switch"><input type="checkbox" data-enable="${escapeHtml(task.key)}" data-character="${character.id}"${on ? " checked" : ""} /><span class="char-switch-track" aria-hidden="true"></span><span class="sr-only">${escapeHtml(`${character.name} ${task.name}에 표시`)}</span></label><small>${on ? "표시" : "숨김"}</small></div>`;
   }
@@ -380,7 +389,12 @@ export async function render(root) {
     const readyCount = states.filter((item) => !item.state.done).length;
     const doneCount = states.length - readyCount;
     const isManaging = managing.has(task.key);
-    const shown = states.filter((item) => columnShown(item.state, now));
+    // 고른 캐릭터인데 직업 때문에 못 하는 캐릭터는 맨 뒤에 "참여 불가" 칸으로(아예 안 보이면 지워진 줄 알 수 있어서, 2026-10-28 사용자 요청).
+    const blockedPeople = orderedCharacters()
+      .filter((character) => homeworkJobBlocked(task, character.job) && homeworkLevelAllowed(task, character.level, character.job) && (!membersReady || members.has(`${character.id}:${task.key}`)))
+      .map((character) => ({ character, state: { done: false, next: null }, blocked: true }));
+    const shown = [...states.filter((item) => columnShown(item.state, now)), ...blockedPeople];
+    const cellOf = (unit, item) => (item.blocked ? blockedCell(unit, item.character) : checkCell(unit, item.character, stateOf(unit, item.character, now), now));
     const icon = task.img ? `<img src="${escapeHtml(task.img)}" alt="" width="40" height="40" />` : `<span class="hw-glyph" style="--hue:${task.hue}">${escapeHtml(task.glyph)}</span>`;
     const rowIcon = task.img ? `<img src="${escapeHtml(task.img)}" alt="" width="30" height="30" />` : `<span class="hw-glyph is-small" style="--hue:${task.hue}">${escapeHtml(task.glyph)}</span>`;
     const extraRows = (columns) => {
@@ -394,9 +408,9 @@ export async function render(root) {
     const modeRows = (columns) => task.modes
       .map((mode) => {
         const unit = unitsOf(task).find((item) => item.key === mode.key);
-        const label = `<div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(mode.label)}</strong><small>${mode.disabled ? "아직 없음" : `${RESET_KINDS[task.kind].short} 뒤 다시`}</small></span></div>`;
+        const label = `<div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(mode.label)}</strong><small>${mode.disabled ? "아직 없음" : task.kind === "daily" ? RESET_KINDS.daily.label : `${RESET_KINDS[task.kind].short} 뒤 다시`}</small></span></div>`;
         const cells = columns.map((item) => (unit
-          ? checkCell(unit, item.character, stateOf(unit, item.character, now), now)
+          ? cellOf(unit, item)
           : `<div class="hw-tcell is-off"><span class="hw-cell is-off" aria-label="${escapeHtml(`${task.name} ${mode.label} 준비 중`)}"><small>준비 중</small></span></div>`));
         return `<div class="hw-trow${unit ? "" : " is-off"}${mode.key.endsWith("-chaos") ? " is-chaos" : ""}">${label}${cells.join("")}</div>`;
       })
@@ -409,7 +423,7 @@ export async function render(root) {
     const label = (html) => (bare ? "" : html);
     const table = (columns, headCell, rowCell) => `<div class="hw-tscroll"><div class="hw-table${bare ? " is-bare" : ""}" style="--cols:${columns.length}">
         <div class="hw-trow is-head">${label(`<div class="hw-tlabel is-corner"></div>`)}${columns.map(headCell).join("")}</div>
-        ${scoreOnly ? "" : task.modes && !isManaging && !bare ? modeRows(columns) : bare && task.modes && !isManaging ? `<div class="hw-trow">${columns.map((item) => checkCell(unitsOf(task)[0], item.character, stateOf(unitsOf(task)[0], item.character, now), now)).join("")}</div>` : `<div class="hw-trow">${label(`<div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(task.name)}</strong><small>${escapeHtml(RESET_KINDS[task.kind]?.label ?? "")}</small></span></div>`)}${columns.map(rowCell).join("")}</div>`}
+        ${scoreOnly ? "" : task.modes && !isManaging && !bare ? modeRows(columns) : bare && task.modes && !isManaging ? `<div class="hw-trow">${columns.map((item) => cellOf(unitsOf(task)[0], item)).join("")}</div>` : `<div class="hw-trow">${label(`<div class="hw-tlabel">${rowIcon}<span><strong>${escapeHtml(task.name)}</strong><small>${escapeHtml(RESET_KINDS[task.kind]?.label ?? "")}</small></span></div>`)}${columns.map(rowCell).join("")}</div>`}
         ${extraRows(columns)}
       </div></div>`;
     let body;
@@ -417,15 +431,15 @@ export async function render(root) {
     else if (!characters.length) body = `<p class="hw-muted">캐릭터를 추가하면 숙제표가 생겨요. <a href="#/characters">캐릭터 추가하러 가기</a></p>`;
     else if (isManaging) {
       body = `<p class="hw-muted hw-manage-note">이 숙제표에 보일 캐릭터를 켜고 끄세요.${task.boss ? " 레벨과 퀘스트를 맞춘 캐릭터만 켜 주세요." : ""} 다 고르면 ✓를 누르세요.</p>`
-        + table(orderedCharacters().filter(character => homeworkLevelAllowed(task, character.level)), (character) => personHead(task, character, null, now, true), (character) => switchCell(task, character));
-    } else if (!people.length) body = `<p class="hw-muted">이 숙제표에 보일 캐릭터가 없어요. 오른쪽 위 + 버튼으로 캐릭터를 넣어 주세요.</p>`;
-    else if (!shown.length) {
+        + table(orderedCharacters().filter(character => homeworkLevelAllowed(task, character.level, character.job)), (character) => personHead(task, character, null, now, true), (character) => switchCell(task, character));
+    } else if (!people.length && !blockedPeople.length) body = `<p class="hw-muted">이 숙제표에 보일 캐릭터가 없어요. 오른쪽 위 + 버튼으로 캐릭터를 넣어 주세요.</p>`;
+    else if (shown.length === blockedPeople.length && people.length) {
       const soonest = states.reduce((best, item) => (item.state.next != null && (!best || item.state.next < best) ? item.state.next : best), null);
       body = readyCount === 0
         ? `<p class="hw-muted hw-all-done">✓ 모두 끝냈어요${soonest ? ` · 가장 빠른 칸은 ${escapeHtml(availableLabel(soonest, now))}(<span data-remain="${soonest}">${shortRemain(soonest - now)}</span> 뒤)` : ""}</p>`
         : `<p class="hw-muted">켜 둔 보기 조건(지금 가능만·오늘·곧)에 맞는 캐릭터가 없어요.</p>`;
     } else {
-      body = table(shown, (item) => personHead(task, item.character, item.state, now, false), (item) => checkCell(task, item.character, item.state, now));
+      body = table(shown, (item) => personHead(task, item.character, item.state, now, false, item.blocked), (item) => (item.blocked ? blockedCell(task, item.character) : checkCell(task, item.character, item.state, now)));
     }
     const ratio = states.length ? doneCount / states.length : 0;
     const full = states.length > 0 && readyCount === 0;
@@ -672,7 +686,8 @@ export async function render(root) {
 
   /** 끝낸 시각을 value(ISO 또는 null)로 바꾼다. 실패하면 되돌린다. */
   async function commit(task, character, value, { undoable = true, target = null } = {}) {
-    if (value != null && !homeworkLevelAllowed(task, character.level)) { notify("입장 가능한 레벨이 아닙니다."); return; }
+    if (value != null && !homeworkLevelAllowed(task, character.level, character.job)) { notify("입장 가능한 레벨이 아닙니다."); return; }
+    if (value != null && homeworkJobBlocked(task, character.job)) { notify("이 직업은 참여할 수 없습니다."); return; }
     const key = `${character.id}:${task.key}`;
     const previous = checkedAt(task, character);
     const generation = ++undoEpoch;
@@ -766,7 +781,7 @@ export async function render(root) {
 
   async function setEnabled(task, character, input) {
     const on = input.checked;
-    if (on && !homeworkLevelAllowed(task, character.level)) { input.checked = false; return; }
+    if (on && !homeworkLevelAllowed(task, character.level, character.job)) { input.checked = false; return; }
     const key = `${character.id}:${task.key}`;
     const write = (value) => {
       if (task.boss) character[task.boss.columnEnabled] = value;

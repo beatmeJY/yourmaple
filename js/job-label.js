@@ -53,3 +53,23 @@ export function jobLabel(name, job) {
 export function normalizeJobName(value) {
   return String(value ?? "").replaceAll(" ", "").replaceAll("·", "");
 }
+
+// 만렙(2026-10-28 사용자): 시그너스 기사단 120, 배틀메이지 200, 나머지 130.
+const CYGNUS_JOBS = new Set(["소울마스터", "플레임위자드", "윈드브레이커", "나이트워커", "스트라이커"]);
+export const CYGNUS_MAX_LEVEL = 120;
+export const BATTLE_MAGE_MAX_LEVEL = 200;
+
+export function isCygnusJob(name) {
+  return CYGNUS_JOBS.has(normalizeJobName(name));
+}
+
+export function isBattleMageJob(name) {
+  return normalizeJobName(name) === "배틀메이지";
+}
+
+/** 직업 이름 → 만렙. 시그너스 120, 배틀메이지 200, 그 밖(모르는 직업 포함) 130. */
+export function maxLevelOf(name) {
+  if (isCygnusJob(name)) return CYGNUS_MAX_LEVEL;
+  if (isBattleMageJob(name)) return BATTLE_MAGE_MAX_LEVEL;
+  return 130;
+}

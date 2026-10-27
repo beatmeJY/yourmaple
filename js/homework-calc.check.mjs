@@ -102,15 +102,29 @@ assert.equal(homeworkState("after6h", last, last + 6 * HOUR).done, false);
 
 console.log("dojo score log ok");
 
-// 몬스터파크: 50~129레벨, 하루2회를 단일 체크로 기록하고 00시에 다시 가능.
-import { RAIDS, homeworkLevelAllowed } from "./homework-calc.js";
+// 몬스터파크: 50~129레벨(시그너스 119), 하루 2회를 1회·2회 칸으로 따로 체크하고 00시에 다시 가능(2026-10-28 변경).
+import { RAIDS, homeworkJobBlocked, homeworkLevelAllowed } from "./homework-calc.js";
 const park = RAIDS.find(task => task.key === "monster-park");
-assert.equal(park.kind, "daily"); assert.equal(park.modes.length,1);assert.equal(park.modes[0].key,"monster-park");
+assert.equal(park.kind, "daily"); assert.deepEqual(park.modes.map(mode=>mode.key),["monster-park","monster-park-2"]);
 for (const [level, allowed] of [[49,false],[50,true],[129,true],[130,false],[null,false]]) {
   assert.equal(homeworkLevelAllowed(park,level),allowed);
   assert.equal(homeworkLevelAllowed({parent:park},level),allowed);
 }
 assert.equal(homeworkLevelAllowed(RAIDS.find(task=>task.key==='zakum'),20),true);
+// 시그너스(만렙 120)는 119까지, 다른 직업은 129까지. 자쿰 같은 레벨 제한 없는 숙제는 직업과 상관없다.
+for (const [level, job, allowed] of [[119,"소울마스터",true],[120,"소울마스터",false],[120,"나이트워커",false],[120,"히어로",true],[129,null,true]]) {
+  assert.equal(homeworkLevelAllowed({parent:park},level,job),allowed);
+}
+assert.equal(homeworkLevelAllowed(RAIDS.find(task=>task.key==='zakum'),125,"소울마스터"),true);
+// 배틀메이지(만렙 200)는 몬파 129까지 그대로
+assert.equal(homeworkLevelAllowed({parent:park},129,"배틀메이지"),true);
+// 크림슨 파퀘: 시그너스·배틀메이지는 참여 불가, 다른 숙제·직업은 상관없음
+const crimson = RAIDS.find(task=>task.key==='crimson-pq');
+for (const [job, blocked] of [["소울마스터",true],["스트라이커",true],["배틀메이지",true],["히어로",false],[null,false]]) {
+  assert.equal(homeworkJobBlocked(crimson,job),blocked);
+  assert.equal(homeworkJobBlocked({parent:crimson},job),blocked);
+}
+assert.equal(homeworkJobBlocked(RAIDS.find(task=>task.key==='malaysia-pq'),"소울마스터"),false);
 const parkDone=at("2026-10-27T23:59:00");
 assert.equal(homeworkState(park.kind,parkDone,at("2026-10-27T23:59:59")).done,true);
 assert.equal(homeworkState(park.kind,parkDone,at("2026-10-28T00:00:00")).done,false);

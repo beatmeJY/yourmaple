@@ -14707,3 +14707,42 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .lp-characters { animation: ym-fade-up 0.24s var(--spring) both; }
 .lp-characters .lp-chip { max-width: 100%; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .lp-characters { animation: none; } }
+
+/* 몬스터파크: 한 판 끝·캐릭터 저장, 못 가는 캐릭터 접기, 시그너스 만렙 표시(2026-10-28) */
+.mp-char-more { margin-top: 10px; }
+.mp-char-more summary { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--glass-line); border-radius: var(--radius-pill); color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; list-style: none; transition: background-color 0.2s, color 0.2s; }
+.mp-char-more summary::-webkit-details-marker { display: none; }
+.mp-char-more summary::after { content: "▾"; transition: transform 0.35s var(--spring); }
+.mp-char-more[open] summary::after { transform: rotate(180deg); }
+.mp-char-more summary:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.mp-char-more summary b { color: var(--text); }
+.mp-char-more > .mp-char-grid { margin-top: 10px; animation: ym-fade-up 0.35s var(--spring) both; }
+.mp-cygnus { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 6px; background: oklch(0.82 0.1 230 / 0.2); color: oklch(0.88 0.09 230); font-size: 10px; font-style: normal; font-weight: 900; }
+.mp-cygnus-toggle[hidden] { display: none; }
+.mp-cygnus-toggle { justify-self: start; height: 30px; padding: 0 10px; font-size: 12px; }
+.mp-cygnus-toggle[aria-pressed="true"] { border-color: oklch(0.82 0.1 230 / 0.7); background: oklch(0.82 0.1 230 / 0.2); color: #fff; }
+.mp-apply { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 14px; border-top: 1px solid var(--glass-line); }
+.mp-run-done { display: inline-flex; align-items: baseline; gap: 8px; height: 46px; padding: 0 20px; border: 1px solid oklch(0.8 0.13 120 / 0.7); border-radius: 14px; background: linear-gradient(180deg, oklch(0.8 0.13 120 / 0.32), oklch(0.8 0.13 120 / 0.16)); color: #fff; font: inherit; font-size: 16px; font-weight: 900; line-height: 46px; cursor: pointer; box-shadow: 0 0 18px oklch(0.8 0.13 120 / 0.25); transition: transform 0.4s var(--spring), box-shadow 0.2s, opacity 0.2s; }
+.mp-run-done small { color: oklch(0.9 0.1 120); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mp-run-done:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 26px oklch(0.8 0.13 120 / 0.45); }
+.mp-run-done:active:not(:disabled) { transform: scale(0.95); }
+.mp-run-done:disabled { border-color: var(--glass-line); background: rgba(255, 255, 255, 0.04); box-shadow: none; color: var(--muted); cursor: default; }
+.mp-run-done:disabled small { color: var(--muted); }
+.mp-save { height: 40px; max-width: 100%; padding: 0 16px; overflow: hidden; border: 1px solid oklch(0.86 0.15 85 / 0.7); border-radius: 12px; background: oklch(0.86 0.15 85 / 0.16); color: var(--gold); font: inherit; font-size: 14px; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; animation: ym-pop-in 0.4s var(--spring) both; transition: transform 0.4s var(--spring), background-color 0.2s; }
+.mp-save:hover:not(:disabled) { transform: translateY(-2px); background: oklch(0.86 0.15 85 / 0.26); }
+.mp-save:disabled { opacity: 0.6; cursor: default; }
+.mp-apply-note { color: var(--muted); font-size: 13px; }
+.mp-apply-note.is-saved { color: var(--gain); }
+@media (max-width: 760px) {
+  .mp-run-done { flex: 1 1 100%; justify-content: center; }
+  .mp-save { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-char-more summary::after, .mp-run-done, .mp-save { transition: none; }
+  .mp-char-more > .mp-char-grid, .mp-save { animation: none; }
+}
+.mp-hw-link { margin-left: 6px; color: var(--gain); font-size: 11px; font-weight: 700; letter-spacing: 0; }
+.mp-hw-link[hidden] { display: none; }
+/* 숙제표: 직업 때문에 참여 불가인 캐릭터(크림슨 파퀘의 시그너스·배틀메이지, 2026-10-28) */
+.hw-person.is-blocked { opacity: 0.5; filter: grayscale(0.8); }
+.hw-tcell.is-blocked .hw-left { color: var(--muted); }

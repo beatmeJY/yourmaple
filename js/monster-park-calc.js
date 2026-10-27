@@ -3,16 +3,17 @@
 //   하루 2회 입장. 레벨 구역 50~70 / 71~100 / 101~129, 같은 구역은 한 판 경험치가 모두 같다.
 //   한 판에 1레벨만 오른다. 넘친 경험치는 다음 레벨 99.99%(필요 경험치 - 1)까지만 남고 나머지는 버려진다.
 //   한 판 뒤 레벨이 올라 구역이 바뀌면 그날 남은 입장은 쓰지 못한다.
+// 만렙은 캐릭터마다 다르다(시그너스 120, 그 밖 130). maxLevel 을 넘기지 않으면 130.
 // 경험치는 BigInt. 구역 경험치를 모르면(null) 그 구역에 들어가는 순간 계산을 멈춘다.
 
 // 12월 1일 00시 전까지라 11월 30일이 마지막 입장일(2026-10-27 사용자 정정).
 export const MONSTER_PARK = { end: "2026-11-30", perDay: 2, minLevel: 50, maxLevel: 130 };
 
-// 71~100 은 2,898,000 확인(2026-10-27 사용자). 50~70 70만·101~129 500만은 사용자가 준 임시값(정확한 값은 나중에 받음).
+// 한 판 경험치: 50~70 418,840 · 71~100 2,898,000 · 101~129 6,289,333(2026-10-28 사용자 확정).
 export const ZONES = [
-  { id: "low", min: 50, max: 70, exp: 700_000n },
+  { id: "low", min: 50, max: 70, exp: 418_840n },
   { id: "mid", min: 71, max: 100, exp: 2_898_000n },
-  { id: "high", min: 101, max: 129, exp: 5_000_000n },
+  { id: "high", min: 101, max: 129, exp: 6_289_333n },
 ];
 
 export function zoneOf(level) {
@@ -24,12 +25,12 @@ export function zoneLabel(zone) {
 }
 
 /** 한 판 경험치를 더한 결과. 1레벨까지만 오르고, 넘친 양은 다음 레벨 (필요-1)까지만 남는다. */
-export function gainRun(level, exp, gain, curve) {
+export function gainRun(level, exp, gain, curve, maxLevel = MONSTER_PARK.maxLevel) {
   const need = curve.get(level);
   if (exp + gain < need) return { level, exp: exp + gain, wasted: 0n, leveled: false };
   const next = level + 1;
   const rest = exp + gain - need;
-  if (next >= MONSTER_PARK.maxLevel) return { level: next, exp: 0n, wasted: 0n, leveled: true };
+  if (next >= maxLevel) return { level: next, exp: 0n, wasted: 0n, leveled: true };
   const cap = curve.get(next) - 1n;
   const kept = rest > cap ? cap : rest;
   return { level: next, exp: kept, wasted: rest - kept, leveled: true };
@@ -52,12 +53,12 @@ export function addDays(date, days) {
 }
 
 /**
- * 날마다 몬파를 돈다. days 일 동안(오늘 = 0일째, 오늘은 todayLeft 회), 130 이 되거나 구역 경험치를 모르면 멈춘다.
+ * 날마다 몬파를 돈다. days 일 동안(오늘 = 0일째, 오늘은 todayLeft 회), 만렙(maxLevel)이 되거나 구역 경험치를 모르면 멈춘다.
  * zoneExp: 구역 id → 한 판 경험치(BigInt) 또는 null.
  * 결과 runs: { day, slot, zone, before, after, gain, wasted, lostAfter(이 판 뒤 그날 못 쓰는 입장 수) }
- * stop: "max"(130) | "unknown"(구역 경험치 모름, zone) | "low"(50 미만) | "days"(기간 끝)
+ * stop: "max"(만렙) | "unknown"(구역 경험치 모름, zone) | "low"(50 미만) | "days"(기간 끝)
  */
-export function simulate({ level, exp, curve, zoneExp, todayLeft = MONSTER_PARK.perDay, days }) {
+export function simulate({ level, exp, curve, zoneExp, todayLeft = MONSTER_PARK.perDay, days, maxLevel = MONSTER_PARK.maxLevel }) {
   let current = { level, exp };
   const runs = [];
   let lost = 0;
@@ -65,13 +66,13 @@ export function simulate({ level, exp, curve, zoneExp, todayLeft = MONSTER_PARK.
   for (let day = 0; day < days; day += 1) {
     const tickets = day === 0 ? todayLeft : MONSTER_PARK.perDay;
     for (let slot = 0; slot < tickets; slot += 1) {
-      if (current.level >= MONSTER_PARK.maxLevel) return finish("max");
+      if (current.level >= maxLevel) return finish("max");
       const zone = zoneOf(current.level);
       if (!zone) return finish("low");
       const gain = zoneExp[zone.id];
       if (gain == null) return finish("unknown", zone);
-      const after = gainRun(current.level, current.exp, gain, curve);
-      const changed = after.level < MONSTER_PARK.maxLevel && zoneOf(after.level)?.id !== zone.id;
+      const after = gainRun(current.level, current.exp, gain, curve, maxLevel);
+      const changed = after.level < maxLevel && zoneOf(after.level)?.id !== zone.id;
       const lostAfter = changed ? tickets - slot - 1 : 0;
       runs.push({ day, slot, zone, before: current, after: { level: after.level, exp: after.exp }, gain, wasted: after.wasted, lostAfter });
       wasted += after.wasted;
@@ -80,7 +81,7 @@ export function simulate({ level, exp, curve, zoneExp, todayLeft = MONSTER_PARK.
       if (lostAfter) break;
     }
   }
-  return finish(current.level >= MONSTER_PARK.maxLevel ? "max" : "days");
+  return finish(current.level >= maxLevel ? "max" : "days");
 
   function finish(stop, zone = null) {
     return { runs, final: current, stop, stopZone: zone, lost, wasted };

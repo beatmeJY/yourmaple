@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { levelExpSeed } from "./level-exp-seed.js";
-import { addDays, daysLeft, expFromPercent, gainRun, percentOf, simulate, zoneOf } from "./monster-park-calc.js";
+import { ZONES, addDays, daysLeft, expFromPercent, gainRun, percentOf, simulate, zoneOf } from "./monster-park-calc.js";
 
 const curve = new Map(levelExpSeed.map(([level, exp]) => [level, BigInt(exp)]));
 const MID = 2_898_000n;
@@ -15,6 +15,13 @@ assert.equal(zoneOf(100).id, "mid");
 assert.equal(zoneOf(101).id, "high");
 assert.equal(zoneOf(129).id, "high");
 assert.equal(zoneOf(130), null);
+
+// 구역 경험치(2026-10-28 사용자 확정)
+assert.deepEqual(ZONES.map((zone) => zone.exp), [418_840n, 2_898_000n, 6_289_333n]);
+// 손계산: Lv101 필요 10,783,397. 0 에서 두 판(12,578,666) → 102 레벨, 남은 1,795,269
+const real = Object.fromEntries(ZONES.map((zone) => [zone.id, zone.exp]));
+const high = simulate({ level: 101, exp: 0n, curve, zoneExp: real, todayLeft: 2, days: 1 });
+assert.deepEqual(high.final, { level: 102, exp: 1_795_269n });
 
 // 레벨이 안 오르면 그대로 더한다
 assert.deepEqual(gainRun(100, 0n, MID, curve), { level: 100, exp: MID, wasted: 0n, leveled: false });
@@ -61,6 +68,14 @@ assert.equal(all.final.level, 130);
 assert.equal(all.runs.at(-1).after.level, 130);
 // 1레벨 제한이라 한 판에 1레벨씩: 125 → 130 은 5판
 assert.equal(all.runs.length, 5);
+
+// 시그너스(만렙 120): 119 → 120 이면 끝, 120 은 바로 "max"
+const cygnus = simulate({ level: 118, exp: 0n, curve, zoneExp: real, todayLeft: 2, days: 100, maxLevel: 120 });
+assert.equal(cygnus.stop, "max");
+assert.equal(cygnus.final.level, 120);
+assert.equal(cygnus.runs.at(-1).after.level, 120);
+assert.deepEqual(gainRun(119, curve.get(119) - 1n, 10n, curve, 120), { level: 120, exp: 0n, wasted: 0n, leveled: true });
+assert.equal(simulate({ level: 120, exp: 0n, curve, zoneExp: real, days: 3, maxLevel: 120 }).runs.length, 0);
 
 // 50 미만은 들어갈 수 없다
 assert.equal(simulate({ level: 49, exp: 0n, curve, zoneExp: known, days: 4 }).stop, "low");
