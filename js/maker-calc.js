@@ -290,9 +290,9 @@ export function enchantCraftCost(selections) {
 }
 
 export const REVERSE_RECIPE = [
-  { id: "orihalcon", label: "오리할콘", count: 5n },
-  { id: "monster_b", label: "하급 몬스터 결정 B", count: 20n },
-  { id: "monster_a", label: "하급 몬스터 결정 A", count: 14n },
+  { optional: true, id: "orihalcon", label: "오리할콘", count: 5n },
+  { optional: true, id: "monster_b", label: "하급 몬스터 결정 B", count: 20n },
+  { optional: true, id: "monster_a", label: "하급 몬스터 결정 A", count: 14n },
   { id: "time_piece", label: "시간조각", count: 45n },
   { id: "high_1", label: "상급 보석·크리스탈 1", count: 1n },
   { id: "high_2", label: "상급 보석·크리스탈 2", count: 1n },
@@ -316,7 +316,7 @@ export const REVERSE_CATALYST_ODDS = [
 /** 리버스 장비 1회 제작비와 파괴를 반복했을 때 완성품 1개당 평균 투입비 */
 export function reverseCraftCost(prices, useCatalyst = true) {
   const rows = REVERSE_RECIPE.map((material) => {
-    const unitPrice = prices?.[material.id] ?? null;
+    const unitPrice = prices?.[material.id] ?? (material.optional ? 0n : null);
     return {
       ...material,
       unitPrice,

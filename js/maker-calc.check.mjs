@@ -171,3 +171,9 @@ for (const cost of [0n, 1n, 500_000_000n, 10n ** 24n]) {
 }
 assert.ok(maker.reverseExpectedValue(null, {}, null).rows.every((row) => row.fairPrice == null));
 console.log("메이커 적정가 및 리버스 비용 배분 검증 통과");
+
+// 시간 조각과 상급 3개만 필수, 부재료 미입력은 0메소다.
+const requiredReverse = {time_piece: 1000000n, high_1: 1000n, high_2: 2000n, high_3: 3000n};
+assert.equal(maker.reverseCraftCost(requiredReverse).attemptCost, 47715000n);
+for (const key of Object.keys(requiredReverse)) { const missing={...requiredReverse}; delete missing[key]; assert.equal(maker.reverseCraftCost(missing).complete,false); }
+assert.equal(maker.reverseCraftCost({...requiredReverse, orihalcon:100n}).attemptCost,47715500n);

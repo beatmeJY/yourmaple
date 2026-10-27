@@ -14875,3 +14875,21 @@ body:has(.deletion-banner) .transport-widget.is-docked { position: relative; ins
   .topbar .feature-search-open, .profile-menu-act, .sound-note .sound-slash { transition: none; }
   .topbar .sound-toggle[aria-pressed="true"]:active .sound-note { animation: none; }
 }
+
+/* 리버스: 적정 판매가를 주 결과로, 실거래가는 선택 비교로 표시한다. */
+.reverse-value-panel { border-color: var(--gold); background: var(--glass); }
+.reverse-value-panel .reverse-panel-title strong { color: var(--gold); font-size: 20px; }
+.reverse-value-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.reverse-value-row { grid-template-columns: auto minmax(0, 1fr); padding: 16px; gap: 10px; }
+.reverse-value-row > strong { font-size: 20px; }
+.reverse-value-row > em { grid-column: 1 / -1; text-align: left; }
+.reverse-value-row > b[data-reverse-fair-price] { grid-column: 1 / -1; font-size: 25px; text-align: left; color: var(--gold); }
+.reverse-value-row > b span { font-size: 12px; }
+.reverse-fair-reading { font-size: 14px; }
+.reverse-market-detail { grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.reverse-market-detail summary { cursor: pointer; }
+.reverse-market-detail .reverse-value-input { margin-top: 10px; }
+.reverse-market-detail[open] .reverse-value-input { animation: ym-fade-up .2s var(--spring) both; }
+.reverse-value-row.is-destroy { grid-column: 1 / -1; }
+@media (max-width: 700px) { .reverse-value-list { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .reverse-market-detail[open] .reverse-value-input { animation: none; } }
