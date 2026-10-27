@@ -92,13 +92,13 @@ export function renderShell() {
             <div class="feature-search-results" id="feature-results" data-feature-results role="listbox" aria-label="기능 목록"></div>
           </div>
           <div class="topbar-actions">
-            <button class="feature-search-open" type="button" data-feature-search-open aria-label="기능 찾기" title="기능 찾기 ( / )"><span class="ym-search-icon" aria-hidden="true"></span></button>
+            <button class="feature-search-open" type="button" data-feature-search-open aria-label="기능 찾기" title="기능 찾기 ( / )"><span class="ym-search-icon" aria-hidden="true"></span><span class="feature-search-open-text">기능 찾기</span><kbd aria-hidden="true">/</kbd></button>
             <div class="topbar-profile-wrap" data-logged-in hidden>
               <button class="topbar-profile" type="button" data-profile-toggle aria-haspopup="menu" aria-expanded="false" aria-label="대표 캐릭터 고르기"></button>
               <div class="profile-menu ym-glass" data-profile-menu hidden></div>
             </div>
             <button class="sound-toggle" type="button" data-sound-toggle aria-pressed="true"><svg class="sound-note" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V5.8l10-2.3v11.7" /><circle cx="6.5" cy="17.5" r="2.6" /><circle cx="16.5" cy="15.2" r="2.6" /><path class="sound-slash" d="M4 4l16 16" /></svg><span class="sr-only">효과음 켜짐</span></button>
-            <button class="login-open" type="button" data-login-open data-logged-out hidden>로그인</button>
+            <button class="login-open" type="button" data-login-open data-logged-out hidden><svg class="login-open-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" /><path d="M4.8 19.4c1.3-3.4 4-5.1 7.2-5.1s5.9 1.7 7.2 5.1" /></svg><span>로그인</span></button>
           </div>
         </header>
         <main id="main" class="main"></main>

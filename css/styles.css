@@ -14893,3 +14893,32 @@ body:has(.deletion-banner) .transport-widget.is-docked { position: relative; ins
 .reverse-value-row.is-destroy { grid-column: 1 / -1; }
 @media (max-width: 700px) { .reverse-value-list { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .reverse-market-detail[open] .reverse-value-input { animation: none; } }
+/* 돋보기: 원만 있던 아이콘에 손잡이를 단다(2026-10-28, 모든 검색칸 공통) */
+.ym-search-icon { position: relative; width: 11px; height: 11px; margin: -2px 3px 0 -1px; }
+.ym-search-icon::after { content: ""; position: absolute; right: -5px; bottom: -4px; width: 6px; height: 2px; border-radius: 2px; background: var(--muted); transform: rotate(45deg); }
+
+/* 헤더 기능 찾기 버튼: 돋보기 + "기능 찾기" + / 단축키(PC), 모바일은 돋보기만 */
+.topbar .feature-search-open { display: inline-flex; align-items: center; gap: 8px; width: auto; padding: 0 10px 0 13px; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; }
+.topbar .feature-search-open .ym-search-icon { border-color: currentColor; transition: transform 0.4s var(--spring); }
+.topbar .feature-search-open .ym-search-icon::after { background: currentColor; }
+.topbar .feature-search-open kbd { padding: 1px 6px; border: 1px solid var(--glass-line); border-radius: 6px; color: var(--faint); font: 700 11px ui-monospace, Menlo, monospace; }
+.topbar .feature-search-open:hover { color: var(--text); }
+.topbar .feature-search-open:hover .ym-search-icon { transform: rotate(-14deg) scale(1.1); }
+@media (max-width: 1100px) {
+  .topbar .feature-search-open-text, .topbar .feature-search-open kbd { display: none; }
+  .topbar .feature-search-open { justify-content: center; width: 40px; padding: 0; }
+}
+
+/* 로그인 전 로그인 버튼: 헤더와 같은 글래스 + 사람 아이콘, 은은한 보라빛(2026-10-28 사용자 요청으로 빛 절반) */
+.topbar .login-open { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 16px 0 12px; overflow: hidden; border: 1px solid oklch(0.8 0.13 295 / 0.3); border-radius: var(--radius-pill); background: linear-gradient(180deg, oklch(0.8 0.13 295 / 0.14), oklch(0.8 0.13 295 / 0.06)); color: #f3effb; font-size: 13px; font-weight: 800; box-shadow: 0 6px 18px -8px oklch(0.8 0.13 295 / 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1); filter: none; }
+.topbar .login-open[hidden] { display: none; }
+.topbar .login-open::before { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%); transform: translateX(-120%); transition: transform 0.7s ease; pointer-events: none; }
+.topbar .login-open:hover { transform: translateY(-1px); border-color: oklch(0.85 0.13 295 / 0.5); box-shadow: 0 8px 22px -8px oklch(0.8 0.13 295 / 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12); filter: none; }
+.topbar .login-open:hover::before { transform: translateX(120%); }
+.topbar .login-open:active { transform: scale(0.94); }
+.topbar .login-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.login-open-icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+.login-open-icon circle { fill: currentColor; fill-opacity: 0.2; }
+@media (prefers-reduced-motion: reduce) {
+  .topbar .feature-search-open .ym-search-icon, .topbar .login-open::before { transition: none; }
+}
