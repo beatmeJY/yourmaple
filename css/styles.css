@@ -14554,7 +14554,7 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .catalog-item h2 { font-size: 18px; margin: 10px 0; }
 .catalog-item p { overflow-wrap: anywhere; color: var(--muted); }
 .catalog-item-art { flex: none; width: 52px; height: 52px; display: grid; place-items: center; color: var(--gold); font-size: 24px; }
-.catalog-item-art img, .catalog-monster-image { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: pixelated; }
+.catalog-item-art img, .catalog-monster-image { max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: pixelated; }
 .mo-stage .catalog-monster-image { max-height: 140px; }
 .trade-item-options { grid-column: 1 / -1; padding: 14px; border: 1px solid var(--line); border-radius: 16px; }
 .trade-item-options summary { cursor: pointer; color: var(--gold); font-weight: 700; }
