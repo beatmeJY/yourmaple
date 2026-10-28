@@ -105,9 +105,9 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 
 공용 몬스터·아이템 도감과 거래 옵션을 사용하려면 **`sql/038_shared_game_catalog.sql`을 운영자가 SQL Editor에서 전체 실행한 다음 앱을 배포**합니다. `catalog_monsters`·`catalog_items`는 모두 조회하고 운영자만 수정합니다. 기존 몬스터 원본은 보존·읽기 전용으로 두고, 이름별 수치 충돌은 비공개 `catalog_monster_reviews`에 남깁니다. 기존 거래는 기본값으로 유지하며 실제 옵션은 별도로 저장합니다. 상세 절차·검증·복구는 [공용 도감 운영 안내](docs/shared-catalog.md)를 따릅니다.
 
-수집처 아이템·몬스터·드랍 확률 일괄 등록은 `sql/043_catalog_import.sql`과 생성된 데이터 SQL을 사용합니다. 전체 수집·재개·등록 순서는 [수집처 수집 안내](docs/collector-import.md)를 따릅니다. 기존 개인 기록은 삭제하지 않습니다.
+공용 도감 아이템·몬스터·드랍 확률 일괄 등록은 `sql/043_catalog_import.sql`과 생성된 데이터 SQL을 사용합니다. 수집·등록 도구와 운영 안내는 공개 저장소에 두지 않고 비공개로 관리합니다. 기존 개인 기록은 삭제하지 않습니다.
 
-이미 513개 아이템을 등록했다면 `sql/044_normalize_catalog_items.sql`을 SQL Editor에서 전체 실행합니다. 기존 아이템의 분류·레벨·성별·공격속도·판매가와 옵션/범위·착용조건·직업을 분리하며 UUID와 거래 참조는 유지합니다. 실행 중인 수집기는 그대로 두고 완료 후 수집 안내의 `--export-only` 명령으로 새 등록 SQL을 생성합니다.
+이미 513개 아이템을 등록했다면 `sql/044_normalize_catalog_items.sql`을 SQL Editor에서 전체 실행합니다. 기존 아이템의 분류·레벨·성별·공격속도·판매가와 옵션/범위·착용조건·직업을 분리하며 UUID와 거래 참조는 유지합니다.
 
 개인 표는 본인 행만, 공용 도감은 `anon`·`authenticated` SELECT만 허용되고 모든 표의 RLS가 켜져 있어야 합니다.
 
@@ -195,9 +195,48 @@ end $$;
 | Project URL | 예 | 아니오. `js/config.js` 또는 GitHub Secret |
 | Publishable key (`sb_publishable_...`, 예전 anon key) | 예. RLS가 켜져 있어야 함 | 아니오 |
 | Secret key, service_role key | 절대 아니오 | 절대 아니오 |
+| 데이터베이스 비밀번호(DBeaver 등 직접 접속) | 절대 아니오 | 절대 아니오. DBeaver에만 저장 |
 
 공개용 키를 숨기는 것만으로는 데이터가 보호되지 않습니다.  
 테이블마다 RLS를 켜고, `user_id`가 로그인한 사용자와 같을 때만 조회/수정/삭제가 되게 합니다.
+
+## DBeaver로 운영 DB 보기 (2026-10-28)
+
+`postgres` 계정은 RLS를 건너뛰어 **모든 사용자의 기록이 보이고 지울 수도 있습니다.** 보기 전용으로 연결합니다.
+
+1. Supabase 대시보드 → 프로젝트 → 위쪽 **Connect** → **Session pooler** 값을 봅니다.
+   - Direct connection(`db.<ref>.supabase.co`)은 IPv6 전용이라 집 인터넷에서 안 될 수 있습니다. Session pooler는 IPv4로 됩니다.
+   - 비밀번호를 모르면 Project Settings → Database → **Reset database password**. 바꾸면 이 비밀번호를 쓰던 다른 곳도 바꿔야 합니다(앱은 이 비밀번호를 쓰지 않습니다).
+2. DBeaver → 새 연결 → **PostgreSQL** → Main 탭(Connect by: Host)
+   | 칸 | 값 |
+   | --- | --- |
+   | Host | Session pooler의 host (`aws-…-ap-northeast-2.pooler.supabase.com` 꼴) |
+   | Port | `5432` |
+   | Database | `postgres` |
+   | Username | `postgres.<프로젝트 ref>` (점 뒤 ref까지 포함) |
+   | Password | DB 비밀번호, "Save password" 체크 |
+3. **SSL** 탭 → Use SSL 체크, SSL mode `require`.
+4. **General**(연결 설정) → Connection type **Production**, **Read-only connection** 체크.
+   Production은 빨간 표시·자동 커밋 끔·실행 전 확인을 켭니다. 고칠 일이 생기면 지금처럼 `sql/NNN_*.sql`을 SQL Editor에서 실행합니다.
+5. 처음 연결 때 드라이버 내려받기를 물으면 받습니다. Test Connection → 완료.
+6. 왼쪽 트리에서 `postgres` → Schemas → **public** 에 앱 테이블이 있습니다. `auth`(로그인 계정), `storage`(얼굴 이미지), `cron`(탈퇴 삭제 작업)도 볼 수 있습니다.
+
+자주 나는 오류
+- `Tenant or user not found`: Username에 `.ref`가 빠졌거나 host 지역이 다름 → Connect 창 값을 그대로 복사.
+- 연결 시간 초과: Direct connection host를 넣은 경우 → Session pooler로.
+- `password authentication failed`: 비밀번호 틀림 → 위 1번에서 재설정.
+
+### DBeaver에서 SQL 파일 반영하기
+
+SQL Editor와 같은 `postgres` 계정이라 결과는 같습니다. 보기용 연결은 그대로 두고 쓰기용을 따로 만듭니다.
+
+1. 보기용 연결 우클릭 → **Copy** → 붙여넣기 → 이름을 `yourmaple 운영(쓰기)`로, General에서 **Read-only connection만 끕니다**(Connection type은 Production 유지).
+2. `sql/NNN_*.sql` 파일을 쓰기용 연결 편집기에서 열고 **Execute SQL Script(⌥X)** 로 전체 실행. Ctrl+Enter는 커서가 있는 문장 하나만 실행합니다.
+3. 오류 없이 끝났으면 위쪽 **Commit**. Production은 자동 커밋이 꺼져 있어 누르기 전까지 반영되지 않습니다.
+4. 중간에 오류가 나면 **Rollback** 후 원인을 고치고 처음부터 다시 실행합니다(우리 SQL은 다시 실행해도 안전하게 작성).
+5. `$$ … $$` 함수 본문을 DBeaver가 잘못 잘라 오류가 나면 그 파일만 Supabase SQL Editor에서 실행합니다.
+
+`delete`·`update`를 직접 칠 때는 RLS가 없어 모든 사용자 기록에 적용됩니다(무료 요금제라 백업 없음). 같은 조건의 `select count(*)`로 걸리는 행 수를 먼저 확인합니다.
 
 ## 로컬에서 화면 보기
 
@@ -266,16 +305,13 @@ Secret key 는 Secret 에도 넣지 않습니다.
 
 `sql/037_trade_undo.sql`을 Supabase SQL Editor에서 실행하세요(재실행 가능). 매수·매도·통합·목록 직접 수정 저장을 한 트랜잭션으로 처리하며, 같은 화면에서 마지막 성공 저장 1건을 취소할 수 있습니다. 합산 전 수량·평균가·등록/수정 시각도 복원합니다. 이후 다른 곳에서 수정된 거래는 덮어쓰지 않습니다. 새로고침·페이지 이동 시 취소 기록은 사라지고, 명시적인 삭제는 취소 대상이 아닙니다.
 
-## 아이템 외부 자료 시험 수집
-
-운영 DB를 건드리지 않는 아이템 시험 수집기(드랍 기반10개 또는 ID순 최대100개)와 검토용 JSON은 [아이템 시험 수집 안내](data/imports/SAMPLE-ITEMS.md)를 참고합니다. 이미지 URL만 수집하며, 메이플랜드 자료 검증과 DB 등록은 별도 단계입니다.
+## 공용 도감 SQL (043~049)
 
 - `sql/045_clear_legacy_monster_drops.sql`: 기존 수동 드랍 문자열 폐기(복구 원문 비공개 보관), 몬스터·아이템·거래·새 수집 드랍 유지. SQL Editor에서 전체 실행합니다.
 
-043~045 실행 후 수집 데이터 자동 등록은 `python3 -B tools/import_collector_db.py`로 실행합니다. 최초 `brew install libpq` 필요. [접속 정보 입력·재개 안내](docs/collector-import.md#권장-터미널에서-한-번에-자동-등록-2026-10-28)를 참고하세요.
+- `sql/046_catalog_cleanup.sql`: 수동220행 비공개 보관 후 수집 원본으로 통일, 접미사 제거·외부ID 갱신·드랍 문자열 컬럼/빈 구 monsters 폐기. **새 몬스터 화면을 배포한 뒤 SQL Editor에서 실행**합니다. 전체 수집 데이터는 이미 운영 등록돼 재등록 불필요.
 
-- `sql/046_catalog_cleanup.sql`: 수동220행 비공개 보관 후 수집 원본으로 통일, 접미사 제거·외부ID 갱신·드랍 문자열 컬럼/빈 구 monsters 폐기. **새 몬스터 화면을 배포한 뒤 SQL Editor에서 실행**합니다. 전체 수집 데이터는 이미 운영 등록돼 재등록 불필요. 현재 기준은 [수집/정리 안내](docs/collector-import.md) 머리말과046 절입니다.
-
-- `sql/047_catalog_search_history.sql`: 목록24개 서버검색·아이템 상세·공개 변경 이력·비공개 변경 원문 보관. SQL Editor에서 먼저 실행한 뒤 새 화면을 배포합니다. [도감 운영/백업/변경 반영 안내](docs/catalog-operations.md), [누락 목록](docs/catalog-missing.md).
+- `sql/047_catalog_search_history.sql`: 목록24개 서버검색·아이템 상세·공개 변경 이력·비공개 변경 원문 보관. SQL Editor에서 먼저 실행한 뒤 새 화면을 배포합니다.
 - `sql/048_catalog_drop_search.sql`: SQL047 이후 드랍 아이템 검색 집합을 한 번씩 계산하도록 개선합니다. 검색 조건·권한·데이터·화면은 유지합니다. SQL Editor에서 전체 실행(재실행 가능), 프런트엔드 재배포 불필요.
   - 운영 적용 확인(2026-10-29). 아이템 상세의 드랍 몬스터 목록과 도감 이동은 기존 관계표를 사용하므로 추가 SQL 없이 화면 배포로 반영됩니다.
+- `sql/049_catalog_source_scrub.sql`: 048 이후 실행(재실행 가능). 공개 도감·변경 이력에서 수집 주소와 외부 링크를 지우고(마지막 ID만 남김) 수집 관련 값·함수·트리거 이름을 중립 이름으로 바꿉니다. UUID·수치·거래/드랍 참조는 유지하고 원래 값은 비공개 스키마(`catalog_import_private.scrub_049_*`)에 보관합니다. SQL Editor 또는 DBeaver 쓰기 연결에서 전체 실행.
