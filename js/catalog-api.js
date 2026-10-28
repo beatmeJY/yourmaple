@@ -32,3 +32,16 @@ export async function monsterDrops(id, client = null) {
     if (!result.data || result.data.length < 200) return { data: rows, error: null };
   }
 }
+
+export async function itemDropPage(id, page = 0, client = null) {
+  const supabase = client ?? await getSupabase();
+  const offset = Math.max(0, Math.min(Number.isSafeInteger(page) ? page : 0, 10000)) * 24;
+  // 선택한 아이템만 조회합니다. 다음 페이지 유무를 알기 위한 한 행만 더 읽습니다.
+  const result = await supabase.from("catalog_monster_drops")
+    .select("id,source_entry,rate_percent,monster:catalog_monsters(id,name,level,source_id,image_url)")
+    .eq("item_id", id).order("monster_id", { ascending: true })
+    .order("source_entry", { ascending: true }).order("id", { ascending: true })
+    .range(offset, offset + 24);
+  if (result.error) return result;
+  return { data: (result.data ?? []).slice(0, 24), hasMore: (result.data?.length ?? 0) > 24, error: null };
+}

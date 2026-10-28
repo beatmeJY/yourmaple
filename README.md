@@ -277,3 +277,5 @@ Secret key 는 Secret 에도 넣지 않습니다.
 - `sql/046_catalog_cleanup.sql`: 수동220행 비공개 보관 후 수집 원본으로 통일, 접미사 제거·외부ID 갱신·드랍 문자열 컬럼/빈 구 monsters 폐기. **새 몬스터 화면을 배포한 뒤 SQL Editor에서 실행**합니다. 전체 수집 데이터는 이미 운영 등록돼 재등록 불필요. 현재 기준은 [수집/정리 안내](docs/collector-import.md) 머리말과046 절입니다.
 
 - `sql/047_catalog_search_history.sql`: 목록24개 서버검색·아이템 상세·공개 변경 이력·비공개 변경 원문 보관. SQL Editor에서 먼저 실행한 뒤 새 화면을 배포합니다. [도감 운영/백업/변경 반영 안내](docs/catalog-operations.md), [누락 목록](docs/catalog-missing.md).
+- `sql/048_catalog_drop_search.sql`: SQL047 이후 드랍 아이템 검색 집합을 한 번씩 계산하도록 개선합니다. 검색 조건·권한·데이터·화면은 유지합니다. SQL Editor에서 전체 실행(재실행 가능), 프런트엔드 재배포 불필요.
+  - 운영 적용 확인(2026-10-29). 아이템 상세의 드랍 몬스터 목록과 도감 이동은 기존 관계표를 사용하므로 추가 SQL 없이 화면 배포로 반영됩니다.

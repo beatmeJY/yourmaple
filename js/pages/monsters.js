@@ -1,6 +1,6 @@
 import { formatExpPerHp, sortMonsterRows } from "../monster-view.js";
 import { catalogRpc, monsterDrops, clearCatalogCache } from "../catalog-api.js";
-import { catalogImage, mountCatalogImageFallback } from "../catalog-image.js";
+import { catalogImage, catalogMonsterImage, mountCatalogImageFallback } from "../catalog-image.js";
 import { sfx } from "../effects.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { matchesText, parseBound } from "../filters.js";
@@ -138,7 +138,7 @@ export function render(root) {
     const tags = elementTags(row);
 
     box.innerHTML = `
-      <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${row.image_url?.startsWith("https://") ? catalogImage(row.image_url, "catalog-monster-image", 96) : `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
+      <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
       <div class="mo-d-title"><strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
       <div class="mo-d-stats">
         <div><span>HP</span><strong>${num(row.hp)}</strong></div>
@@ -223,8 +223,9 @@ export function render(root) {
     order: "level",
     ascending: true,
     emptyText: "아직 공용 몬스터 정보가 없습니다. 운영자가 도감 데이터를 준비하고 있습니다.",
+    initialQuery: (new URLSearchParams(location.hash.split("?")[1] || "").get("q") || "").slice(0,100),
     searchLabel: "몬스터명",
-    searchPlaceholder: "이름으로 찾기",
+    searchPlaceholder: "이름·몬스터 번호",
     searchFields: ["name"],
     levelMode: "point",
     levelField: "level",
@@ -311,7 +312,7 @@ export function render(root) {
           const accuracy = neededAccuracy(row, myLevel);
           const el = firstElement(row);
           return `<button type="button" class="mo-card${row.id === selectedId ? " is-on" : ""}" data-pick-monster="${row.id}" aria-pressed="${row.id === selectedId}" style="--i:${Math.min(index, 16)}">
-            <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${row.image_url?.startsWith("https://") ? catalogImage(row.image_url, "catalog-monster-image", 96) : `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중">명중 ${num(accuracy)}</span>` : ""}</span>
+            <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중">명중 ${num(accuracy)}</span>` : ""}</span>
             <span class="mo-name"><strong>${escapeHtml(row.name)}</strong></span>
             <span class="mo-stats"><span><small>HP</small><strong>${num(row.hp)}</strong></span><span><small>EXP</small><strong>${num(row.exp)}</strong></span></span>
             <span class="mo-eff">

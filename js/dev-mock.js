@@ -271,6 +271,7 @@ class Query {
     const data = result.map((row) => {
       const value=withJoins(row,joins);
       if(this.table==="catalog_monster_drops"&&this.columns.includes("item:catalog_items"))value.item=rowsOf("catalog_items").find(i=>i.id===row.item_id)??null;
+      if(this.table==="catalog_monster_drops"&&this.columns.includes("monster:catalog_monsters"))value.monster=rowsOf("catalog_monsters").find(m=>m.id===row.monster_id)??null;
       return value;
     });
     if (this.action !== "select" && !this.returning && this.mode === "many") return { data: null, error: null };
@@ -379,11 +380,11 @@ const RPCS = {
     return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
   },
   catalog_search_monsters({p_query="",p_drop="",p_min=null,p_max=null,p_weak=[],p_resist=[],p_sort="level",p_page=0}={}) {
-    const filtered=rowsOf("catalog_monsters").filter(r=>String(r.name).toLowerCase().includes(p_query.toLowerCase())
+    const filtered=rowsOf("catalog_monsters").filter(r=>(String(r.name).toLowerCase().includes(p_query.toLowerCase())||r.source_id===p_query)
       &&(p_min==null||r.level>=p_min)&&(p_max==null||r.level<=p_max)
       &&p_weak.every(v=>String(r.weak_elements??"").split(", ").includes(v))
       &&p_resist.every(v=>String(r.resist_elements??"").split(", ").includes(v))
-      &&(!p_drop||rowsOf("catalog_monster_drops").some(d=>d.monster_id===r.id&&rowsOf("catalog_items").some(i=>i.id===d.item_id&&i.name.includes(p_drop)))))
+      &&(!p_drop||rowsOf("catalog_monster_drops").some(d=>d.monster_id===r.id&&rowsOf("catalog_items").some(i=>i.id===d.item_id&&(i.name.toLowerCase().includes(p_drop.toLowerCase())||i.source_id===p_drop)))))
       .sort((a,b)=>(p_sort==="eff"?(a.exp>0?a.hp/a.exp:Infinity)-(b.exp>0?b.hp/b.exp:Infinity):0)||a.level-b.level||String(a.id).localeCompare(String(b.id)));
     return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
   },

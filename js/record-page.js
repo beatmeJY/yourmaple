@@ -54,7 +54,7 @@ export async function renderRecords(root, options) {
       </div>
     </form>`;
   const filtersInner = `
-      <label class="field"><span>${options.searchLabel}</span><input data-search placeholder="${options.searchPlaceholder}" /></label>
+      <label class="field"><span>${options.searchLabel}</span><input data-search value="${escapeHtml(options.initialQuery ?? "")}" placeholder="${options.searchPlaceholder}" /></label>
       ${levelFilters}`;
   const filtersHtml =
     options.filterClass === "filters-my-level"
@@ -156,7 +156,9 @@ export async function renderRecords(root, options) {
         ? readLevelFilter(root.querySelector("[data-level-min]").value, root.querySelector("[data-level-max]").value)
         : null;
     if (!rows.length) {
-      list.innerHTML = `<p class="empty">${options.emptyText}</p>`;
+      // 서버에서 검색을 마친 빈 응답은 도감 전체가 비었다는 뜻이 아닙니다.
+      const emptyText = options.paginated ? options.emptyFilterText || options.emptyText : options.emptyText;
+      list.innerHTML = `<p class="empty">${emptyText}</p>`;
       options.afterPaint?.([]);
       return;
     }

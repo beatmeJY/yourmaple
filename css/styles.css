@@ -15359,3 +15359,14 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 @media(prefers-reduced-motion:reduce) { .catalog-item,.catalog-change,.catalog-pager button { animation:none; transition:none; } }
 
 .catalog-image-fallback { display:grid; place-items:center; color:var(--muted); font-weight:800; }
+
+/* 아이템 상세에서 드랍 몬스터로 이어지는 공용 도감 카드 */
+.catalog-item-droppers { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr)); gap:12px; }
+.catalog-dropper { display:flex; gap:12px; align-items:center; min-width:0; padding:14px; border-radius:16px; color:var(--text); text-decoration:none; animation:ym-fade-up .25s var(--ease-out) both; transition:transform .2s,border-color .2s; }
+.catalog-dropper:hover { transform:translateY(-2px); border-color:var(--gold); }
+.catalog-dropper-art { display:grid; place-items:center; flex:none; width:48px; height:48px; }
+.catalog-dropper-art img { max-width:48px; max-height:48px; object-fit:contain; image-rendering:pixelated; }
+.catalog-dropper > span { display:flex; flex-direction:column; min-width:0; gap:4px; overflow-wrap:anywhere; }
+.catalog-dropper small { color:var(--muted); font-size:12px; }
+.catalog-dropper > strong { margin-left:auto; flex:none; color:var(--gold); font-size:14px; }
+@media(prefers-reduced-motion:reduce) { .catalog-dropper { animation:none; transition:none; } }
