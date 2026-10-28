@@ -261,6 +261,49 @@ export function roundToFloor(round) {
   return round + Math.floor((round - 1) / 5);
 }
 
+// 층별 보스(2026-10-28 사용자 제공). 우리 동선은 크림슨 발록(32층, 27라운드)까지라 그 층까지만 둔다.
+// note는 그 보스에서 조심할 것(예전 구간 주의 문구를 보스에 붙임).
+export const FLOOR_BOSSES = {
+  1: { name: "마노" },
+  2: { name: "스텀피" },
+  3: { name: "데우" },
+  4: { name: "킹슬라임" },
+  5: { name: "대왕지네" },
+  7: { name: "파우스트" },
+  8: { name: "킹크랑" },
+  9: { name: "머쉬맘" },
+  10: { name: "알리샤르" },
+  11: { name: "타이머", note: "스턴" },
+  13: { name: "다일" },
+  14: { name: "파파픽시", note: "실명 · 스킬잠금" },
+  15: { name: "좀비머쉬맘" },
+  16: { name: "제노" },
+  17: { name: "데비존" },
+  19: { name: "구미호", note: "실명" },
+  20: { name: "태륜" },
+  21: { name: "초강화형 포이즌골렘", note: "스킬잠금 · 실명 · 키반대" },
+  22: { name: "요괴선사" },
+  23: { name: "주니어 발록" },
+  25: { name: "엘리쟈" },
+  26: { name: "프랑켄로이드", note: "실명 · 스킬잠금" },
+  27: { name: "키메라" },
+  28: { name: "포장마차" },
+  29: { name: "스노우맨", note: "스턴" },
+  31: { name: "블루 머쉬맘" },
+  32: { name: "크림슨 발록" },
+};
+
+// 라운드 구간 안의 보스를 층 순서대로: [{ floor, round, name, note }]
+export function bandBosses(start, end) {
+  const list = [];
+  for (let round = start; round <= end; round += 1) {
+    const floor = roundToFloor(round);
+    const boss = FLOOR_BOSSES[floor];
+    if (boss) list.push({ floor, round, name: boss.name, note: boss.note ?? "" });
+  }
+  return list;
+}
+
 export function saveFloorToFloor(saveRound) {
   return roundToFloor(saveRound) + 1;
 }

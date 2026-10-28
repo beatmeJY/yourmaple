@@ -15216,3 +15216,105 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .dj-char, .dj-gate, .dj-gate i, .dj-quick, .dj-watch-ring, .dj-watch-btn, .dj-card, .dj-card-redo, .dj-card-x, .dj-beltcard, .dj-track-cell { transition: none; }
 }
 .dj-charbar .dj-picker[hidden] { display: none; }
+
+/* 무릉 구간 보스 말풍선 (2026-10-28): 층 이름 hover·focus·모바일 누르기·그 구간을 잴 때 */
+.dojo-page .dj-bands .dojo-band-info[data-band-boss-toggle] { cursor: help; border-radius: 6px; outline: none; }
+.dojo-page .dj-bands .dojo-band-info[data-band-boss-toggle]:focus-visible { box-shadow: 0 0 0 2px oklch(0.8 0.13 85 / 0.8); }
+.dojo-band-boss-mark {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 6px;
+  border: 1px solid oklch(0.78 0.12 80 / 0.55);
+  border-radius: 999px;
+  color: oklch(0.85 0.12 85);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 800;
+  vertical-align: 2px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.dojo-band-info:hover .dojo-band-boss-mark,
+.dojo-band-info:focus-visible .dojo-band-boss-mark,
+.dojo-band.is-boss-open .dojo-band-boss-mark { background: oklch(0.8 0.13 85); color: #2a120a; }
+.dojo-page .dojo-band-boss-tip {
+  left: 14px;
+  width: min(280px, calc(100vw - 48px));
+  max-width: none;
+  padding: 10px 12px 9px;
+  border: 1px solid oklch(0.78 0.12 80 / 0.6);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #3a160c, #22100a);
+  color: #f6e7c8;
+  text-align: left;
+  box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.7), inset 0 0 0 3px oklch(0.24 0.07 25);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px) scale(0.96);
+  transform-origin: 30px 100%;
+  transition: opacity 0.18s ease, transform 0.28s var(--spring, cubic-bezier(0.34, 1.56, 0.64, 1)), visibility 0s linear 0.28s;
+}
+.dojo-page .dojo-band-boss-tip::after { left: 34px; border-top-color: oklch(0.78 0.12 80 / 0.6); }
+.dojo-page .dojo-band:has(.dojo-band-info:hover) .dojo-band-boss-tip,
+.dojo-page .dojo-band:has(.dojo-band-info:focus-visible) .dojo-band-boss-tip,
+.dojo-page .dojo-band.is-boss-open .dojo-band-boss-tip,
+.dojo-page .dojo-band.is-timing .dojo-band-boss-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.18s ease, transform 0.28s var(--spring, cubic-bezier(0.34, 1.56, 0.64, 1)), visibility 0s;
+}
+.dojo-band-boss-tip p { margin: 0 0 6px; color: oklch(0.85 0.12 85); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+.dojo-band-boss-tip ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.dojo-band-boss-tip li { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: baseline; column-gap: 6px; font-size: 13px; font-weight: 700; }
+.dojo-band-boss-tip li b { color: #bfa887; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.dojo-band-boss-tip li em { grid-column: 2; color: #ff9b84; font-size: 11.5px; font-style: normal; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .dojo-page .dojo-band-boss-tip { transition: none; transform: none; }
+}
+
+/* 측정대 층 칸 보스 말풍선 (2026-10-28) */
+.dj-track { position: relative; }
+.dj-track-cell { cursor: help; }
+.dj-track-cell.is-tip { background: oklch(0.82 0.15 var(--hue)); box-shadow: 0 0 0 1px #fff4dc, 0 0 10px oklch(0.8 0.15 var(--hue) / 0.8); transform: scaleY(1.15); transform-origin: bottom; }
+.dj-track-tip {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(100% + 6px);
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-width: 96px;
+  max-width: 220px;
+  padding: 7px 12px 6px;
+  border: 1px solid oklch(0.78 0.12 80 / 0.6);
+  border-top: 3px solid oklch(0.72 0.16 var(--hue, 40));
+  border-radius: 9px;
+  background: linear-gradient(180deg, #3a160c, #22100a);
+  color: #f6e7c8;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 12px 26px -8px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: dj-track-tip-in 0.22s var(--spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+}
+.dj-track-tip[hidden] { display: none; }
+.dj-track-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: calc(50% + var(--arrow, 0px));
+  border: 6px solid transparent;
+  border-top-color: oklch(0.78 0.12 80 / 0.6);
+  transform: translateX(-50%);
+}
+.dj-track-tip b { color: oklch(0.85 0.12 85); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
+.dj-track-tip span { color: #fff4dc; font-size: 14px; font-weight: 800; }
+.dj-track-tip em { color: #ff9b84; font-size: 11px; font-style: normal; font-weight: 700; white-space: normal; }
+.dj-track-tip small { color: #bfa887; font-size: 10.5px; }
+@keyframes dj-track-tip-in { from { opacity: 0; transform: translate(-50%, 5px) scale(0.94); } }
+@media (prefers-reduced-motion: reduce) {
+  .dj-track-tip { animation: none; }
+  .dj-track-cell.is-tip { transform: none; }
+}
+@media (hover: none) { .dj-track { touch-action: pan-y; } }

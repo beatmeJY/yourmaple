@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { BELTS, GOAL_SCORE, DAILY_CAP, beltById, quoteSale, quoteBlackBelt, calendarDays, mesoPerHour } from "./dojo-calc.js";
+import { BANDS, FLOOR_BOSSES, bandBosses, BELTS, GOAL_SCORE, DAILY_CAP, beltById, quoteSale, quoteBlackBelt, calendarDays, mesoPerHour } from "./dojo-calc.js";
 
 const thresholds = [["white", 140], ["yellow", 1300], ["blue", 2800], ["red", 6400], ["black", 12000]];
 const prices = { white: 100n, yellow: 200n, blue: 300n, red: 400n, black: 500n };
@@ -39,3 +39,12 @@ assert.equal(quoteSale(prices, 12000, 17000, route).seconds, 0);
 assert.equal(quoteBlackBelt({ white: 100n }, route, 60).hour, null);
 assert.equal(quoteBlackBelt(prices, route, null).seconds, null);
 console.log("무릉 허리띠 점수·획득 경계·시간·수익 검증 통과");
+
+// 층별 보스: 쉬는 층(6·12·18·24·30층)은 빠지고, 27라운드 = 32층 크림슨 발록에서 끝난다.
+assert.deepEqual(bandBosses(1, 5).map((boss) => boss.name), ["마노", "스텀피", "데우", "킹슬라임", "대왕지네"]);
+assert.deepEqual(bandBosses(6, 10).map((boss) => [boss.floor, boss.name]), [[7, "파우스트"], [8, "킹크랑"], [9, "머쉬맘"], [10, "알리샤르"], [11, "타이머"]]);
+assert.deepEqual(bandBosses(26, 27).map((boss) => [boss.floor, boss.name]), [[31, "블루 머쉬맘"], [32, "크림슨 발록"]]);
+assert.equal(BANDS.reduce((sum, band) => sum + bandBosses(band.start, band.end).length, 0), 27);
+assert.equal(Object.keys(FLOOR_BOSSES).length, 27);
+assert.equal(bandBosses(16, 20).find((boss) => boss.floor === 21).note, "스킬잠금 · 실명 · 키반대");
+console.log("무릉 층별 보스 검증 통과");

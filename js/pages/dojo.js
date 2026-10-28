@@ -9,6 +9,7 @@ import {
   GOAL_SCORE,
   SAVE_FLOORS,
   SAVE_SECONDS,
+  bandBosses,
   bandPoints,
   beltById,
   calendarDays,
@@ -82,12 +83,13 @@ function beltLabel(belt) {
   return `<span class="dojo-belt">${iconHtml}<span class="dojo-belt-copy"><span class="dojo-belt-name">${escapeHtml(belt.name)}</span><span class="hint">${escapeHtml(formatCount(belt.score))}점</span></span></span>`;
 }
 
-const BAND_BOSS_NOTES = {
-  6: "10층 타이머 스턴 유의",
-  11: "12층 파파픽시 실명, 스킬잠금 유의",
-  16: "19층 구미호 실명 / 21층 포이즌골렘 스킬잠금, 실명, 키반대 유의",
-  21: "26층 프랑켄로이드 실명, 스킬잠금 유의 / 29층 스노우맨 스턴 유의",
-};
+// 구간 보스 말풍선: 층 이름에 마우스를 대거나(키보드 포커스·모바일은 누르기) 그 구간을 잴 때 뜬다.
+function bossTipHtml(band) {
+  const bosses = bandBosses(band.start, band.end);
+  if (!bosses.length) return "";
+  const items = bosses.map((boss) => `<li><b>${boss.floor}층</b><span>${escapeHtml(boss.name)}</span>${boss.note ? `<em>${escapeHtml(boss.note)} 주의</em>` : ""}</li>`).join("");
+  return `<div class="dojo-band-boss-tip" data-band-boss role="tooltip" id="dojo-boss-${band.start}"><p>${spanParts(band.start, band.end).floorLabel} 보스</p><ul>${items}</ul></div>`;
+}
 
 // 구간마다 다른 색. 구간 행 색 막대, 루트 칸 그림, 층 트랙에 같이 쓴다.
 const BAND_HUES = [150, 85, 50, 25, 330, 295];
@@ -118,14 +120,11 @@ function floorsTable() {
     const label = spanText(band.start, band.end);
     const { floorLabel, roundLabel } = spanParts(band.start, band.end);
     const saveTitle = SAVE_FLOORS.includes(band.end) ? ` title="${saveFloorToFloor(band.end)}층(쉬는 층)에서 저장"` : "";
-    const bossNote = BAND_BOSS_NOTES[band.start];
-    const bossTip = bossNote
-      ? `<div class="dojo-band-boss-tip" data-band-boss hidden role="status">${escapeHtml(bossNote)}</div>`
-      : "";
+    const bossTip = bossTipHtml(band);
     return `<div class="dojo-band" data-band-row="${band.start}" style="--hue:${BAND_HUES[bandIndex]}"${saveTitle}>
       ${bossTip}
-      <div class="dojo-band-info">
-        <span class="dojo-band-floor">${floorLabel}</span>
+      <div class="dojo-band-info"${bossTip ? ` tabindex="0" data-band-boss-toggle="${band.start}" aria-describedby="dojo-boss-${band.start}"` : ""}>
+        <span class="dojo-band-floor">${floorLabel}${bossTip ? `<i class="dojo-band-boss-mark" aria-hidden="true">보스</i>` : ""}</span>
         <span class="dojo-band-round">(${roundLabel})</span>
         <span class="dojo-band-points" data-band-points="${band.start}"></span>
       </div>
@@ -644,8 +643,6 @@ export async function render(root) {
       const readout = row.querySelector("[data-band-time]");
       const start = row.querySelector("[data-band-start]");
       const stop = row.querySelector("[data-band-stop]");
-      const bossTip = row.querySelector("[data-band-boss]");
-      if (bossTip) bossTip.hidden = !on;
       if (readout) {
         readout.hidden = !on && !pending;
         if (on) readout.textContent = formatStopwatch(Date.now() - clock.startedAt);
@@ -839,18 +836,19 @@ export async function render(root) {
     const parts = [];
     for (let round = 1; round <= last; round += 1) {
       const rerun = saves.some((save) => round > save);
-      parts.push(`<i class="dj-track-cell${rerun ? " is-rerun" : ""}" style="--hue:${bandHue(round)}" title="${roundToFloorText(round)}"></i>`);
+      parts.push(`<i class="dj-track-cell${rerun ? " is-rerun" : ""}" style="--hue:${bandHue(round)}" data-track-round="${round}" aria-label="${escapeHtml(roundToFloorText(round))}"></i>`);
       if (SAVE_FLOORS.includes(round)) {
         const on = saves.includes(round);
         parts.push(`<button type="button" class="dj-gate${on ? " is-on" : ""}" data-gate="${round}" aria-pressed="${on}" title="${saveFloorToFloor(round)}층(쉬는 층)에서 저장"${locked ? " disabled" : ""}><small>${saveFloorToFloor(round)}층</small><i aria-hidden="true"></i></button>`);
       }
     }
-    return `<div class="dj-track">${parts.join("")}</div>`;
+    return `<div class="dj-track">${parts.join("")}<div class="dj-track-tip" data-track-tip role="tooltip" hidden></div></div>`;
   }
 
   function roundToFloorText(round) {
     const { floorLabel } = spanParts(round, round);
-    return `${floorLabel} (${round}라운드)`;
+    const boss = bandBosses(round, round)[0];
+    return `${floorLabel} ${boss ? `${boss.name} ` : ""}(${round}라운드)`;
   }
 
   // 측정대: ① 저장할 쉬는 층 고르기 ② 한 바퀴 재기(원형 스톱워치)
@@ -1976,6 +1974,62 @@ export async function render(root) {
     const start = event.target.closest("[data-band-start], [data-clock-start]");
     if (start && !start.disabled) burstStart(start);
   });
+  // 측정대 층 칸에 마우스를 올리면(모바일은 누르면) 그 층 보스를 말풍선으로 보여준다.
+  function showTrackTip(cell) {
+    const track = cell.closest(".dj-track");
+    const tip = track?.querySelector("[data-track-tip]");
+    if (!tip) return;
+    const round = Number(cell.dataset.trackRound);
+    const boss = bandBosses(round, round)[0];
+    const { floorLabel } = spanParts(round, round);
+    tip.innerHTML = `<b>${floorLabel}</b><span>${escapeHtml(boss?.name ?? "보스 정보 없음")}</span>${boss?.note ? `<em>${escapeHtml(boss.note)} 주의</em>` : ""}<small>${round}라운드</small>`;
+    tip.style.setProperty("--hue", bandHue(round));
+    tip.hidden = false;
+    for (const other of track.querySelectorAll(".dj-track-cell.is-tip")) other.classList.remove("is-tip");
+    cell.classList.add("is-tip");
+    // 칸 가운데 위에 두되 트랙 밖으로 나가지 않게 좌우를 맞춘다.
+    const center = cell.offsetLeft + cell.offsetWidth / 2;
+    const half = tip.offsetWidth / 2;
+    const left = Math.min(Math.max(center, half + 4), track.clientWidth - half - 4);
+    tip.style.left = `${left}px`;
+    tip.style.setProperty("--arrow", `${center - left}px`);
+  }
+  function hideTrackTip(track) {
+    const tip = track?.querySelector("[data-track-tip]");
+    if (tip) tip.hidden = true;
+    for (const cell of track?.querySelectorAll(".dj-track-cell.is-tip") ?? []) cell.classList.remove("is-tip");
+  }
+  root.addEventListener("pointerover", (event) => {
+    const cell = event.target.closest?.("[data-track-round]");
+    if (cell) showTrackTip(cell);
+  });
+  // 모바일은 칸이 좁아(약 4px) 손가락이 닿은 가로 위치에서 가장 가까운 칸을 고르고, 옆으로 끌면 따라간다.
+  function trackCellAt(track, x) {
+    let best = null;
+    let gap = Infinity;
+    for (const cell of track.querySelectorAll("[data-track-round]")) {
+      const rect = cell.getBoundingClientRect();
+      const distance = Math.abs(rect.left + rect.width / 2 - x);
+      if (distance < gap) {
+        gap = distance;
+        best = cell;
+      }
+    }
+    return best;
+  }
+  function touchTrack(event) {
+    if (event.pointerType === "mouse" || event.target.closest?.("[data-gate]")) return;
+    const track = event.target.closest?.(".dj-track");
+    const cell = track && trackCellAt(track, event.clientX);
+    if (cell) showTrackTip(cell);
+  }
+  root.addEventListener("pointerdown", touchTrack);
+  root.addEventListener("pointermove", touchTrack);
+  root.addEventListener("pointerout", (event) => {
+    if (event.pointerType !== "mouse") return;
+    const track = event.target.closest?.(".dj-track");
+    if (track && !track.contains(event.relatedTarget)) hideTrackTip(track);
+  });
   root.addEventListener("mousedown", (event) => {
     clockPressed = Boolean(event.target.closest(CLOCK_CONTROLS));
   });
@@ -1983,6 +2037,14 @@ export async function render(root) {
     clockPressed = false;
   });
   root.addEventListener("click", (event) => {
+    // 마우스가 없는 기기는 층 이름을 눌러 보스 말풍선을 열고 닫는다(다른 곳을 누르면 닫힘).
+    const bossToggle = event.target.closest("[data-band-boss-toggle]");
+    const bossRow = bossToggle && window.matchMedia("(hover: none)").matches ? bossToggle.closest(".dojo-band") : null;
+    for (const row of root.querySelectorAll(".dojo-band.is-boss-open")) {
+      if (row !== bossRow) row.classList.remove("is-boss-open");
+    }
+    if (bossRow) bossRow.classList.toggle("is-boss-open");
+    if (!event.target.closest(".dj-track")) for (const track of root.querySelectorAll(".dj-track")) hideTrackTip(track);
     const clockStart = event.target.closest("[data-clock-start]");
     if (clockStart && !clockStart.disabled) {
       sfx("mid");
