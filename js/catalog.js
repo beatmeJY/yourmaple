@@ -2,6 +2,7 @@ import { getSupabase } from "./supabase-client.js";
 import { translateDbError } from "./db-error.js";
 
 export function catalogError(error) {
+  if (/catalog_search_|catalog_item_detail|catalog_changes/i.test(`${error?.message} ${error?.details}`) && /schema cache|could not find|does not exist/i.test(`${error?.message} ${error?.details}`)) return "도감 검색·변경 이력을 준비 중입니다. 운영자가 SQL047을 실행해야 합니다.";
   if (/catalog_|item_snapshot|item_options|item_id|replace_my_trades_v2/i.test(`${error?.message} ${error?.details}`) && /schema cache|could not find|does not exist/i.test(`${error?.message} ${error?.details}`)) return "공용 도감을 준비 중입니다. 운영자가 sql/038_shared_game_catalog.sql을 실행해야 합니다.";
   return translateDbError(error);
 }

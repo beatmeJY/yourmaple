@@ -94,6 +94,26 @@ export async function renderRecords(root, options) {
   const title = root.querySelector("[data-form-title]");
   let rows = [];
   let loadId = 0;
+  let pageNumber = 0;
+  let total = 0;
+  let debounce;
+  if (options.paginated) list.insertAdjacentHTML("afterend", `<nav class="catalog-pager" aria-label="목록 페이지"><button type="button" data-page-prev>이전</button><span data-page-info aria-live="polite"></span><button type="button" data-page-next>다음</button></nav>`);
+  function pageInfo(busy = false) {
+    if (!options.paginated) return;
+    root.querySelector("[data-page-prev]").disabled = busy || pageNumber === 0;
+    root.querySelector("[data-page-next]").disabled = busy || (pageNumber + 1) * 24 >= total;
+    root.querySelector("[data-page-info]").textContent = `${pageNumber + 1} / ${Math.max(1, Math.ceil(total / 24))} 페이지 · ${total}개`;
+  }
+  function refreshSearch(delayed = false) {
+    if (!options.paginated) { paintList(); return; }
+    clearTimeout(debounce);
+    ++loadId; // 입력 순간부터 이전 응답이 목록을 덮지 못하게 합니다.
+    pageNumber = 0;
+    pageInfo(true);
+    if (delayed) debounce = setTimeout(() => { if (root.isConnected) void loadRows(); }, 300);
+    else void loadRows();
+  }
+
 
   function showStatus(text, kind) {
     notify(text, kind);
@@ -140,7 +160,7 @@ export async function renderRecords(root, options) {
       options.afterPaint?.([]);
       return;
     }
-    const filtered = filterRows(rows, {
+    const filtered = options.paginated ? { rows: [...rows] } : filterRows(rows, {
       query: root.querySelector("[data-search]").value,
       fields: options.searchFields,
       levelMode: options.levelMode,
@@ -153,17 +173,17 @@ export async function renderRecords(root, options) {
       list.innerHTML = `<p class="empty">${filtered.error}</p>`;
       return;
     }
-    if (options.match) filtered.rows = filtered.rows.filter((row) => options.match(row, root));
+    if (options.match && !options.paginated) filtered.rows = filtered.rows.filter((row) => options.match(row, root));
     if (!filtered.rows.length) {
       list.innerHTML = `<p class="empty">${options.emptyFilterText || "검색 결과가 없습니다. 검색어나 레벨 범위를 바꿔 보세요."}</p>`;
       options.afterPaint?.([]);
       return;
     }
-    if (options.sortRows) filtered.rows = options.sortRows(filtered.rows, root);
+    if (options.sortRows && !options.paginated) filtered.rows = options.sortRows(filtered.rows, root);
     if (options.renderList) {
       // renderList: 카드 목록 대신 화면이 목록 전체를 그린다. afterPaint 로 상세 칸 같은 곁 요소를 맞춘다.
       list.innerHTML = options.renderList(filtered.rows, rows);
-      options.afterPaint?.(filtered.rows);
+      options.afterPaint?.(filtered.rows, { total, page: pageNumber });
       return;
     }
     if (options.sheet) {
@@ -218,19 +238,27 @@ export async function renderRecords(root, options) {
   }
 
   async function loadRows() {
+    if (!root.isConnected) return;
     const current = ++loadId;
+    const bounds = options.paginated ? options.readBounds?.(root) : undefined;
+    if (bounds?.error) { total = 0; pageInfo(); options.afterPaint?.([], { total: 0 }); list.innerHTML = `<p class="empty">${escapeHtml(bounds.error)}</p>`; return; }
+    pageInfo(true);
     list.innerHTML = `<p class="empty">불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
-    const { data, error } = options.load
-      ? await options.load(supabase)
+    const { data, error, total: resultTotal } = options.load
+      ? await options.load(supabase, { root, page: pageNumber, bounds })
       : await supabase.from(options.table).select(options.columns).order(options.order, { ascending: options.ascending ?? false });
     if (current !== loadId || !list.isConnected) return;
     if (error) {
       rows = [];
+      total = 0; pageInfo();
+      options.afterPaint?.([], { total: 0 });
       list.innerHTML = `<p class="empty">${escapeHtml(options.errorMessage ? options.errorMessage(error) : translateDbError(error))}</p>`;
       return;
     }
     rows = data ?? [];
+    total = resultTotal ?? rows.length;
+    pageInfo();
     if (options.settle && !options.readOnly) {
       const settled = await options.settle(rows, supabase);
       if (current !== loadId || !list.isConnected) return;
@@ -247,17 +275,25 @@ export async function renderRecords(root, options) {
   }
 
   root.addEventListener("input", (event) => {
-    if (event.target.closest(".filters input, .filters select")) paintList();
+    if (event.target.closest(".filters input, .filters select")) refreshSearch(true);
   });
 
   root.addEventListener("click", async (event) => {
+    const nextPage = event.target.closest("[data-page-prev], [data-page-next]");
+    if (nextPage && options.paginated) {
+      clearTimeout(debounce);
+      pageNumber += nextPage.hasAttribute("data-page-next") ? 1 : -1;
+      pageNumber = Math.max(0, pageNumber);
+      await loadRows();
+      return;
+    }
     if (event.target.closest("[data-reset-search]")) {
       for (const input of root.querySelectorAll(".filters input, .filters select")) input.value = "";
       for (const button of root.querySelectorAll(".filters [data-element-toggle]")) {
         button.setAttribute("aria-pressed", "false");
         button.classList.remove("is-on");
       }
-      paintList();
+      refreshSearch();
       return;
     }
     const elementToggle = event.target.closest("[data-element-toggle]");
@@ -265,7 +301,7 @@ export async function renderRecords(root, options) {
       const on = elementToggle.getAttribute("aria-pressed") !== "true";
       elementToggle.setAttribute("aria-pressed", on ? "true" : "false");
       elementToggle.classList.toggle("is-on", on);
-      paintList();
+      refreshSearch();
       return;
     }
     if (options.readOnly) return;
@@ -328,6 +364,6 @@ export async function renderRecords(root, options) {
     await loadRows();
   });
 
-  if (options.bind) options.bind({ root, reload: loadRows, showStatus, repaint: paintList, rows: () => rows, fillForm });
+  if (options.bind) options.bind({ root, reload: loadRows, showStatus, repaint: refreshSearch, rows: () => rows, fillForm });
   await loadRows();
 }

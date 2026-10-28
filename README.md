@@ -275,3 +275,5 @@ Secret key 는 Secret 에도 넣지 않습니다.
 043~045 실행 후 수집 데이터 자동 등록은 `python3 -B tools/import_collector_db.py`로 실행합니다. 최초 `brew install libpq` 필요. [접속 정보 입력·재개 안내](docs/collector-import.md#권장-터미널에서-한-번에-자동-등록-2026-10-28)를 참고하세요.
 
 - `sql/046_catalog_cleanup.sql`: 수동220행 비공개 보관 후 수집 원본으로 통일, 접미사 제거·외부ID 갱신·드랍 문자열 컬럼/빈 구 monsters 폐기. **새 몬스터 화면을 배포한 뒤 SQL Editor에서 실행**합니다. 전체 수집 데이터는 이미 운영 등록돼 재등록 불필요. 현재 기준은 [수집/정리 안내](docs/collector-import.md) 머리말과046 절입니다.
+
+- `sql/047_catalog_search_history.sql`: 목록24개 서버검색·아이템 상세·공개 변경 이력·비공개 변경 원문 보관. SQL Editor에서 먼저 실행한 뒤 새 화면을 배포합니다. [도감 운영/백업/변경 반영 안내](docs/catalog-operations.md), [누락 목록](docs/catalog-missing.md).

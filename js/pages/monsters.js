@@ -1,5 +1,6 @@
 import { formatExpPerHp, sortMonsterRows } from "../monster-view.js";
-import { loadMonsterCatalog } from "../monster-catalog.js";
+import { catalogRpc, monsterDrops, clearCatalogCache } from "../catalog-api.js";
+import { catalogImage, mountCatalogImageFallback } from "../catalog-image.js";
 import { sfx } from "../effects.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { matchesText, parseBound } from "../filters.js";
@@ -112,18 +113,22 @@ function hpCell(value) {
 }
 
 export function render(root) {
+  mountCatalogImageFallback(root);
   let myLevel = null;
   let sortMode = "level";
   let selectedId = "";
   let allRows = [];
   let accLevel = "";
   let accMine = readAccuracy();
+  let detailLoadId = 0;
+  const dropsCache = new Map();
 
 
   // 오른쪽 상세: 공용 그림·수치·속성·명중 계산·드랍템(읽기 전용).
   function paintDetail() {
     const box = root.querySelector("[data-mo-detail]");
     if (!box) return;
+    const request = ++detailLoadId;
     const row = allRows.find((item) => item.id === selectedId);
     if (!row) {
       box.innerHTML = `<p class="mo-muted">${allRows.length ? "몬스터를 고르면 자세히 보여 줘요." : "공용 도감이 준비되면 명중과 드랍템을 볼 수 있어요."}</p>`;
@@ -131,9 +136,9 @@ export function render(root) {
     }
     const ratio = hpPerExp(row.hp, row.exp);
     const tags = elementTags(row);
-    const drops = row.drops ?? [];
+
     box.innerHTML = `
-      <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${row.image_url?.startsWith("https://") ? `<img class="catalog-monster-image" src="${escapeHtml(row.image_url)}" alt="" loading="lazy" />` : `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
+      <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${row.image_url?.startsWith("https://") ? catalogImage(row.image_url, "catalog-monster-image", 96) : `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
       <div class="mo-d-title"><strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
       <div class="mo-d-stats">
         <div><span>HP</span><strong>${num(row.hp)}</strong></div>
@@ -151,12 +156,24 @@ export function render(root) {
         <div class="mo-acc-out" data-acc-out></div>
         <p class="mo-muted">기본 필요 명중 ${num(row.required_accuracy)} · 레벨이 낮으면 1레벨마다 ${num(row.accuracy_per_level)}씩 더 필요해요.</p>
       </div>
-      <div class="mo-drops">
-        <span class="mo-d-label">드랍 아이템 <small>${drops.length}개 항목</small></span>
-        ${drops.length ? `<div class="mo-drop-grid">${drops.map((drop, index) => `<span class="mo-drop" style="--i:${Math.min(index, 12)}"><i aria-hidden="true">${escapeHtml(initial(drop.item?.name))}</i><span>${escapeHtml(drop.item?.name ?? "아이템 정보 없음")}</span><small>${drop.rate_percent == null ? "확률 미상" : `${escapeHtml(drop.rate_percent)}%`}</small></span>`).join("")}</div>` : `<p class="mo-muted">등록된 드랍 정보가 없어요.</p>`}
-      </div>
+      <div class="mo-drops" data-monster-drops><p class="mo-muted">드랍 정보를 불러오는 중입니다.</p></div>
+      <a class="catalog-history-link" href="#/catalog-updates?entity=${encodeURIComponent(row.id)}">이 몬스터 변경 이력</a>
+
 `;
     paintAccuracy();
+    const cached = dropsCache.get(row.id);
+    const pending = cached && Date.now() - cached.time < 30_000 ? Promise.resolve(cached.result) : monsterDrops(row.id);
+    void pending.then(result => {
+      if (request !== detailLoadId || !root.isConnected || selectedId !== row.id) return;
+      const slot = box.querySelector("[data-monster-drops]");
+      if (result.error) { slot.innerHTML = `<p class="mo-muted">${escapeHtml(catalogError(result.error))}</p>`; return; }
+      dropsCache.set(row.id, { time: Date.now(), result });
+      while (dropsCache.size > 24) dropsCache.delete(dropsCache.keys().next().value);
+      const drops = result.data ?? [];
+      slot.innerHTML = `<span class="mo-d-label">드랍 아이템 <small>${drops.length}개 항목</small></span>${drops.length ? `<div class="mo-drop-grid">${drops.map((drop, index) => `<a class="mo-drop" href="#/item-catalog?id=${encodeURIComponent(drop.item_id)}" style="--i:${Math.min(index,12)}">${catalogImage(drop.item?.image_url, "catalog-drop-image", 36) || `<i aria-hidden="true">${escapeHtml(initial(drop.item?.name))}</i>`}<span>${escapeHtml(drop.item?.name ?? "아이템 정보 없음")}</span><small>${drop.rate_percent == null ? "확률 미상" : `${escapeHtml(drop.rate_percent)}%`}</small></a>`).join("")}</div>` : `<p class="mo-muted">등록된 드랍 정보가 없어요.</p>`}`;
+    }).catch(() => {
+      if (request === detailLoadId && root.isConnected) box.querySelector("[data-monster-drops]").textContent = "드랍 조회에 실패했습니다. 몬스터를 다시 선택해주세요.";
+    });
   }
 
   function paintAccuracy() {
@@ -190,7 +207,17 @@ export function render(root) {
     addLabel: "몬스터 추가",
     table: "catalog_monsters",
     readOnly: true,
-    load: (supabase) => loadMonsterCatalog(supabase),
+    paginated: true,
+    load: async (supabase, context) => {
+      const response = await catalogRpc("catalog_search_monsters", {
+        p_query: context.root.querySelector("[data-search]").value.trim(),
+        p_drop: context.root.querySelector("[data-drop-search]").value.trim(),
+        p_min: context.bounds?.min ?? null, p_max: context.bounds?.max ?? null,
+        p_weak: selectedElements(context.root, "weak"), p_resist: selectedElements(context.root, "resist"),
+        p_sort: sortMode, p_page: context.page,
+      }, supabase);
+      return { data: response.data?.rows, total: response.data?.total, error: response.error };
+    },
     errorMessage: catalogError,
     columns,
     order: "level",
@@ -212,7 +239,7 @@ export function render(root) {
       <div class="mo-page">
         <header class="ym-page-head mo-head">
           <div><h1>몬스터 도감</h1><p>레벨·약점으로 찾고, 1 EXP당 HP로 사냥 효율을 비교해요.</p></div>
-          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span></div>
+          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><a class="catalog-history-link" href="#/catalog-updates">최근 변경 이력</a><button type="button" class="mo-ghost" data-catalog-reload>새로 확인</button></div>
         </header>
         <div class="mo-layout">
           <div class="mo-main">
@@ -284,8 +311,8 @@ export function render(root) {
           const accuracy = neededAccuracy(row, myLevel);
           const el = firstElement(row);
           return `<button type="button" class="mo-card${row.id === selectedId ? " is-on" : ""}" data-pick-monster="${row.id}" aria-pressed="${row.id === selectedId}" style="--i:${Math.min(index, 16)}">
-            <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${row.image_url?.startsWith("https://") ? `<img class="catalog-monster-image" src="${escapeHtml(row.image_url)}" alt="" loading="lazy" />` : `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중">명중 ${num(accuracy)}</span>` : ""}</span>
-            <span class="mo-name"><strong>${escapeHtml(row.name)}</strong>${row.drop_search ? `<span title="${escapeHtml(row.drop_search)}">${escapeHtml(row.drop_search)}</span>` : ""}</span>
+            <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${row.image_url?.startsWith("https://") ? catalogImage(row.image_url, "catalog-monster-image", 96) : `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중">명중 ${num(accuracy)}</span>` : ""}</span>
+            <span class="mo-name"><strong>${escapeHtml(row.name)}</strong></span>
             <span class="mo-stats"><span><small>HP</small><strong>${num(row.hp)}</strong></span><span><small>EXP</small><strong>${num(row.exp)}</strong></span></span>
             <span class="mo-eff">
               <span class="mo-eff-top"><span>1 EXP당 HP</span>${hpCell(ratio)}</span>
@@ -298,9 +325,9 @@ export function render(root) {
         .join("");
       return `<div class="mo-grid">${cards}</div>`;
     },
-    afterPaint(rows) {
+    afterPaint(rows, context = {}) {
       const count = root.querySelector("[data-mo-count]");
-      if (count) count.textContent = rows.length ? `${rows.length}마리${sortMode === "eff" ? " · 1 EXP당 HP가 낮을수록 사냥 효율이 좋아요" : ""}` : "";
+      if (count) count.textContent = rows.length ? `전체 ${context.total ?? rows.length}마리 · 현재 ${rows.length}마리${sortMode === "eff" ? " · 1 EXP당 HP가 낮을수록 사냥 효율이 좋아요" : ""}` : "";
       if (!rows.some((row) => row.id === selectedId)) selectedId = rows[0]?.id || "";
       paintDetail();
     },
@@ -320,6 +347,7 @@ export function render(root) {
       });
 
       page.addEventListener("click", (event) => {
+        if (event.target.closest("[data-catalog-reload]")) { clearCatalogCache(); dropsCache.clear(); repaint(); return; }
         const sortButton = event.target.closest("[data-sort-mode]");
         if (sortButton) {
           sortMode = sortButton.dataset.sortMode;
