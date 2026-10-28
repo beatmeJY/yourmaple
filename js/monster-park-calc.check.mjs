@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { levelExpSeed } from "./level-exp-seed.js";
-import { ZONES, addDays, daysLeft, expFromPercent, gainRun, percentOf, simulate, zoneOf } from "./monster-park-calc.js";
+import { ZONES, addDays, parkRun, savedZoneExp, daysLeft, expFromPercent, gainRun, percentOf, simulate, zoneOf } from "./monster-park-calc.js";
 
 const curve = new Map(levelExpSeed.map(([level, exp]) => [level, BigInt(exp)]));
 const MID = 2_898_000n;
@@ -87,3 +87,24 @@ assert.equal(expFromPercent("100", 10000n), 9999n);
 assert.equal(expFromPercent("", 10000n), 0n);
 
 console.log("monster-park-calc ok");
+
+// 숙제표 한 판: 구역 경험치를 더하고, 몬파 끝 레벨·모르는 구역이면 반영하지 않는다.
+const zones = { low: 418_840n, mid: MID, high: 6_289_333n };
+const one = parkRun({ level: 101, exp: 0n, curve, zoneExp: zones });
+assert.equal(one.gain, 6_289_333n);
+assert.equal(one.level, 101);
+assert.equal(one.exp, 6_289_333n);
+const two = parkRun({ level: one.level, exp: one.exp, curve, zoneExp: zones });
+assert.deepEqual([two.level, two.exp], [102, 1_795_269n]);
+assert.equal(parkRun({ level: 130, exp: 0n, curve, zoneExp: zones }), null);
+assert.equal(parkRun({ level: 120, exp: 0n, curve, zoneExp: zones, parkMax: 120 }), null);
+assert.equal(parkRun({ level: 49, exp: 0n, curve, zoneExp: zones }), null);
+assert.equal(parkRun({ level: 60, exp: 0n, curve, zoneExp: { ...zones, low: null } }), null);
+// 배틀메이지: 몬파는 130에서 끝나지만 129 → 130 뒤 경험치는 만렙 200 기준으로 남는다.
+assert.equal(parkRun({ level: 129, exp: curve.get(129) - 1n, curve, zoneExp: zones, parkMax: 130, maxLevel: 200 }).level, 130);
+// 이 기기에 고친 구역 경험치를 읽고, 깨진 값은 기본값으로.
+const fakeStorage = (value) => ({ getItem: () => value });
+assert.equal(savedZoneExp(fakeStorage(JSON.stringify({ zoneExp: { low: "500000" } }))).low, 500_000n);
+assert.equal(savedZoneExp(fakeStorage("{oops")).mid, MID);
+assert.equal(savedZoneExp(fakeStorage(JSON.stringify({ zoneExp: { high: "abc" } }))).high, 6_289_333n);
+console.log("숙제표 몬파 한 판 경험치 검증 통과");

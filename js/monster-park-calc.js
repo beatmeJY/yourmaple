@@ -103,3 +103,34 @@ export function expFromPercent(text, need) {
   const exp = (need * basis) / 10000n;
   return exp >= need ? need - 1n : exp;
 }
+
+/**
+ * 숙제표에서 몬파 한 판을 체크했을 때 캐릭터에 더할 결과(2026-10-28 사용자 요청: 1회 체크 = 한 판, 2회 = 한 판 더).
+ * parkMax(몬파 끝 레벨, 시그너스 120·그 밖 130) 이상이거나 몬파 레벨이 아니거나 구역 경험치를 모르면 null.
+ * 경험치는 직업 만렙(maxLevel) 기준으로 더한다(배틀메이지는 130에서도 경험치가 남는다).
+ */
+export function parkRun({ level, exp, curve, zoneExp, parkMax = MONSTER_PARK.maxLevel, maxLevel = parkMax }) {
+  if (level >= parkMax) return null;
+  const zone = zoneOf(level);
+  const gain = zone ? zoneExp[zone.id] : null;
+  if (gain == null) return null;
+  return { ...gainRun(level, exp, gain, curve, maxLevel), gain };
+}
+
+/** 몬파 화면에서 사용자가 고친 구역 경험치(이 기기 localStorage)까지 반영한 구역별 한 판 경험치 */
+export const PARK_STORE_KEY = "maple-note-monster-park";
+export function savedZoneExp(storage = globalThis.localStorage) {
+  let saved = {};
+  try {
+    saved = JSON.parse(storage?.getItem(PARK_STORE_KEY) || "{}")?.zoneExp ?? {};
+  } catch {
+    saved = {};
+  }
+  return Object.fromEntries(ZONES.map((zone) => {
+    try {
+      return [zone.id, saved[zone.id] ? BigInt(saved[zone.id]) : zone.exp];
+    } catch {
+      return [zone.id, zone.exp];
+    }
+  }));
+}

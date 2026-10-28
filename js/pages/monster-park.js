@@ -5,7 +5,7 @@ import { homeworkState } from "../homework-calc.js";
 import { asBig } from "../hunt-calc.js";
 import { CYGNUS_MAX_LEVEL, findJob, isCygnusJob, jobStyle, maxLevelOf } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
-import { MONSTER_PARK, ZONES, addDays, daysLeft, expFromPercent, gainRun, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
+import { MONSTER_PARK, PARK_STORE_KEY, ZONES, addDays, daysLeft, expFromPercent, gainRun, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
 import { translateDbError } from "../db-error.js";
 import { loadMainCharacter, mainCharacterId, paintProfileButton } from "../profile.js";
 import { isLoggedIn } from "../session.js";
@@ -19,7 +19,7 @@ import { notify } from "../toast.js";
 // 고른 캐릭터의 "오늘 남은 입장"은 숙제표 몬스터파크 1회·2회 체크(homework_checks)와 같은 값이다. 표가 없으면 이 기기에만 기억.
 // 이 기기에만 기억: 구역 경험치(모르는 구역을 사용자가 적은 값), 오늘 남은 입장(날짜가 바뀌면 2회로).
 
-const STORE_KEY = "maple-note-monster-park";
+const STORE_KEY = PARK_STORE_KEY;
 const PARK_KEYS = ["monster-park", "monster-park-2"]; // 숙제표 1회·2회 칸(homework-calc.js RAIDS)
 const curve = new Map(levelExpSeed.map(([level, exp]) => [level, asBig(exp)]));
 const PERCENT_CHIPS = ["0", "25", "50", "75", "99.99"];

@@ -15318,3 +15318,7 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .dj-track-cell.is-tip { transform: none; }
 }
 @media (hover: none) { .dj-track { touch-action: pan-y; } }
+
+/* 숙제표 몬스터파크: 체크하면 경험치가 반영된다는 작은 안내 (2026-10-28) */
+.hw-card-title .hw-card-note { display: inline-flex; align-items: center; gap: 4px; width: fit-content; max-width: 100%; margin-top: 1px; padding: 1px 8px; border-radius: 999px; background: rgba(159, 240, 196, 0.1); color: #9ff0c4; font-size: 11px; font-weight: 700; }
+.hw-card-title .hw-card-note::before { content: "EXP"; font-size: 9.5px; font-weight: 900; letter-spacing: 0.04em; opacity: 0.8; }

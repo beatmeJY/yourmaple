@@ -4,7 +4,11 @@ import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, celebrate, enterBoss, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
 import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, homeworkJobBlocked, homeworkLevelAllowed, RAIDS, RESET_KINDS, availableDay, periodMs, availableLabel, availableTime, clockRemain, dojoProgress, homeworkState, nextMidnight, resetDojoTotal, shortRemain } from "../homework-calc.js";
-import { jobRecord } from "../job-label.js";
+import { asBig } from "../hunt-calc.js";
+import { jobRecord, maxLevelOf } from "../job-label.js";
+import { levelExpSeed } from "../level-exp-seed.js";
+import { MONSTER_PARK, parkRun, percentOf, savedZoneExp } from "../monster-park-calc.js";
+import { loadMainCharacter, paintProfileButton } from "../profile.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
@@ -24,7 +28,9 @@ const BOSS_BURST = {
   rift: ["#7ecbff", "#3aa0ff", "#67e8f9", "#ffffff"],
   pianus: ["#ff5a5a", "#e10600", "#fecaca", "#ffffff"],
 };
-const BASE_COLUMNS = "id, name, level, job, account_id, accounts(name), jobs(name, color, color_dark), pianus_enabled, pianus_at, papulatus_enabled, papulatus_at, rift_enabled, rift_at";
+const PARK_KEYS = ["monster-park", "monster-park-2"]; // 몬스터파크 1회·2회 칸(RAIDS)
+const PARK_CURVE = new Map(levelExpSeed.map(([level, exp]) => [level, asBig(exp)]));
+const BASE_COLUMNS = "id, name, level, exp, job, account_id, accounts(name), jobs(name, color, color_dark), pianus_enabled, pianus_at, papulatus_enabled, papulatus_at, rift_enabled, rift_at";
 const TABS = [
   { id: "all", label: "전체" },
   { id: "daily", label: "매일 00시" },
@@ -170,6 +176,7 @@ export async function render(root) {
   const celebrated = new Set();
   // 방금 바꾼 기록을 되돌릴 때 쓸 예전 값: `${characterId}:${taskKey}` → { previous, generation }
   const undoSlots = new Map();
+  const parkUndo = new Map(); // 몬파 체크로 더한 경험치 되돌리기: "캐릭터:칸" → { before, after }
   let undoEpoch = 0;
 
   // ── 데이터 ────────────────────────────────────────────────
@@ -197,6 +204,7 @@ export async function render(root) {
         minLevel: raid.minLevel, maxLevel: raid.maxLevel, belowMaxLevel: raid.belowMaxLevel, blocksJob: raid.blocksJob,
         img: BOSS_ART[raid.key],
         sub: raid.sub ?? `${raid.type ?? "보스"} · 입장 후 ${RESET_KINDS[raid.kind].short}${raid.modes.length > 1 ? " · 노말·카오스 따로" : ""}`,
+        note: raid.key === "monster-park" ? "체크하면 한 판 경험치가 캐릭터에 바로 반영돼요" : "",
         needsTable: true,
         modes: raid.modes,
       })),
@@ -446,7 +454,7 @@ export async function render(root) {
     return `<section class="hw-card${full ? " is-full" : ""}" data-task-card="${escapeHtml(task.key)}" style="--i:${Math.min(index, 8)};--deg:${ratio * 360}deg">
       <header class="hw-card-head">
         <span class="hw-card-icon">${icon}</span>
-        <span class="hw-card-title"><strong>${escapeHtml(task.name)} 숙제표</strong><small>${escapeHtml(task.sub)}</small></span>
+        <span class="hw-card-title"><strong>${escapeHtml(task.name)} 숙제표</strong><small>${escapeHtml(task.sub)}</small>${task.note ? `<small class="hw-card-note">${escapeHtml(task.note)}</small>` : ""}</span>
         ${task.key === "dojo" ? `<a class="hw-mini hw-link" href="#/dojo?log">자세한 기록</a>` : ""}
         ${sortUnit && !isManaging && people.length > 1
           ? `<span class="hw-sortby" role="group" aria-label="${escapeHtml(task.name)} 정렬 기준"><small>정렬</small>${task.modes
@@ -685,7 +693,7 @@ export async function render(root) {
   }
 
   /** 끝낸 시각을 value(ISO 또는 null)로 바꾼다. 실패하면 되돌린다. */
-  async function commit(task, character, value, { undoable = true, target = null } = {}) {
+  async function commit(task, character, value, { undoable = true, target = null, parkExp = false } = {}) {
     if (value != null && !homeworkLevelAllowed(task, character.level, character.job)) { notify("입장 가능한 레벨이 아닙니다."); return; }
     if (value != null && homeworkJobBlocked(task, character.job)) { notify("이 직업은 참여할 수 없습니다."); return; }
     const key = `${character.id}:${task.key}`;
@@ -716,7 +724,12 @@ export async function render(root) {
       paintCards();
       paintClocks();
       notify(translateDbError(error), "error");
-      return;
+      return false;
+    }
+    // 몬스터파크: 직접 체크하면 한 판 경험치를 더하고, 기록을 지우면 이 화면에서 더한 경험치를 되돌린다.
+    if (PARK_KEYS.includes(task.key)) {
+      if (value != null && parkExp) await addParkRun(character, task.key);
+      else if (value == null) await revertParkRun(character, task.key);
     }
     // 실제 클릭으로 입장한 보스만, DB 저장 성공 후 연출한다. 시각 수정·취소에는 띄우지 않는다.
     if (entering) {
@@ -727,6 +740,55 @@ export async function render(root) {
       else if (bossKey === "rift") enterBoss(task.name, character.name, BOSS_ART.rift, bossKey, { verb: "조각을 받았습니다", label: "REWARD", sound: null, duration: 1800 });
       else enterBoss(task.name, character.name, BOSS_ART[bossKey], bossKey);
     } else if (doneNow) cheerIfComplete(character);
+    return true;
+  }
+
+  // ── 몬스터파크 경험치(2026-10-28 사용자 요청: 1회 체크 = 한 판, 2회 체크 = 한 판 더) ──
+
+  function parkLevelText(level, exp, job) {
+    if (level >= maxLevelOf(job)) return `Lv.${level}`;
+    return `Lv.${level} ${percentOf(exp, PARK_CURVE.get(level))}%`;
+  }
+
+  async function saveLevel(character, level, exp) {
+    const supabase = await getSupabase();
+    const { error } = await supabase.from("characters").update({ level, exp: exp.toString() }).eq("id", character.id);
+    if (!root.isConnected) return false;
+    if (error) {
+      notify(`경험치를 반영하지 못했어요. ${translateDbError(error)}`, "error");
+      return false;
+    }
+    character.level = level;
+    character.exp = exp.toString();
+    loadMainCharacter(true).then(paintProfileButton);
+    paintCards();
+    return true;
+  }
+
+  async function addParkRun(character, key) {
+    const level = Number(character.level);
+    const exp = asBig(character.exp);
+    const maxLevel = maxLevelOf(character.job);
+    const run = parkRun({ level, exp, curve: PARK_CURVE, zoneExp: savedZoneExp(), parkMax: Math.min(maxLevel, MONSTER_PARK.maxLevel), maxLevel });
+    if (!run) return;
+    if (!(await saveLevel(character, run.level, run.exp))) return;
+    parkUndo.set(`${character.id}:${key}`, { before: { level, exp }, after: { level: run.level, exp: run.exp } });
+    notify(`${character.name} 몬파 경험치 +${formatCount(run.gain)} → ${parkLevelText(run.level, run.exp, character.job)}`, "success");
+    if (run.wasted > 0n) notify(`1레벨 제한으로 경험치 ${formatCount(run.wasted)}이 버려졌어요`, "info");
+  }
+
+  // 이 화면에서 더한 경험치만, 그 뒤로 레벨·경험치가 안 바뀌었을 때 되돌린다.
+  async function revertParkRun(character, key) {
+    const slot = parkUndo.get(`${character.id}:${key}`);
+    if (!slot) return;
+    parkUndo.delete(`${character.id}:${key}`);
+    if (Number(character.level) !== slot.after.level || asBig(character.exp) !== slot.after.exp) {
+      notify(`${character.name}의 레벨·경험치가 그 뒤로 바뀌어 몬파 경험치는 되돌리지 않았어요.`, "info");
+      return;
+    }
+    if (await saveLevel(character, slot.before.level, slot.before.exp)) {
+      notify(`${character.name} 몬파 경험치를 되돌렸어요 → ${parkLevelText(slot.before.level, slot.before.exp, character.job)}`, "info");
+    }
   }
 
   async function undo(taskKey, characterId) {
@@ -743,7 +805,12 @@ export async function render(root) {
     const now = Date.now();
     const state = stateOf(task, character, now);
     if (!state.done) {
-      await commit(task, character, new Date(now).toISOString(), { target: button });
+      // 몬파 2회를 1회보다 먼저 누르면 두 판 다 한 것으로 보고 1회도 체크한다(경험치도 두 판).
+      const first = task.key === PARK_KEYS[1] ? findUnit(PARK_KEYS[0]) : null;
+      if (first && !stateOf(first, character, now).done) {
+        if (!(await commit(first, character, new Date(now).toISOString(), { target: button, parkExp: true }))) return;
+      }
+      await commit(task, character, new Date(now).toISOString(), { target: button, parkExp: true });
       return;
     }
     const key = `${character.id}:${task.key}`;
