@@ -31,11 +31,40 @@ export function changeCards(rows) {
   rows = rows.filter(r => r.operation !== "UPDATE" || fields(r.changes).length);
   return rows.length ? rows.map(r=>`<article class="catalog-change ym-glass"><div class="catalog-change-head"><strong>${escapeHtml(r.entity_name)}</strong><span class="ym-chip">${({INSERT:"추가",UPDATE:"수정",DELETE:"삭제"})[r.operation] ?? "변경"}</span><time>${escapeHtml(new Date(r.changed_at).toLocaleString("ko-KR"))}</time></div>${r.release_label ? `<p class="hint">${escapeHtml(r.release_label)}</p>` : ""}<dl>${fields(r.changes).map(([k,v])=>`<div><dt>${escapeHtml(labels[k] ?? k)}</dt><dd><del>${escapeHtml(value(v.before,k))}</del><span aria-hidden="true"> → </span><strong>${escapeHtml(value(v.after,k))}</strong></dd></div>`).join("")}</dl></article>`).join("") : `<p class="empty">이력 기록을 시작한 뒤 변경된 정보가 아직 없습니다.</p>`;
 }
-export async function mountEntityHistory(slot, id) {
-  slot.innerHTML = `<p class="hint">최근 변경을 확인하고 있어요.</p>`;
-  const client = await getSupabase();
-  const result = await client.from("catalog_changes").select("id,entity_name,operation,changes,release_label,changed_at")
-    .eq("entity_id", id).order("id", {ascending:false}).limit(5);
-  if (!slot.isConnected) return;
-  slot.innerHTML = result.error ? `<p class="hint">변경 이력을 불러오지 못했습니다.</p>` : changeCards(result.data ?? []);
+export async function mountEntityHistory(slot, id, entityType) {
+  if (!["item", "monster"].includes(entityType)) throw new Error("도감 이력 종류를 지정해주세요.");
+  let page = 0, loadId = 0;
+  slot.innerHTML = `<div data-history-list aria-live="polite"></div><nav class="catalog-pager" data-history-nav aria-label="이 개체의 변경 이력 페이지"><button type="button" data-history-prev>이전</button><span data-history-page></span><button type="button" data-history-next>다음</button></nav>`;
+  async function load() {
+    const request = ++loadId;
+    const list = slot.querySelector("[data-history-list]");
+    list.innerHTML = `<p class="hint">변경 이력을 확인하고 있어요.</p>`;
+    slot.querySelectorAll("button").forEach(button => button.disabled = true);
+    try {
+      const client = await getSupabase();
+      if (!slot.isConnected || request !== loadId) return;
+      // 선택한 종류와 UUID에 해당하는 이력만 읽습니다. 다음 페이지 확인용 한 행을 더 조회합니다.
+      const result = await client.from("catalog_changes").select("id,entity_name,operation,changes,release_label,changed_at")
+        .eq("entity_type", entityType).eq("entity_id", id).order("id", {ascending:false}).range(page * 5, page * 5 + 5);
+      if (!slot.isConnected || request !== loadId) return;
+      if (result.error) throw result.error;
+      const rows = result.data ?? [];
+      list.innerHTML = changeCards(rows.slice(0, 5));
+      slot.querySelector("[data-history-nav]").hidden = page === 0 && rows.length === 0;
+      slot.querySelector("[data-history-page]").textContent = `${page + 1} 페이지`;
+      slot.querySelector("[data-history-prev]").disabled = page === 0;
+      slot.querySelector("[data-history-next]").disabled = rows.length <= 5;
+    } catch {
+      if (!slot.isConnected || request !== loadId) return;
+      slot.querySelector("[data-history-nav]").hidden = true;
+      list.innerHTML = `<p class="hint">변경 이력을 불러오지 못했습니다.</p><button type="button" class="mo-ghost" data-history-retry>다시 확인</button>`;
+    }
+  }
+  slot.addEventListener("click", event => {
+    if (event.target.closest("[data-history-prev]")) page = Math.max(0, page - 1);
+    else if (event.target.closest("[data-history-next]")) page++;
+    else if (!event.target.closest("[data-history-retry]")) return;
+    void load();
+  });
+  await load();
 }

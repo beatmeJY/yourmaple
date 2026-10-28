@@ -6,6 +6,7 @@ import { escapeHtml, formatCount } from "../format.js";
 import { matchesText, parseBound } from "../filters.js";
 import { elements, hpPerExp, readElementTokens } from "../monster-merge.js";
 import { catalogError } from "../catalog.js";
+import { mountEntityHistory } from "../catalog-history.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
 
@@ -157,10 +158,11 @@ export function render(root) {
         <p class="mo-muted">기본 필요 명중 ${num(row.required_accuracy)} · 레벨이 낮으면 1레벨마다 ${num(row.accuracy_per_level)}씩 더 필요해요.</p>
       </div>
       <div class="mo-drops" data-monster-drops><p class="mo-muted">드랍 정보를 불러오는 중입니다.</p></div>
-      <a class="catalog-history-link" href="#/catalog-updates?entity=${encodeURIComponent(row.id)}">이 몬스터 변경 이력</a>
+      <section class="mo-history" aria-label="몬스터 변경 이력"><h3>변경 이력</h3><div data-monster-history></div></section>
 
 `;
     paintAccuracy();
+    void mountEntityHistory(box.querySelector("[data-monster-history]"), row.id, "monster");
     const cached = dropsCache.get(row.id);
     const pending = cached && Date.now() - cached.time < 30_000 ? Promise.resolve(cached.result) : monsterDrops(row.id);
     void pending.then(result => {
@@ -240,7 +242,7 @@ export function render(root) {
       <div class="mo-page">
         <header class="ym-page-head mo-head">
           <div><h1>몬스터 도감</h1><p>레벨·약점으로 찾고, 1 EXP당 HP로 사냥 효율을 비교해요.</p></div>
-          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><a class="catalog-history-link" href="#/catalog-updates">최근 변경 이력</a><button type="button" class="mo-ghost" data-catalog-reload>새로 확인</button></div>
+          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><button type="button" class="mo-ghost" data-catalog-reload>새로 확인</button></div>
         </header>
         <div class="mo-layout">
           <div class="mo-main">

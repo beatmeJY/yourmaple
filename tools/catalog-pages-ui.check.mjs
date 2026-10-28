@@ -6,7 +6,8 @@ const monsterId=n=>`d0000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const items=Array.from({length:60},(_,n)=>({id:n===0?itemId:`e0000000-0000-4000-8000-${String(n+1).padStart(12,'0')}`,name:n===0?'청갑충':`아이템${n+1}`,category:'장비',required_level:n+1,image_url:n===0?'https://image.invalid/1.gif':null,description:'상세 설명',shop_sell_price:'100000',source_url:'https://example.com/item',source_id:String(n+1)}));
 const monsters=Array.from({length:60},(_,n)=>({id:monsterId(n+1),name:`몬스터${n+1}`,level:n+1,hp:(n+1)*100,exp:(n+1)*10,required_accuracy:1,accuracy_per_level:0.1}));
 monsters[0].name='혼테일';monsters[0].source_id='8810018';
-const db={catalog_items:items,catalog_monsters:monsters,catalog_monster_drops:[0,1].map(n=>({id:'drop'+n,monster_id:monsterId(1),item_id:itemId,source_entry:n,rate_percent:n?'0.002':'0.008'})),catalog_item_stats:[{item_id:itemId,stat_key:'attack',base_value:34,minimum_value:30,maximum_value:38}],catalog_item_requirements:[{item_id:itemId,requirement_key:'dex',required_value:100}],catalog_item_jobs:[{item_id:itemId,job_name:'도적'}],catalog_item_source_attributes:[],catalog_changes:[{id:1,entity_id:itemId,entity_name:'청갑충',operation:'UPDATE',changes:{attack:{before:33,after:34}},changed_at:'2026-10-28T10:00:00Z'}]};
+const db={catalog_items:items,catalog_monsters:monsters,catalog_monster_drops:[0,1].map(n=>({id:'drop'+n,monster_id:monsterId(1),item_id:itemId,source_entry:n,rate_percent:n?'0.002':'0.008'})),catalog_item_stats:[{item_id:itemId,stat_key:'attack',base_value:34,minimum_value:30,maximum_value:38}],catalog_item_requirements:[{item_id:itemId,requirement_key:'dex',required_value:100}],catalog_item_jobs:[{item_id:itemId,job_name:'도적'}],catalog_item_source_attributes:[],catalog_changes:[{id:1,entity_type:'item',entity_id:itemId,entity_name:'청갑충',operation:'UPDATE',changes:{attack:{before:33,after:34}},changed_at:'2026-10-28T10:00:00Z'}]};
+db.catalog_changes.push(...Array.from({length:7},(_,n)=>({id:10+n,entity_type:'monster',entity_id:monsterId(1),entity_name:'혼테일',operation:'UPDATE',changes:{hp:{before:100+n,after:101+n}},changed_at:'2026-10-28T10:00:00Z'})),{id:20,entity_type:'monster',entity_id:monsterId(2),entity_name:'몬스터2',operation:'UPDATE',changes:{exp:{before:20,after:21}},changed_at:'2026-10-28T11:00:00Z'},{id:21,entity_type:'item',entity_id:monsterId(1),entity_name:'다른종류이력',operation:'UPDATE',changes:{name:{before:'이전',after:'이후'}},changed_at:'2026-10-28T12:00:00Z'});
 const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
 try{for(const width of [1280,375]){
  const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -15,14 +16,41 @@ try{for(const width of [1280,375]){
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.goto('http://127.0.0.1:5513/?mock=guest#/monsters');await page.waitForSelector('.mo-card');
  assert.equal(await page.locator('.mo-card').count(),24);
+ await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
+ assert(!(await page.locator('[data-monster-history]').innerText()).includes('다른종류이력'));
+ assert.equal(await page.locator('a[href*="#/catalog-updates"]').count(),0);
+ await page.locator('[data-monster-history] [data-history-next]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===2);
+ await page.locator('[data-monster-history] [data-history-prev]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
+ await page.locator('.mo-card').nth(1).click();await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
+ assert.equal(await page.locator('[data-monster-history] .catalog-change').count(),1);
+ await page.locator('.mo-card').first().click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
+ await page.locator('[data-monster-history]').screenshot({path:`/private/tmp/monster-history-inline-${width}.png`});
+ await page.evaluate(async()=>{
+  const client=await(await import('/js/supabase-client.js')).getSupabase(),original=client.from.bind(client);
+  window.restoreHistoryFrom=()=>{client.from=original;};
+  let slow=true,fail=true;
+  client.from=table=>{const query=original(table);if(table!=='catalog_changes')return query;
+   let entity;const eq=query.eq.bind(query),range=query.range.bind(query);
+   query.eq=(key,value)=>{if(key==='entity_id')entity=value;return eq(key,value);};
+   query.range=(...args)=>{if(entity.endsWith('000000000001')&&slow){slow=false;return new Promise(resolve=>setTimeout(async()=>resolve(await range(...args)),1200));}if(entity.endsWith('000000000001')&&fail){fail=false;return Promise.resolve({data:null,error:{message:'이력 조회 실패'}});}return range(...args);};return query;};
+ });
+ await page.locator('.mo-card').nth(1).click();await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
+ await page.locator('.mo-card').first().click();await page.waitForTimeout(100);
+ await page.locator('.mo-card').nth(1).click();await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
+ await page.waitForTimeout(1300);assert.match(await page.locator('[data-monster-history]').innerText(),/몬스터2/);assert(!(await page.locator('[data-monster-history]').innerText()).includes('혼테일'));
+ await page.locator('.mo-card').first().click();await page.waitForSelector('[data-monster-history] [data-history-retry]');await page.locator('[data-monster-history] [data-history-retry]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
+ await page.evaluate(()=>window.restoreHistoryFrom());
+
+
  await page.waitForFunction(()=>[...document.querySelectorAll('img[src="img/horntail.png"]')].some(i=>i.complete&&i.naturalWidth>0));
  assert((await page.locator('.mo-card img[src="img/horntail.png"]').count())>0);
  await page.screenshot({path:`/private/tmp/catalog-boss-fallback-${width}.png`,fullPage:true});
  await page.waitForSelector('.mo-drop-grid .mo-drop');assert.equal(await page.locator('.mo-drop-grid .mo-drop').count(),2);
  assert.deepEqual(await page.locator('.mo-drop-grid small').allTextContents(),['0.008%','0.002%']);
  assert.equal(await page.evaluate(()=>window.catalogCalls.filter(c=>c.name==='catalog_search_monsters').length),1);
- const reads=await page.evaluate(()=>window.catalogReads);assert(!reads.some(r=>r.table==='catalog_monsters'));assert(reads.filter(r=>r.table==='catalog_monster_drops').every(r=>r.filters>0));
+ const reads=await page.evaluate(()=>window.catalogReads);assert(reads.filter(r=>r.table==='catalog_changes').every(r=>r.filters===2&&r.limit===6));assert(!reads.some(r=>r.table==='catalog_monsters'));assert(reads.filter(r=>r.table==='catalog_monster_drops').every(r=>r.filters>0));
  await page.locator('[data-page-next]').click();await page.waitForFunction(()=>document.querySelector('.mo-card .mo-name strong')?.textContent==='몬스터25');
+ await page.waitForFunction(()=>document.querySelector('[data-monster-history]')?.textContent.includes('변경된 정보가 아직 없습니다'));assert.equal(await page.locator('[data-monster-history] [data-history-nav]').isVisible(),false);
  await page.locator('[data-search]').fill('몬스터59');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===1);assert.match(await page.locator('.mo-card').innerText(),/몬스터59/);
  await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-grid a');
  await page.evaluate(async()=>{
@@ -39,7 +67,7 @@ try{for(const width of [1280,375]){
  await page.locator('[data-search]').fill('오류검색');await page.waitForFunction(()=>document.querySelector('[data-list]').textContent.includes('SQL047'));
  await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-grid a');
  await page.locator('.mo-drop-grid a').first().click();await page.waitForSelector('.catalog-stat');await page.waitForSelector('.catalog-image-fallback');
- assert.match(await page.locator('[data-item-detail]').innerText(),/청갑충/);assert.match(await page.locator('.catalog-stat').innerText(),/30 ~ 38/);assert.match(await page.locator('.catalog-item-hero').innerText(),/DEX 100.*도적/s);
+ assert.match(await page.locator('[data-item-detail]').innerText(),/청갑충/);assert.match(await page.locator('.catalog-stat').innerText(),/30 ~ 38/);assert.match(await page.locator('.catalog-item-hero').innerText(),/DEX\s+100.*도적/s);assert.equal(await page.locator('.equipment-job.is-allowed').count(),1);assert.equal(await page.locator('.equipment-stat').first().evaluate(el=>getComputedStyle(el).flexDirection),'row');assert.equal(await page.locator('.equipment-requirements > div').count(),6);
  await page.waitForSelector('.catalog-change');assert.match(await page.locator('.catalog-change').innerText(),/33.*34/s);
  await page.waitForSelector('.catalog-dropper');assert.equal(await page.locator('.catalog-dropper').count(),2);
  assert.deepEqual(await page.locator('.catalog-dropper > strong').allTextContents(),['0.008%','0.002%']);
@@ -57,11 +85,12 @@ try{for(const width of [1280,375]){
 
  await page.goto('http://127.0.0.1:5513/?mock=guest#/item-catalog');await page.waitForSelector('.catalog-item');assert.equal(await page.locator('.catalog-item').count(),24);await page.locator('[data-next]').click();await page.waitForFunction(()=>document.querySelector('.catalog-pager [data-page]').textContent.startsWith('2 /'),null,{timeout:5000}).catch(async e=>{console.log(await page.locator('#main').innerText());console.log(await page.evaluate(()=>window.catalogCalls));throw e;});assert.equal(await page.locator('.catalog-item').count(),24);
  await page.locator('[data-catalog-search]').fill('아이템60');await page.waitForFunction(()=>document.querySelectorAll('.catalog-item').length===1);assert.match(await page.locator('.catalog-item').innerText(),/아이템60/);
- await page.goto('http://127.0.0.1:5513/?mock=guest#/catalog-updates');await page.waitForSelector('.catalog-change');assert.match(await page.locator('.catalog-change').innerText(),/청갑충/);
- await page.screenshot({path:`/private/tmp/catalog-history-${width}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ assert.equal(await page.locator('a[href*="#/catalog-updates"]').count(),0);
+ await page.goto('http://127.0.0.1:5513/?mock=guest#/catalog-updates');await page.waitForSelector('#main[data-page=dashboard]');
+ assert.equal(await page.evaluate(async()=>{const {routes}=await import('/js/routes.js');return routes.some(r=>r.id==='catalog-updates');}),false);
  const special='"><img src=x onerror=alert(1)>';
  await page.goto(`http://127.0.0.1:5513/?mock=guest#/monsters?q=${encodeURIComponent(special)}`);
  await page.waitForFunction(()=>document.querySelector('[data-list]')?.textContent.includes('검색 결과가 없습니다'));
  assert.equal(await page.locator('[data-search]').inputValue(),special);assert.equal(await page.locator('img[src="x"]').count(),0);
- assert.deepEqual(errors,[]);console.log(`${width}px: 목록24개·페이지/전체검색·선택드랍만조회·아이템범위/조건/이력·공개변경·넘침/오류없음 통과`);await page.close();
+ assert.deepEqual(errors,[]);console.log(`${width}px: 목록24개·페이지/전체검색·선택드랍만조회·아이템범위/조건/이력·몬스터별이력/페이지·별도페이지제거·넘침/오류없음 통과`);await page.close();
 }}finally{await browser.close();}

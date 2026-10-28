@@ -12,7 +12,6 @@ const pages = {
   enhance: () => import("./pages/enhance.js"),
   monsters: () => import("./pages/monsters.js"),
   "item-catalog": () => import("./pages/item-catalog.js"),
-  "catalog-updates": () => import("./pages/catalog-updates.js"),
   trades: () => import("./pages/trades.js"),
   quests: () => import("./pages/quests.js"),
   notes: () => import("./pages/notes.js"),

@@ -14554,7 +14554,7 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .catalog-item h2 { font-size: 18px; margin: 10px 0; }
 .catalog-item p { overflow-wrap: anywhere; color: var(--muted); }
 .catalog-item-art { flex: none; width: 52px; height: 52px; display: grid; place-items: center; color: var(--gold); font-size: 24px; }
-.catalog-item-art img, .catalog-monster-image { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.catalog-item-art img, .catalog-monster-image { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: pixelated; }
 .mo-stage .catalog-monster-image { max-height: 140px; }
 .trade-item-options { grid-column: 1 / -1; padding: 14px; border: 1px solid var(--line); border-radius: 16px; }
 .trade-item-options summary { cursor: pointer; color: var(--gold); font-weight: 700; }
@@ -15370,3 +15370,52 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .catalog-dropper small { color:var(--muted); font-size:12px; }
 .catalog-dropper > strong { margin-left:auto; flex:none; color:var(--gold); font-size:14px; }
 @media(prefers-reduced-motion:reduce) { .catalog-dropper { animation:none; transition:none; } }
+
+/* 별도 화면 대신 선택한 몬스터 상세에서 이력을 읽습니다. */
+.mo-history { margin-top:24px; padding-top:20px; border-top:1px solid var(--line); }
+.mo-history h3 { margin:0 0 12px; font-size:16px; }
+.mo-history .catalog-change { padding:14px; }
+.mo-history .catalog-change dl > div { grid-template-columns:1fr; gap:4px; }
+.mo-history .catalog-change-head time { margin-left:0; width:100%; }
+.mo-history .catalog-pager { gap:8px; font-size:12px; }
+.mo-history .catalog-pager button { padding:8px 12px; }
+
+.catalog-pager[hidden] { display:none; }
+
+/* 장비 도감: 착용 조건과 기본 옵션을 한 장에서 읽습니다. */
+.equipment-card.catalog-item-hero { display: block; max-width: 760px; margin: 20px auto; padding: 32px; }
+.equipment-card > header { text-align: center; }
+.equipment-card h1 { margin: 14px 0 28px; font-size: clamp(24px, 4vw, 34px); overflow-wrap: anywhere; }
+.equipment-overview { display: grid; grid-template-columns: 160px 1fr; gap: 32px; align-items: center; max-width: 480px; margin: auto; }
+.equipment-art.catalog-detail-art { width: 150px; height: 150px; background: radial-gradient(ellipse, var(--glass), transparent 70%); }
+.equipment-art img { width: auto; height: auto; max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+.equipment-requirements { margin: 0; display: grid; gap: 8px; }
+.equipment-requirements > div { display: flex; justify-content: space-between; gap: 16px; }
+.equipment-requirements dt { color: var(--muted); }
+.equipment-requirements dd { margin: 0; font-weight: 700; }
+.equipment-jobs { display: flex; gap: 8px; margin: 28px 0 22px; }
+.equipment-job { flex: 1; padding: 9px 4px; text-align: center; border-radius: 12px; background: var(--glass); color: var(--muted); font-size: 14px; }
+.equipment-job.is-allowed { color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent); }
+.equipment-type { padding: 20px 0; border-top: 1px solid var(--line); text-align: center; color: var(--muted); }
+.equipment-stats { display: grid; gap: 10px; }
+.equipment-stat.catalog-stat { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-radius: 14px; background: var(--glass); }
+.equipment-stat dt { color: var(--muted); }
+.equipment-stat dd { margin: 0; text-align: right; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.equipment-stat strong { font-size: 18px; color: var(--text); }
+.equipment-stat small { color: var(--muted); align-self: center; }
+.equipment-card > footer { border-top: 1px dashed var(--line); padding-top: 22px; margin-top: 24px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.equipment-card > footer strong { color: var(--gold); }
+.equipment-description { line-height: 1.7; color: var(--muted); }
+@media (max-width: 600px) {
+ .equipment-card.catalog-item-hero { padding: 20px 16px; }
+ .equipment-overview { grid-template-columns: 90px 1fr; gap: 16px; }
+ .equipment-art.catalog-detail-art { width: 90px; height: 110px; }
+ .equipment-requirements { font-size: 14px; }
+ .equipment-jobs { gap: 5px; }
+ .equipment-job { font-size: 12px; }
+ .equipment-stat.catalog-stat { padding: 12px; font-size: 14px; }
+ .equipment-stat strong { font-size: 16px; }
+}
+
+.equipment-card { animation: ym-fade-up .3s ease both; }
+@media (prefers-reduced-motion: reduce) { .equipment-card { animation: none; } }
