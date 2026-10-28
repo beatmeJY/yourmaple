@@ -11,3 +11,7 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# 외부 수집 캐시·전체 데이터·생성 SQL(로컬 실행 산출물)
+data/local/
+__pycache__/

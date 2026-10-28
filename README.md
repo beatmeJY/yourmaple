@@ -105,6 +105,10 @@ Supabase SQL Editor에서 아래 순서대로 파일 전체를 붙여 넣고 Run
 
 공용 몬스터·아이템 도감과 거래 옵션을 사용하려면 **`sql/038_shared_game_catalog.sql`을 운영자가 SQL Editor에서 전체 실행한 다음 앱을 배포**합니다. `catalog_monsters`·`catalog_items`는 모두 조회하고 운영자만 수정합니다. 기존 몬스터 원본은 보존·읽기 전용으로 두고, 이름별 수치 충돌은 비공개 `catalog_monster_reviews`에 남깁니다. 기존 거래는 기본값으로 유지하며 실제 옵션은 별도로 저장합니다. 상세 절차·검증·복구는 [공용 도감 운영 안내](docs/shared-catalog.md)를 따릅니다.
 
+수집처 아이템·몬스터·드랍 확률 일괄 등록은 `sql/043_catalog_import.sql`과 생성된 데이터 SQL을 사용합니다. 전체 수집·재개·등록 순서는 [수집처 수집 안내](docs/collector-import.md)를 따릅니다. 기존 개인 기록은 삭제하지 않습니다.
+
+이미 513개 아이템을 등록했다면 `sql/044_normalize_catalog_items.sql`을 SQL Editor에서 전체 실행합니다. 기존 아이템의 분류·레벨·성별·공격속도·판매가와 옵션/범위·착용조건·직업을 분리하며 UUID와 거래 참조는 유지합니다. 실행 중인 수집기는 그대로 두고 완료 후 수집 안내의 `--export-only` 명령으로 새 등록 SQL을 생성합니다.
+
 개인 표는 본인 행만, 공용 도감은 `anon`·`authenticated` SELECT만 허용되고 모든 표의 RLS가 켜져 있어야 합니다.
 
 ## 운영자 몬스터 엑셀 등록
@@ -261,3 +265,13 @@ Secret key 는 Secret 에도 넣지 않습니다.
 ## 거래의 마지막 저장 취소
 
 `sql/037_trade_undo.sql`을 Supabase SQL Editor에서 실행하세요(재실행 가능). 매수·매도·통합·목록 직접 수정 저장을 한 트랜잭션으로 처리하며, 같은 화면에서 마지막 성공 저장 1건을 취소할 수 있습니다. 합산 전 수량·평균가·등록/수정 시각도 복원합니다. 이후 다른 곳에서 수정된 거래는 덮어쓰지 않습니다. 새로고침·페이지 이동 시 취소 기록은 사라지고, 명시적인 삭제는 취소 대상이 아닙니다.
+
+## 아이템 외부 자료 시험 수집
+
+운영 DB를 건드리지 않는 아이템 시험 수집기(드랍 기반10개 또는 ID순 최대100개)와 검토용 JSON은 [아이템 시험 수집 안내](data/imports/SAMPLE-ITEMS.md)를 참고합니다. 이미지 URL만 수집하며, 메이플랜드 자료 검증과 DB 등록은 별도 단계입니다.
+
+- `sql/045_clear_legacy_monster_drops.sql`: 기존 수동 드랍 문자열 폐기(복구 원문 비공개 보관), 몬스터·아이템·거래·새 수집 드랍 유지. SQL Editor에서 전체 실행합니다.
+
+043~045 실행 후 수집 데이터 자동 등록은 `python3 -B tools/import_collector_db.py`로 실행합니다. 최초 `brew install libpq` 필요. [접속 정보 입력·재개 안내](docs/collector-import.md#권장-터미널에서-한-번에-자동-등록-2026-10-28)를 참고하세요.
+
+- `sql/046_catalog_cleanup.sql`: 수동220행 비공개 보관 후 수집 원본으로 통일, 접미사 제거·외부ID 갱신·드랍 문자열 컬럼/빈 구 monsters 폐기. **새 몬스터 화면을 배포한 뒤 SQL Editor에서 실행**합니다. 전체 수집 데이터는 이미 운영 등록돼 재등록 불필요. 현재 기준은 [수집/정리 안내](docs/collector-import.md) 머리말과046 절입니다.

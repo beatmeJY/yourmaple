@@ -1,16 +1,15 @@
 import { formatExpPerHp, sortMonsterRows } from "../monster-view.js";
-import { splitMonsterDrops } from "../monster-drops.js";
-import { mountMonsterImport } from "../monster-import.js";
+import { loadMonsterCatalog } from "../monster-catalog.js";
 import { sfx } from "../effects.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { matchesText, parseBound } from "../filters.js";
 import { elements, hpPerExp, readElementTokens } from "../monster-merge.js";
-import { catalogError, loadCatalog } from "../catalog.js";
+import { catalogError } from "../catalog.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
 
 const columns =
-  "id, name, level, hp, exp, required_accuracy, hp_per_exp, drop_items, accuracy_per_level, weak_elements, resist_elements, updated_at, image_url";
+  "id, name, level, hp, exp, required_accuracy, hp_per_exp, accuracy_per_level, weak_elements, resist_elements, updated_at, image_url";
 
 function elementOptions() {
   return elements.map((name) => ({ value: name, label: name, tone: name }));
@@ -132,7 +131,7 @@ export function render(root) {
     }
     const ratio = hpPerExp(row.hp, row.exp);
     const tags = elementTags(row);
-    const drops = splitMonsterDrops(row.drop_items);
+    const drops = row.drops ?? [];
     box.innerHTML = `
       <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${row.image_url?.startsWith("https://") ? `<img class="catalog-monster-image" src="${escapeHtml(row.image_url)}" alt="" loading="lazy" />` : `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
       <div class="mo-d-title"><strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
@@ -153,8 +152,8 @@ export function render(root) {
         <p class="mo-muted">기본 필요 명중 ${num(row.required_accuracy)} · 레벨이 낮으면 1레벨마다 ${num(row.accuracy_per_level)}씩 더 필요해요.</p>
       </div>
       <div class="mo-drops">
-        <span class="mo-d-label">드랍 아이템 <small>${drops.length}종</small></span>
-        ${drops.length ? `<div class="mo-drop-grid">${drops.map((name, index) => `<span class="mo-drop" style="--i:${index}"><i aria-hidden="true">${escapeHtml(initial(name))}</i>${escapeHtml(name)}</span>`).join("")}</div>` : `<p class="mo-muted">적어 둔 드랍템이 없어요.</p>`}
+        <span class="mo-d-label">드랍 아이템 <small>${drops.length}개 항목</small></span>
+        ${drops.length ? `<div class="mo-drop-grid">${drops.map((drop, index) => `<span class="mo-drop" style="--i:${Math.min(index, 12)}"><i aria-hidden="true">${escapeHtml(initial(drop.item?.name))}</i><span>${escapeHtml(drop.item?.name ?? "아이템 정보 없음")}</span><small>${drop.rate_percent == null ? "확률 미상" : `${escapeHtml(drop.rate_percent)}%`}</small></span>`).join("")}</div>` : `<p class="mo-muted">등록된 드랍 정보가 없어요.</p>`}
       </div>
 `;
     paintAccuracy();
@@ -191,7 +190,7 @@ export function render(root) {
     addLabel: "몬스터 추가",
     table: "catalog_monsters",
     readOnly: true,
-    load: (supabase) => loadCatalog("catalog_monsters", columns, supabase),
+    load: (supabase) => loadMonsterCatalog(supabase),
     errorMessage: catalogError,
     columns,
     order: "level",
@@ -213,7 +212,7 @@ export function render(root) {
       <div class="mo-page">
         <header class="ym-page-head mo-head">
           <div><h1>몬스터 도감</h1><p>레벨·약점으로 찾고, 1 EXP당 HP로 사냥 효율을 비교해요.</p></div>
-          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><div data-monster-import></div></div>
+          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span></div>
         </header>
         <div class="mo-layout">
           <div class="mo-main">
@@ -236,7 +235,7 @@ export function render(root) {
       </div>`,
     emptyFilterText: "검색 결과가 없습니다. 이름, 드랍템, 약점, 반감, 레벨을 바꿔 보세요.",
     match(row, page) {
-      if (!matchesText(row, page.querySelector("[data-drop-search]").value, ["drop_items"])) return false;
+      if (!matchesText(row, page.querySelector("[data-drop-search]").value, ["drop_search"])) return false;
       const weakNames = new Set(readElementTokens(row.weak_elements).names);
       const resistNames = new Set(readElementTokens(row.resist_elements).names);
       if (!selectedElements(page, "weak").every((name) => weakNames.has(name))) return false;
@@ -286,7 +285,7 @@ export function render(root) {
           const el = firstElement(row);
           return `<button type="button" class="mo-card${row.id === selectedId ? " is-on" : ""}" data-pick-monster="${row.id}" aria-pressed="${row.id === selectedId}" style="--i:${Math.min(index, 16)}">
             <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${row.image_url?.startsWith("https://") ? `<img class="catalog-monster-image" src="${escapeHtml(row.image_url)}" alt="" loading="lazy" />` : `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중">명중 ${num(accuracy)}</span>` : ""}</span>
-            <span class="mo-name"><strong>${escapeHtml(row.name)}</strong>${row.drop_items ? `<span title="${escapeHtml(splitMonsterDrops(row.drop_items).join(" · "))}">${escapeHtml(splitMonsterDrops(row.drop_items).join(" · "))}</span>` : ""}</span>
+            <span class="mo-name"><strong>${escapeHtml(row.name)}</strong>${row.drop_search ? `<span title="${escapeHtml(row.drop_search)}">${escapeHtml(row.drop_search)}</span>` : ""}</span>
             <span class="mo-stats"><span><small>HP</small><strong>${num(row.hp)}</strong></span><span><small>EXP</small><strong>${num(row.exp)}</strong></span></span>
             <span class="mo-eff">
               <span class="mo-eff-top"><span>1 EXP당 HP</span>${hpCell(ratio)}</span>
@@ -308,7 +307,6 @@ export function render(root) {
     extraHtml: `<p class="hint" data-level-range hidden></p>`,
     fields: [],
     bind({ root: page, reload, showStatus, repaint }) {
-      void mountMonsterImport(page, reload, () => allRows).catch(() => { /* 권한 조회 실패 시 등록 UI를 열지 않습니다. */ });
       // 처음 내 레벨은 대표 캐릭터 레벨(명중 계산 칸). 필터의 "내 레벨"을 적으면 그 값을 따른다.
       loadMainCharacter().then((state) => {
         if (accLevel) return;
