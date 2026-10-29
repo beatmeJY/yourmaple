@@ -50,7 +50,7 @@ function tierLabel(tierId) {
 }
 
 // 메이커의 세 기능은 운영 주소에서도 공개한다.
-const TABS = [
+const MAKER_PAGES = [
   { id: "gem", label: "보석 제작", icon: "◆", description: "제련 원가와 거래 손익" },
   { id: "craft", label: "리버스 제작", icon: "⚒", description: "재료비와 옵션 기대값" },
   { id: "enchant", label: "장비 옵션 부여", icon: "✦", description: "보석 옵션 계산" },
@@ -593,14 +593,16 @@ function explainHtml(item, stageId, prices, extra) {
   `;
 }
 
-export async function render(root) {
+export async function render(root, mode = "gem") {
+  const page = MAKER_PAGES.find((item) => item.id === mode) ?? MAKER_PAGES[0];
+  const routeId = page.id === "gem" ? "maker" : `maker-${page.id}`;
   root.innerHTML = `
     <div class="maker-page">
       <header class="page-header maker-page-header">
         <div class="maker-title-block">
           <p class="trade-kicker">메이커</p>
           <div class="trade-hero-row">
-            <h1>메이커 계산</h1>
+            <h1>${escapeHtml(page.label)}</h1>
           </div>
         </div>
         <section class="maker-price-board" aria-label="보석 시세 보관함">
@@ -612,16 +614,13 @@ export async function render(root) {
           </button>
         </section>
       </header>
-      <div class="trade-segments maker-tabs" data-maker-tabs role="tablist" aria-label="메이커 기능" style="--tabs:${TABS.length}">
-        ${TABS.map((tab, index) => `<button type="button" class="maker-tab-button ${index === 0 ? "is-on" : ""}" data-tab="${tab.id}" role="tab" aria-selected="${index === 0}" aria-controls="maker-panel-${tab.id}"><span class="maker-tab-icon" aria-hidden="true">${tab.icon}</span><span class="maker-tab-copy"><strong>${escapeHtml(tab.label)}</strong><small>${escapeHtml(tab.description)}</small></span><i aria-hidden="true"></i></button>`).join("")}
-      </div>
-      <section id="maker-panel-gem" class="trade-board maker-tab-panel" data-tab-panel="gem" role="tabpanel">
+      <section id="maker-panel-gem" class="trade-board maker-tab-panel" data-tab-panel="gem" aria-label="보석 제작"${page.id !== "gem" ? " hidden" : ""}>
         <div class="mk-gem" data-craft-body></div>
       </section>
-      <section id="maker-panel-craft" class="trade-board maker-tab-panel" data-tab-panel="craft" role="tabpanel" hidden>
+      <section id="maker-panel-craft" class="trade-board maker-tab-panel" data-tab-panel="craft" aria-label="리버스 제작"${page.id !== "craft" ? " hidden" : ""}>
         ${reverseCalculatorHtml()}
       </section>
-      <section id="maker-panel-enchant" class="trade-board maker-tab-panel" data-tab-panel="enchant" role="tabpanel" hidden>
+      <section id="maker-panel-enchant" class="trade-board maker-tab-panel" data-tab-panel="enchant" aria-label="장비 옵션 부여"${page.id !== "enchant" ? " hidden" : ""}>
         ${enchantCalculatorHtml()}
       </section>
       <div class="maker-quick-price-layer" data-quick-price-layer hidden>
@@ -640,7 +639,6 @@ export async function render(root) {
     </div>
   `;
 
-  const tabBar = root.querySelector("[data-maker-tabs]");
   const priceBody = root.querySelector("[data-price-body]");
   const craftBody = root.querySelector("[data-craft-body]");
   const historyDialog = root.querySelector("[data-price-history-dialog]");
@@ -1329,20 +1327,6 @@ export async function render(root) {
     await loadPrices();
   }
 
-  tabBar.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-tab]");
-    if (!button) return;
-    const id = button.dataset.tab;
-    for (const b of tabBar.querySelectorAll("[data-tab]")) {
-      const on = b.dataset.tab === id;
-      b.classList.toggle("is-on", on);
-      b.setAttribute("aria-selected", String(on));
-    }
-    for (const panel of root.querySelectorAll("[data-tab-panel]")) {
-      panel.hidden = panel.dataset.tabPanel !== id;
-    }
-  });
-
   root.addEventListener("click", (event) => {
     const priceToggle = event.target.closest("[data-toggle-price-board]");
     if (priceToggle) {
@@ -1641,7 +1625,7 @@ export async function render(root) {
   updateReverseCalculator();
   await loadPrices();
   // 로그인하러 가기 전에 적던 시세가 있으면 되살린다: 다른 칸은 그대로, 시세는 그 시세 창을 열어 채워 둔다(저장은 사용자가 누른다).
-  const draft = takeDraft("maker");
+  const draft = takeDraft(routeId);
   if (draft && root.isConnected) {
     restoreFields(root, draft.fields);
     const [itemId, tierId] = String(draft.key || "").split(":");

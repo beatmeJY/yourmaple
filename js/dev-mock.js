@@ -4,6 +4,7 @@
 // supabase-js 중 이 앱이 쓰는 만큼만 흉내 낸다: from().select/insert/update/upsert/delete + eq/neq/in/gte/lte/is/order/limit/single/maybeSingle,
 // 조인은 select 의 accounts(...)·jobs(...) 처럼 "표이름(칸)"을 그 표의 단수형_id 로 붙인다. rpc·storage·auth 도 최소한만.
 
+import { nameMatchRank, normalizeSearch } from "./search-match.js";
 const DB_KEY = "ym-mock-db";
 const AUTH_KEY = "ym-mock-auth"; // "in" | "out"
 const USER = {
@@ -374,9 +375,11 @@ const storage = {
 const strip = ({ user_id: _userId, ...row }) => row;
 const RPCS = {
   catalog_search_items({p_query="",p_page=0}={}) {
+    // sql/054 와 같은 규칙: 이름 그대로 → 글자 순서만 맞음 → 분류·외부 ID, 같은 순위는 짧은 이름 먼저
     const q=p_query.toLowerCase();
-    const filtered=rowsOf("catalog_items").filter(r=>[r.name,r.category,r.middle_category,r.source_id].some(v=>String(v??"").toLowerCase().includes(q)))
-      .sort((a,b)=>(a.required_level??Infinity)-(b.required_level??Infinity)||String(a.id).localeCompare(String(b.id)));
+    const rank=r=>{const n=nameMatchRank(r.name,p_query);return n??([r.category,r.middle_category].some(v=>String(v??"").toLowerCase().includes(q))||r.source_id===p_query?2:null)};
+    const filtered=rowsOf("catalog_items").filter(r=>!normalizeSearch(p_query)||rank(r)!=null)
+      .sort((a,b)=>(normalizeSearch(p_query)?(rank(a)-rank(b))||(a.name.length-b.name.length):0)||(a.required_level??Infinity)-(b.required_level??Infinity)||String(a.id).localeCompare(String(b.id)));
     return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
   },
   catalog_search_monsters({p_query="",p_drop="",p_min=null,p_max=null,p_weak=[],p_resist=[],p_sort="level",p_page=0}={}) {
