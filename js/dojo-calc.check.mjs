@@ -48,3 +48,17 @@ assert.equal(BANDS.reduce((sum, band) => sum + bandBosses(band.start, band.end).
 assert.equal(Object.keys(FLOOR_BOSSES).length, 27);
 assert.equal(bandBosses(16, 20).find((boss) => boss.floor === 21).note, "스킬잠금 · 실명 · 키반대");
 console.log("무릉 층별 보스 검증 통과");
+
+// 쉼터 시간(2026-10-29 사용자 규칙): 저장 10초, 저장 없이 지나가면 2초, 구간 초에는 안 들어감
+{
+  const { compareSaves } = await import("./dojo-calc.js");
+  const times = new Map([[1, 60], [6, 80], [11, 110], [16, 150], [21, 200], [26, 120]]);
+  const route = (saves) => compareSaves(times, false).rows.find((row) => row.saves.join() === saves.join()).best;
+  // 저장 안 함: 720초 + 쉼터 5곳 지나감 2초×5
+  assert.equal(route([]).seconds, 720 + 10);
+  // 12층(10라운드 뒤) 저장: 1회차 720 + 2회차 11~27라운드 580, 쉼터 지나감 1회차 4곳 + 2회차 3곳 = 7×2, 저장 1×10
+  assert.equal(route([10]).seconds, 720 + 580 + 7 * 2 + 10);
+  // 6층·12층 저장: 회차 3개(1·6·11라운드부터), 쉼터 5+4+3=12번 중 저장 2번
+  assert.equal(route([5, 10]).seconds, 720 + 660 + 580 + 10 * 2 + 10 * 2);
+  console.log("무릉 쉼터 시간 검증 통과");
+}

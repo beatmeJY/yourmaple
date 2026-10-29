@@ -1,7 +1,10 @@
 export const MAX_FLOOR = 27;
 export const DAILY_CAP = 3500;
 export const SAVE_FLOORS = [5, 10, 15, 20, 25];
-export const SAVE_SECONDS = 5;
+// 참고 시간에 더하는 쉼터 시간(사용자 제공, 2026-10-29). 구간 초에는 들어가 있지 않다.
+// 쉼터에서 저장하면 1번에 SAVE_SECONDS, 저장하지 않고 지나가면 1번에 PASS_SECONDS.
+export const SAVE_SECONDS = 10;
+export const PASS_SECONDS = 2;
 
 export const BELTS = [
   { id: "white", name: "흰색 허리띠", score: 140 },
@@ -102,6 +105,12 @@ function saveChains() {
   return chains;
 }
 
+// 회차마다 지나가는 쉼터(5·10·15·20·25라운드 뒤) 수. 그중 저장한 곳은 저장 시간, 나머지는 지나가는 시간.
+function restSeconds(runs, saveCount) {
+  const passes = runs.reduce((sum, run) => sum + SAVE_FLOORS.filter((floor) => floor >= run.start && floor < run.end).length, 0);
+  return saveCount * SAVE_SECONDS + (passes - saveCount) * PASS_SECONDS;
+}
+
 function chainRoute(times, party, saves) {
   const full = spanToTop(times, 1, party);
   if (!full) return null;
@@ -122,7 +131,7 @@ function chainRoute(times, party, saves) {
     start: runs[1]?.start ?? 1,
     end: MAX_FLOOR,
     points: runs.reduce((sum, run) => sum + run.points, 0),
-    seconds: runs.reduce((sum, run) => sum + run.seconds, 0) + saves.length * SAVE_SECONDS,
+    seconds: runs.reduce((sum, run) => sum + run.seconds, 0) + restSeconds(runs, saves.length),
     runs,
   };
 }

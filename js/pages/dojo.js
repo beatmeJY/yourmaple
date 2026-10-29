@@ -9,6 +9,7 @@ import {
   GOAL_SCORE,
   SAVE_FLOORS,
   SAVE_SECONDS,
+  PASS_SECONDS,
   bandBosses,
   bandPoints,
   beltById,
@@ -255,7 +256,7 @@ export async function render(root) {
               <h2><i aria-hidden="true">◈</i>저장 루트 순위표<i aria-hidden="true">◈</i></h2>
               <span class="dj-scroll-sub" data-scroll-sub>저장 조합 중 분당 점수가 높은 순</span>
               <div class="dj-best-tabs-slot" data-best-tabs></div>
-              <p class="dj-scroll-note" data-ref-note hidden>추천 동선은 쉼터(쉬는 층)를 한 번 들를 때마다 ${SAVE_SECONDS}초가 자동으로 더해져요.</p>
+              <p class="dj-scroll-note" data-ref-note hidden>추천 동선은 쉼터(쉬는 층)에서 저장하면 ${SAVE_SECONDS}초, 그냥 지나가면 ${PASS_SECONDS}초가 자동으로 더해져요.</p>
               <div class="dojo-best is-empty" data-best></div>
               <div class="dj-route-list" data-route-list></div>
               <div class="dj-route-all" data-route-all></div>
