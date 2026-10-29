@@ -13,6 +13,7 @@ function value(v, field) {
   return String(v);
 }
 // 수집 경로는 화면에 보여주지 않습니다.
+Object.assign(labels, { mp:"MP",physical_attack:"물리 공격력",magic_attack:"마법 공격력",physical_defense:"물리 방어력",magic_defense:"마법 방어력",movement_speed:"이동속도",knockback_damage:"넉백 기준 피해량",meso_value:"메소",accuracy_reference_level:"명중 기준 레벨" });
 const hiddenFields = new Set(["source_url","source","source_hash","response_sha256"]);
 function fields(changes) {
   const result = [];
@@ -67,4 +68,31 @@ export async function mountEntityHistory(slot, id, entityType) {
     void load();
   });
   await load();
+}
+
+let historyDialogId = 0;
+export function mountHistoryDialog(button, id, entityType, name) {
+  button.setAttribute("aria-haspopup", "dialog");
+  let dialog;
+  button.addEventListener("click", () => {
+    if (dialog?.isConnected) return;
+    const titleId = `catalog-history-title-${++historyDialogId}`;
+    dialog = document.createElement("dialog");
+    dialog.className = "catalog-history-dialog";
+    dialog.setAttribute("aria-labelledby", titleId);
+    dialog.innerHTML = `<header class="catalog-history-dialog-head"><div><span class="ym-chip">변경 이력</span><h2 id="${titleId}">${escapeHtml(name)}</h2></div><button type="button" class="mo-ghost" data-history-close aria-label="변경 이력 닫기" autofocus>닫기 ×</button></header><p class="hint">이력 기록을 시작한 뒤 변경된 정보입니다.</p><div data-${entityType === "monster" ? "monster" : "item"}-history></div>`;
+    button.parentElement.append(dialog);
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (button.isConnected) button.focus({ preventScroll: true });
+    }, { once: true });
+    dialog.querySelector("[data-history-close]").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", event => {
+      if (event.target !== dialog) return;
+      const rect = dialog.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
+    });
+    dialog.showModal();
+    void mountEntityHistory(dialog.querySelector("[data-item-history], [data-monster-history]"), id, entityType);
+  });
 }

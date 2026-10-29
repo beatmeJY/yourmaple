@@ -1,3 +1,4 @@
+import { monsterCombatFacts, neededMonsterAccuracy } from "../monster-details.js";
 import { formatExpPerHp, sortMonsterRows } from "../monster-view.js";
 import { catalogRpc, monsterDrops, clearCatalogCache } from "../catalog-api.js";
 import { catalogImage, catalogMonsterImage, mountCatalogImageFallback } from "../catalog-image.js";
@@ -6,7 +7,7 @@ import { escapeHtml, formatCount } from "../format.js";
 import { matchesText, parseBound } from "../filters.js";
 import { elements, hpPerExp, readElementTokens } from "../monster-merge.js";
 import { catalogError } from "../catalog.js";
-import { mountEntityHistory } from "../catalog-history.js";
+import { mountHistoryDialog } from "../catalog-history.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
 
@@ -91,13 +92,7 @@ function rangeLabel(range) {
   return `${range.min}~${range.max}레벨`;
 }
 
-function neededAccuracy(row, myLevel) {
-  if (myLevel == null) return null;
-  if (row.required_accuracy == null && row.accuracy_per_level == null) return null;
-  const gap = Math.max(0, (row.level ?? myLevel) - myLevel);
-  const raw = Number(row.required_accuracy || 0) + gap * Number(row.accuracy_per_level || 0);
-  return Math.ceil(Math.round(raw * 1e6) / 1e6);
-}
+const neededAccuracy = neededMonsterAccuracy;
 
 function hpBand(value) {
   if (value == null || value === "") return null;
@@ -139,6 +134,7 @@ export function render(root) {
     const tags = elementTags(row);
 
     box.innerHTML = `
+      <div class="catalog-detail-actions"><button type="button" class="catalog-history-button" data-open-history>변경 이력</button></div>
       <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
       <div class="mo-d-title"><strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
       <div class="mo-d-stats">
@@ -147,6 +143,7 @@ export function render(root) {
         <div><span>1 EXP당 HP</span><strong>${hpCell(ratio)}</strong></div>
         <div><span>1 HP당 EXP</span><strong>${escapeHtml(formatExpPerHp(row.hp,row.exp))}</strong></div>
       </div>
+      <section class="mo-combat"><h3>전투 정보</h3><div data-monster-combat><p class="mo-muted">상세 수치를 불러오는 중입니다.</p></div></section>
       <div class="mo-d-tags">${tags || `<span class="mo-tag is-resist">속성 없음</span>`}</div>
       <div class="mo-accbox" data-accbox>
         <div class="mo-acc-head"><span>명중 계산</span><span class="mo-acc-badge" data-acc-badge></span></div>
@@ -155,14 +152,25 @@ export function render(root) {
           <label class="mo-well"><span>내 명중률</span><input data-acc-mine inputmode="decimal" value="${escapeHtml(accMine)}" placeholder="명중" /></label>
         </div>
         <div class="mo-acc-out" data-acc-out></div>
-        <p class="mo-muted">기본 필요 명중 ${num(row.required_accuracy)} · 레벨이 낮으면 1레벨마다 ${num(row.accuracy_per_level)}씩 더 필요해요.</p>
+        <p class="mo-muted" data-acc-note></p>
       </div>
       <div class="mo-drops" data-monster-drops><p class="mo-muted">드랍 정보를 불러오는 중입니다.</p></div>
-      <section class="mo-history" aria-label="몬스터 변경 이력"><h3>변경 이력</h3><div data-monster-history></div></section>
+
 
 `;
     paintAccuracy();
-    void mountEntityHistory(box.querySelector("[data-monster-history]"), row.id, "monster");
+    void catalogRpc("catalog_monster_detail", { p_id: row.id }).then(result => {
+      if (request !== detailLoadId || !root.isConnected || selectedId !== row.id) return;
+      const facts = box.querySelector("[data-monster-combat]");
+      if (result.error || !result.data?.monster) {
+        facts.textContent = result.error ? catalogError(result.error) : "상세 전투 정보가 없습니다.";
+        return;
+      }
+      Object.assign(row, result.data.monster);
+      facts.innerHTML = monsterCombatFacts(row);
+      paintAccuracy();
+    });
+    mountHistoryDialog(box.querySelector("[data-open-history]"), row.id, "monster", row.name);
     const cached = dropsCache.get(row.id);
     const pending = cached && Date.now() - cached.time < 30_000 ? Promise.resolve(cached.result) : monsterDrops(row.id);
     void pending.then(result => {
@@ -186,11 +194,13 @@ export function render(root) {
     const out = box.querySelector("[data-acc-out]");
     const level = parseBound(accLevel);
     const mine = Number(String(accMine).replaceAll(",", ""));
+    const note = box.querySelector("[data-acc-note]");
+    note.textContent = `기준 필요 명중 ${row.required_accuracy == null ? "미제공" : formatCount(row.required_accuracy)} · ${row.accuracy_per_level == null ? "낮은 레벨의 증가량은 미제공입니다." : `레벨이 낮으면 1레벨마다 ${formatCount(row.accuracy_per_level)}씩 더 필요합니다.`}`;
     const need = level.error || level.value == null ? null : neededAccuracy(row, level.value);
     if (need == null) {
       badge.textContent = "";
       badge.className = "mo-acc-badge";
-      out.innerHTML = `<span class="mo-muted">${row.required_accuracy == null ? "필요 명중률이 비어 있어요." : "내 레벨을 적으면 필요 명중을 계산해요."}</span>`;
+      out.innerHTML = `<span class="mo-muted">${row.required_accuracy == null ? "필요 명중 자료가 없습니다." : level.value == null ? "내 레벨을 적으면 필요 명중을 계산해요." : "현재 레벨의 필요 명중을 계산할 자료가 없습니다."}</span>`;
       return;
     }
     const hasMine = String(accMine).trim() !== "" && Number.isFinite(mine);

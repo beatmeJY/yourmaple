@@ -5,7 +5,7 @@ const cache = new Map();
 let revision = 0;
 export function clearCatalogCache() { cache.clear(); }
 export async function catalogRpc(name, args = {}, client = null, fresh = false) {
-  if (!["catalog_search_items", "catalog_search_monsters", "catalog_item_detail"].includes(name)) throw new Error("공용 도감 조회만 캐시할 수 있습니다.");
+  if (!["catalog_search_items", "catalog_search_monsters", "catalog_item_detail", "catalog_monster_detail"].includes(name)) throw new Error("공용 도감 조회만 캐시할 수 있습니다.");
   const key = JSON.stringify([name, args]);
   const entry = cache.get(key);
   if (!fresh && entry && Date.now() - entry.time < 30_000) return structuredClone(entry.result);

@@ -15387,7 +15387,8 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .equipment-card > header { text-align: center; }
 .equipment-card h1 { margin: 14px 0 28px; font-size: clamp(24px, 4vw, 34px); overflow-wrap: anywhere; }
 .equipment-overview { display: grid; grid-template-columns: 160px 1fr; gap: 32px; align-items: center; max-width: 480px; margin: auto; }
-.equipment-art.catalog-detail-art { width: 150px; height: 150px; background: radial-gradient(ellipse, var(--glass), transparent 70%); }
+.equipment-art.catalog-detail-art { position: relative; width: 150px; height: 150px; border: 1px solid var(--line); border-radius: 24px; background: radial-gradient(ellipse, color-mix(in srgb, var(--gold) 12%, transparent), var(--glass) 75%); }
+.equipment-art-label { position: absolute; bottom: 10px; font-size: 10px; letter-spacing: .18em; color: var(--muted); }
 .equipment-art img { width: auto; height: auto; max-width: 100%; max-height: 100%; image-rendering: pixelated; }
 .equipment-requirements { margin: 0; display: grid; gap: 8px; }
 .equipment-requirements > div { display: flex; justify-content: space-between; gap: 16px; }
@@ -15419,3 +15420,84 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 
 .equipment-card { animation: ym-fade-up .3s ease both; }
 @media (prefers-reduced-motion: reduce) { .equipment-card { animation: none; } }
+
+/* 기본값과 옵션 범위를 같은 열에 맞춰 비교합니다. */
+.equipment-options-head { display: grid; grid-template-columns: minmax(0,1fr) 90px 132px; align-items: end; gap: 10px; padding: 0 18px 10px; color: var(--muted); font-size: 12px; }
+.equipment-options-head h2 { font-size: 17px; color: var(--text); margin: 0; }
+.equipment-options-head > span { text-align: right; }
+.equipment-stats { margin: 0; gap: 8px; }
+.equipment-stat dd { display: grid; grid-template-columns: 90px 132px; gap: 10px; align-items: center; }
+.equipment-stat .equipment-range { color: var(--muted); font-variant-numeric: tabular-nums; }
+.equipment-stat .equipment-range.is-unknown { opacity: .55; }
+.equipment-stat dt, .equipment-stat strong { font-variant-numeric: tabular-nums; }
+.equipment-options-note { margin: 12px 0 0; font-size: 12px; line-height: 1.7; color: var(--muted); }
+.equipment-card > details { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.equipment-card > details > summary { color: var(--muted); cursor: pointer; }
+@media (max-width: 600px) {
+ .equipment-overview { grid-template-columns: 100px minmax(0,1fr); gap: 18px; }
+ .equipment-art.catalog-detail-art { width: 100px; height: 130px; border-radius: 18px; }
+ .equipment-art img { max-width: 84px; max-height: 96px; }
+ .equipment-options-head { grid-template-columns: minmax(0,1fr) 54px 88px; gap: 7px; padding: 0 12px 10px; font-size: 11px; }
+ .equipment-stat dd { grid-template-columns: 54px 88px; gap: 7px; }
+ .equipment-stat dt { font-size: 13px; overflow-wrap: anywhere; }
+ .equipment-stat small { font-size: 11px; }
+ .equipment-options-head h2 { font-size: 15px; }
+}
+
+/* PC는 장비와 드랍 몬스터를 나란히, 좁은 화면은 기존 세로 흐름을 유지합니다. */
+@media (min-width: 1100px) {
+ .equipment-detail-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 24px; margin: 20px 0; }
+ .equipment-detail-columns > .equipment-card.catalog-item-hero { width: 100%; min-width: 0; max-width: none; margin: 0; padding: 24px; }
+ .equipment-detail-columns > .equipment-droppers { margin: 0; padding: 22px; }
+ .equipment-detail-columns .equipment-overview { grid-template-columns: 120px minmax(0,1fr); gap: 20px; }
+ .equipment-detail-columns .equipment-art.catalog-detail-art { width: 120px; height: 140px; }
+ .equipment-detail-columns .catalog-dropper { min-width: 0; }
+ .equipment-detail-columns .catalog-dropper > span { min-width: 0; }
+}
+
+.catalog-item-droppers { display: block; max-height: 560px; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; padding: 2px 6px 2px 2px; }
+.catalog-drop-rows { display: grid; gap: 12px; }
+.catalog-item-droppers > button[hidden] { display: none; }
+.catalog-item-droppers:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+@media (min-width: 1100px) {
+ .equipment-detail-columns > .equipment-droppers { position: relative; min-height: 0; overflow: hidden; }
+ .equipment-detail-columns .equipment-droppers-content { position: absolute; inset: 22px; display: flex; flex-direction: column; min-height: 0; }
+ .equipment-detail-columns [data-item-drops] { flex: 1; min-height: 0; }
+ .equipment-detail-columns .catalog-item-droppers { height: 100%; max-height: none; }
+}
+
+.equipment-droppers-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.equipment-monster-count { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent); border-radius: 999px; color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, transparent); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.equipment-monster-count::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.equipment-monster-count[hidden], [data-drop-status][hidden] { display: none; }
+
+.catalog-detail-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+.catalog-history-button { padding: 9px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent); color: var(--gold); background: color-mix(in srgb, var(--gold) 9%, transparent); font: inherit; font-size: 13px; cursor: pointer; transition: background .2s, transform .2s; }
+.catalog-history-button:hover { background: color-mix(in srgb, var(--gold) 16%, transparent); transform: translateY(-1px); }
+.catalog-history-button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.catalog-history-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 24px; margin: auto; overflow: auto; color: var(--text); background: var(--bg-raised); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); text-align: left; }
+.catalog-history-dialog[open] { animation: ym-fade-up .24s ease both; }
+.catalog-history-dialog::backdrop { background: color-mix(in srgb, var(--bg) 75%, transparent); backdrop-filter: blur(8px); }
+.catalog-history-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.catalog-history-dialog-head h2 { margin: 12px 0; font-size: 24px; overflow-wrap: anywhere; }
+.catalog-history-dialog-head > button { flex: none; }
+.catalog-history-dialog .catalog-change { padding: 16px; }
+.catalog-history-dialog .catalog-change dl > div { grid-template-columns: minmax(80px, 120px) minmax(0,1fr); }
+@media (max-width: 600px) {
+ .catalog-history-dialog { padding: 18px; border-radius: 18px; }
+ .catalog-history-dialog .catalog-change dl > div { grid-template-columns: 1fr; gap: 4px; }
+ .catalog-history-dialog-head h2 { font-size: 21px; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .catalog-history-dialog[open] { animation: none; }
+ .catalog-history-button { transition: none; }
+}
+
+.mo-combat { margin: 18px 0; }
+.mo-combat h3 { margin: 0 0 12px; font-size: 15px; }
+.mo-combat-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 0; }
+.mo-combat-grid > div { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--glass); }
+.mo-combat-grid dt { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.mo-combat-grid dd { margin: 4px 0 0; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.mo-combat-grid > div:first-child { grid-column: 1 / -1; border-color: color-mix(in srgb,var(--gold) 30%,transparent); }
+.mo-combat-grid > div:first-child dd { color: var(--gold); }

@@ -5,7 +5,7 @@ const itemId='e0000000-0000-4000-8000-000000000001';
 const monsterId=n=>`d0000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const items=Array.from({length:60},(_,n)=>({id:n===0?itemId:`e0000000-0000-4000-8000-${String(n+1).padStart(12,'0')}`,name:n===0?'청갑충':`아이템${n+1}`,category:'장비',required_level:n+1,image_url:n===0?'https://image.invalid/1.gif':null,description:'상세 설명',shop_sell_price:'100000',source_url:'https://example.com/item',source_id:String(n+1)}));
 const monsters=Array.from({length:60},(_,n)=>({id:monsterId(n+1),name:`몬스터${n+1}`,level:n+1,hp:(n+1)*100,exp:(n+1)*10,required_accuracy:1,accuracy_per_level:0.1}));
-monsters[0].name='혼테일';monsters[0].source_id='8810018';
+Object.assign(monsters[0],{mp:0,physical_attack:12,physical_defense:20,movement_speed:-65});monsters[0].name='혼테일';monsters[0].source_id='8810018';
 const db={catalog_items:items,catalog_monsters:monsters,catalog_monster_drops:[0,1].map(n=>({id:'drop'+n,monster_id:monsterId(1),item_id:itemId,source_entry:n,rate_percent:n?'0.002':'0.008'})),catalog_item_stats:[{item_id:itemId,stat_key:'attack',base_value:34,minimum_value:30,maximum_value:38}],catalog_item_requirements:[{item_id:itemId,requirement_key:'dex',required_value:100}],catalog_item_jobs:[{item_id:itemId,job_name:'도적'}],catalog_item_source_attributes:[],catalog_changes:[{id:1,entity_type:'item',entity_id:itemId,entity_name:'청갑충',operation:'UPDATE',changes:{attack:{before:33,after:34}},changed_at:'2026-10-28T10:00:00Z'}]};
 db.catalog_changes.push(...Array.from({length:7},(_,n)=>({id:10+n,entity_type:'monster',entity_id:monsterId(1),entity_name:'혼테일',operation:'UPDATE',changes:{hp:{before:100+n,after:101+n}},changed_at:'2026-10-28T10:00:00Z'})),{id:20,entity_type:'monster',entity_id:monsterId(2),entity_name:'몬스터2',operation:'UPDATE',changes:{exp:{before:20,after:21}},changed_at:'2026-10-28T11:00:00Z'},{id:21,entity_type:'item',entity_id:monsterId(1),entity_name:'다른종류이력',operation:'UPDATE',changes:{name:{before:'이전',after:'이후'}},changed_at:'2026-10-28T12:00:00Z'});
 const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
@@ -13,18 +13,22 @@ try{for(const width of [1280,375]){
  const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin!=='http://127.0.0.1:5513')return route.abort();const file=root+(u.pathname==='/'?'/index.html':u.pathname);if(!existsSync(file))return route.fulfill({status:404,body:''});let body=readFileSync(file);if(u.pathname==='/js/dev-mock.js')body=body.toString().replace('  run() {','  run() { (window.catalogReads??=[]).push({table:this.table,filters:this.filters.length,limit:this.limitCount});').replace('async function rpc(name, args) {','async function rpc(name, args) { (window.catalogCalls??=[]).push({name,args});');return route.fulfill({body,contentType:/\.m?js$/.test(file)?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.png')?'image/png':'text/html'});});
  await page.addInitScript(data=>{localStorage.setItem('ym-mock-db',JSON.stringify(data));localStorage.setItem('ym-mock-auth','out');},db);
+ const closeHistory=async()=>{if(await page.locator('.catalog-history-dialog[open]').count()){await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('.catalog-history-dialog'));}};
+ const openHistory=async()=>{await page.locator('[data-open-history]').click();await page.waitForSelector('.catalog-history-dialog[open]');};
+ const selectHistory=async n=>{await closeHistory();await page.locator('.mo-card').nth(n).click();await openHistory();};
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.goto('http://127.0.0.1:5513/?mock=guest#/monsters');await page.waitForSelector('.mo-card');
- assert.equal(await page.locator('.mo-card').count(),24);
+ await page.waitForSelector('.mo-combat-grid');assert.equal(await page.locator('.mo-combat-grid > div').filter({hasText:/^MP/}).locator('dd').innerText(),'0');assert.equal(await page.locator('.mo-combat-grid > div').filter({hasText:'이동속도'}).locator('dd').innerText(),'-65');
+ assert.equal(await page.locator('.mo-card').count(),24);assert.equal(await page.locator('[data-monster-history]').count(),0);await openHistory();
  await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
  assert(!(await page.locator('[data-monster-history]').innerText()).includes('다른종류이력'));
  assert.equal(await page.locator('a[href*="#/catalog-updates"]').count(),0);
  await page.locator('[data-monster-history] [data-history-next]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===2);
  await page.locator('[data-monster-history] [data-history-prev]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
- await page.locator('.mo-card').nth(1).click();await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
+ await selectHistory(1);await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
  assert.equal(await page.locator('[data-monster-history] .catalog-change').count(),1);
- await page.locator('.mo-card').first().click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
- await page.locator('[data-monster-history]').screenshot({path:`/private/tmp/monster-history-inline-${width}.png`});
+ await selectHistory(0);await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
+ await page.locator('[data-monster-history]').screenshot({path:`/private/tmp/monster-history-popup-${width}.png`});
  await page.evaluate(async()=>{
   const client=await(await import('/js/supabase-client.js')).getSupabase(),original=client.from.bind(client);
   window.restoreHistoryFrom=()=>{client.from=original;};
@@ -34,12 +38,12 @@ try{for(const width of [1280,375]){
    query.eq=(key,value)=>{if(key==='entity_id')entity=value;return eq(key,value);};
    query.range=(...args)=>{if(entity.endsWith('000000000001')&&slow){slow=false;return new Promise(resolve=>setTimeout(async()=>resolve(await range(...args)),1200));}if(entity.endsWith('000000000001')&&fail){fail=false;return Promise.resolve({data:null,error:{message:'이력 조회 실패'}});}return range(...args);};return query;};
  });
- await page.locator('.mo-card').nth(1).click();await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
- await page.locator('.mo-card').first().click();await page.waitForTimeout(100);
- await page.locator('.mo-card').nth(1).click();await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
+ await selectHistory(1);await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
+ await selectHistory(0);await page.waitForTimeout(100);
+ await selectHistory(1);await page.waitForFunction(()=>document.querySelector('[data-monster-history] .catalog-change strong')?.textContent==='몬스터2');
  await page.waitForTimeout(1300);assert.match(await page.locator('[data-monster-history]').innerText(),/몬스터2/);assert(!(await page.locator('[data-monster-history]').innerText()).includes('혼테일'));
- await page.locator('.mo-card').first().click();await page.waitForSelector('[data-monster-history] [data-history-retry]');await page.locator('[data-monster-history] [data-history-retry]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
- await page.evaluate(()=>window.restoreHistoryFrom());
+ await selectHistory(0);await page.waitForSelector('[data-monster-history] [data-history-retry]');await page.locator('[data-monster-history] [data-history-retry]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-monster-history] .catalog-change').length===5);
+ await page.evaluate(()=>window.restoreHistoryFrom());await closeHistory();assert.equal(await page.locator('[data-open-history]').evaluate(el=>el===document.activeElement),true);
 
 
  await page.waitForFunction(()=>[...document.querySelectorAll('img[src="img/horntail.png"]')].some(i=>i.complete&&i.naturalWidth>0));
@@ -49,8 +53,8 @@ try{for(const width of [1280,375]){
  assert.deepEqual(await page.locator('.mo-drop-grid small').allTextContents(),['0.008%','0.002%']);
  assert.equal(await page.evaluate(()=>window.catalogCalls.filter(c=>c.name==='catalog_search_monsters').length),1);
  const reads=await page.evaluate(()=>window.catalogReads);assert(reads.filter(r=>r.table==='catalog_changes').every(r=>r.filters===2&&r.limit===6));assert(!reads.some(r=>r.table==='catalog_monsters'));assert(reads.filter(r=>r.table==='catalog_monster_drops').every(r=>r.filters>0));
- await page.locator('[data-page-next]').click();await page.waitForFunction(()=>document.querySelector('.mo-card .mo-name strong')?.textContent==='몬스터25');
- await page.waitForFunction(()=>document.querySelector('[data-monster-history]')?.textContent.includes('변경된 정보가 아직 없습니다'));assert.equal(await page.locator('[data-monster-history] [data-history-nav]').isVisible(),false);
+ await page.locator('[data-page-next]').click();await page.waitForFunction(()=>document.querySelector('.mo-card .mo-name strong')?.textContent==='몬스터25');await openHistory();
+ await page.waitForFunction(()=>document.querySelector('[data-monster-history]')?.textContent.includes('변경된 정보가 아직 없습니다'));assert.equal(await page.locator('[data-monster-history] [data-history-nav]').isVisible(),false);await page.locator('[data-history-close]').click();await page.waitForFunction(()=>!document.querySelector('.catalog-history-dialog'));
  await page.locator('[data-search]').fill('몬스터59');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===1);assert.match(await page.locator('.mo-card').innerText(),/몬스터59/);
  await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-grid a');
  await page.evaluate(async()=>{
@@ -67,10 +71,10 @@ try{for(const width of [1280,375]){
  await page.locator('[data-search]').fill('오류검색');await page.waitForFunction(()=>document.querySelector('[data-list]').textContent.includes('SQL047'));
  await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-grid a');
  await page.locator('.mo-drop-grid a').first().click();await page.waitForSelector('.catalog-stat');await page.waitForSelector('.catalog-image-fallback');
- assert.match(await page.locator('[data-item-detail]').innerText(),/청갑충/);assert.match(await page.locator('.catalog-stat').innerText(),/30 ~ 38/);assert.match(await page.locator('.catalog-item-hero').innerText(),/DEX\s+100.*도적/s);assert.equal(await page.locator('.equipment-job.is-allowed').count(),1);assert.equal(await page.locator('.equipment-stat').first().evaluate(el=>getComputedStyle(el).flexDirection),'row');assert.equal(await page.locator('.equipment-requirements > div').count(),6);
- await page.waitForSelector('.catalog-change');assert.match(await page.locator('.catalog-change').innerText(),/33.*34/s);
+ assert.match(await page.locator('[data-item-detail]').innerText(),/청갑충/);assert.match(await page.locator('.catalog-stat').innerText(),/30 ~ 38/);assert.match(await page.locator('.catalog-item-hero').innerText(),/DEX\s+100.*도적/s);assert.equal(await page.locator('.equipment-job.is-allowed').count(),1);assert.equal(await page.locator('.equipment-stat').first().evaluate(el=>getComputedStyle(el).flexDirection),'row');assert.equal(await page.locator('.equipment-requirements > div').count(),6);const equipmentBox=await page.locator('.equipment-card').boundingBox(),droppersBox=await page.locator('.equipment-droppers').boundingBox();if(width>=1100){assert(droppersBox.x>=equipmentBox.x+equipmentBox.width);assert(Math.abs(droppersBox.y-equipmentBox.y)<2);assert(Math.abs(droppersBox.height-equipmentBox.height)<2);assert(Math.abs(droppersBox.width-equipmentBox.width)<2);}else{assert(droppersBox.y>=equipmentBox.y+equipmentBox.height);}assert.equal(await page.locator('[data-item-history]').count(),0);
+ await openHistory();await page.waitForSelector('.catalog-change');assert.match(await page.locator('.catalog-change').innerText(),/33.*34/s);assert(!(await page.locator('.catalog-history-dialog').innerText()).includes('혼테일'));assert.equal(await page.locator('.catalog-history-dialog').evaluate(el=>el.scrollWidth>el.clientWidth),false);await closeHistory();
  await page.waitForSelector('.catalog-dropper');assert.equal(await page.locator('.catalog-dropper').count(),2);
- assert.deepEqual(await page.locator('.catalog-dropper > strong').allTextContents(),['0.008%','0.002%']);
+ assert.deepEqual(await page.locator('.catalog-dropper > strong').allTextContents(),['0.008%','0.002%']);assert.equal(await page.locator('[data-drop-species]').innerText(),'1종');assert.equal(await page.locator('[data-drop-status]').isVisible(),false);
  await page.locator('.catalog-dropper').first().click();
  await page.waitForSelector('.mo-card',{timeout:5000});assert.equal(await page.locator('[data-search]').inputValue(),'8810018');assert.equal(await page.locator('.mo-card').count(),1);assert.match(await page.locator('.mo-card').innerText(),/혼테일/);
  await page.goto(`http://127.0.0.1:5513/?mock=guest#/item-catalog?id=${itemId}`);await page.waitForSelector('.catalog-stat');await page.waitForSelector('.catalog-dropper');
@@ -82,6 +86,27 @@ try{for(const width of [1280,375]){
  });
  await page.locator('[data-item-refresh]').click();await page.waitForSelector('[data-drops-retry]');
  await page.locator('[data-drops-retry]').click();await page.waitForSelector('.catalog-dropper');assert.equal(await page.locator('.catalog-dropper').count(),2);
+ // 많은 드랍도 카드 크기를 바꾸지 않고 스크롤로 이어 보며, 실패 시 기존 목록을 유지합니다.
+ await page.evaluate(async()=>{
+  const c=await(await import('/js/supabase-client.js')).getSupabase(),original=c.from.bind(c);let failSecond=true;
+  c.from=table=>{const query=original(table);if(table==='catalog_monster_drops')query.range=async(first,last)=>{
+   if(first===24&&failSecond){failSecond=false;return {data:null,error:{message:'network error'}};}
+   return {data:Array.from({length:55},(_,n)=>({id:'long'+n,source_entry:n,rate_percent:n===0?'0':null,monster:{id:'m'+n,name:'스크롤 몬스터 '+n,level:n+1,source_id:String(n)}})).slice(first,last+1),error:null};
+  };return query;};
+ });
+ await page.locator('[data-item-refresh]').click();await page.waitForFunction(()=>document.querySelectorAll('.catalog-dropper').length===24);assert.equal(await page.locator('[data-drop-species]').innerText(),'확인 24종');
+ const scrollList=page.locator('[data-droppers]');assert.equal(await page.locator('[data-drops-next]').count(),0);
+ await scrollList.evaluate(el=>{el.scrollTop=el.scrollHeight;el.dispatchEvent(new Event('scroll'));});
+ await page.waitForFunction(()=>document.querySelector('[data-drop-status]').textContent.includes('서버에 연결하지 못했습니다.'));
+ assert.equal(await page.locator('.catalog-dropper').count(),24);
+ await page.locator('[data-drops-retry]').click();await page.waitForFunction(()=>document.querySelectorAll('.catalog-dropper').length===48);
+ await scrollList.evaluate(el=>{el.scrollTop=el.scrollHeight;el.dispatchEvent(new Event('scroll'));});
+ await page.waitForFunction(()=>document.querySelectorAll('.catalog-dropper').length===55);
+ assert.equal(await page.locator('[data-drops-retry]').isVisible(),false);assert.equal(await page.locator('[data-drop-species]').innerText(),'55종');
+ assert.equal(await page.locator('.catalog-dropper').first().locator('strong').innerText(),'0%');
+ if(width>=1100){const left=await page.locator('.equipment-card').boundingBox(),right=await page.locator('.equipment-droppers').boundingBox();assert(Math.abs(left.height-right.height)<2);assert(Math.abs(left.width-right.width)<2);}
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+
 
  await page.goto('http://127.0.0.1:5513/?mock=guest#/item-catalog');await page.waitForSelector('.catalog-item');assert.equal(await page.locator('.catalog-item').count(),24);await page.locator('[data-next]').click();await page.waitForFunction(()=>document.querySelector('.catalog-pager [data-page]').textContent.startsWith('2 /'),null,{timeout:5000}).catch(async e=>{console.log(await page.locator('#main').innerText());console.log(await page.evaluate(()=>window.catalogCalls));throw e;});assert.equal(await page.locator('.catalog-item').count(),24);
  await page.locator('[data-catalog-search]').fill('아이템60');await page.waitForFunction(()=>document.querySelectorAll('.catalog-item').length===1);assert.match(await page.locator('.catalog-item').innerText(),/아이템60/);

@@ -23,3 +23,15 @@ assert(card.includes('&lt;장비&gt;'));assert(card.includes('9,007,199,254,740,
 assert(card.includes('<dd>0</dd>'));assert(card.includes('<dd>미제공</dd>'));assert(card.includes('(0 ~ 2)'));assert(!card.includes('메랜지지'));
 assert(!changeCards([{entity_name:'아이템',operation:'UPDATE',changes:{source_url:{before:'https://example.com/before',after:'https://example.com/after'}}}]).includes('example.com'));
 console.log('장비 분류·공용 직업·0/미제공 구분·큰 메소 정밀도·범위·수집처 이력 비노출 통과');
+
+assert(isEquipment({category:'Equip'}),'영문 장비 분류도 상세 카드 적용');
+const equip=equipmentCard({item:{name:'신문지 투구',category:'Equip',subcategory:'Hat'},stats:[{stat_key:'defense',base_value:3,minimum_value:1,maximum_value:5}]});
+assert(equip.includes('모자'));assert(equip.includes('기본값'));assert(equip.includes('가능 범위'));assert(equip.includes('(1 ~ 5)'));
+assert(equip.includes('범위 미제공'));assert(equip.includes('착용 직업 미제공'));
+console.log('Equip 장비 누락 회귀·한글 분류·기본값/범위 구분·미제공 안내 통과');
+
+const duplicateDetails=equipmentCard({item:{name:'장비',category:'장비'},attributes:[{attribute_name:'REQ JOB',value_text:'공용'},{attribute_name:'상점가',value_text:'500메소'},{attribute_name:'level',value_text:'50'}]});
+assert(!duplicateDetails.includes('<details>'),'추가 정보가 전부 중복이면 영역 제거');
+const uniqueDetails=equipmentCard({item:{name:'장비',category:'장비'},attributes:[{attribute_name:'GENDER',value_text:'공용'},{attribute_name:'특수 효과',value_text:'설명 <효과>'}]});
+assert(uniqueDetails.includes('<details>'));assert(uniqueDetails.includes('특수 효과'));assert(uniqueDetails.includes('설명 &lt;효과&gt;'));assert(!uniqueDetails.includes('<dt>GENDER</dt>'));
+console.log('중복 추가정보 숨김·별도 속성 보존/이스케이프 통과');

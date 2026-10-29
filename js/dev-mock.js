@@ -388,6 +388,7 @@ const RPCS = {
       .sort((a,b)=>(p_sort==="eff"?(a.exp>0?a.hp/a.exp:Infinity)-(b.exp>0?b.hp/b.exp:Infinity):0)||a.level-b.level||String(a.id).localeCompare(String(b.id)));
     return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
   },
+  catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
   catalog_item_detail({p_id}={}) {
     const item=rowsOf("catalog_items").find(i=>i.id===p_id);
     if(!item)return null;

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {neededMonsterAccuracy,monsterCombatFacts} from './monster-details.js';
+assert.equal(neededMonsterAccuracy({level:10,required_accuracy:0},10),0);
+assert.equal(neededMonsterAccuracy({level:10,required_accuracy:30},9),null);
+assert.equal(neededMonsterAccuracy({level:10,required_accuracy:null,accuracy_per_level:1},10),null);
+assert.equal(neededMonsterAccuracy({level:10,required_accuracy:30,accuracy_per_level:2},9),32);
+assert.equal(neededMonsterAccuracy({level:50,accuracy_reference_level:40,required_accuracy:30},40),30);
+const html=monsterCombatFacts({level:10,required_accuracy:0,mp:0,physical_attack:12,movement_speed:-65,meso_value:7.5});
+assert(html.includes('Lv.10 필요 명중'));assert(html.includes('<dd>0</dd>'));assert(html.includes('-65'));assert(html.includes('7.5'));assert(html.includes('미제공'));assert(!html.includes('source_data'));
+console.log('몬스터 전투정보0/음수/소수/미제공·레벨증가량없는 명중계산차단·기준레벨 적용 통과');
