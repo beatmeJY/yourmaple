@@ -190,7 +190,10 @@ export async function render(root) {
               <span>/ ${formatCount(GOAL_SCORE)}</span>
             </label>
             <span class="dj-plaque-who" data-who>캐릭터를 선택해 주세요</span>
-            <button type="button" class="dj-plaque-log" data-score-log-open>통합 점수 기록 보기</button>
+            <span class="dj-plaque-actions">
+              <button type="button" class="dj-plaque-log" data-score-log-open>통합 점수 기록 보기</button>
+              <button type="button" class="dj-plaque-log is-danger" data-delete-current hidden>이 기록 삭제</button>
+            </span>
           </div>
           <div class="dj-stats">
             <div class="dj-stat"><span>검은색 허리띠까지</span><strong data-stat-need>-</strong></div>
@@ -208,14 +211,15 @@ export async function render(root) {
           ).join("")}
         </div>
         <div class="dj-charbar">
-          <span class="dj-charbar-label">캐릭터</span>
-          <div class="dj-charbar-list" data-char-chips role="group" aria-label="캐릭터 고르기"></div>
+          <span class="dj-charbar-label">기록할 캐릭터</span>
+          <div class="dj-charbar-list" data-char-chips role="group" aria-label="기록할 캐릭터 고르기"></div>
           <label class="dj-picker" hidden><span class="sr-only">캐릭터 선택</span>
             <select name="character_id" aria-label="캐릭터 선택" tabindex="-1"><option value="">캐릭터 선택</option></select>
           </label>
         </div>
         <div class="dj-quick-char" data-quick-char hidden>
           <p class="dj-quick-char-hint" data-quick-char-hint>이름만 적으면 바로 캐릭터를 만들어요.</p>
+          <div class="dj-quick-char-list" data-quick-char-list></div>
           <div class="dj-quick-char-row">
             <input data-quick-char-name maxlength="30" autocomplete="off" placeholder="캐릭터 이름" aria-label="새 캐릭터 이름" />
             <button type="button" class="dj-quick-char-make" data-quick-char-create>만들기</button>
@@ -223,15 +227,7 @@ export async function render(root) {
           </div>
           <small>직업·레벨은 나중에 캐릭터 관리에서 채워요. 만든 캐릭터는 무릉 숙제표와 퀘스트에도 바로 보여요.</small>
         </div>
-      </section>
-
-      <section class="dj-panel dj-chars">
-        <div class="dj-panel-head">
-          <h2><i aria-hidden="true">◆</i>캐릭터별 기록</h2>
-          <span class="dj-sub">카드를 누르면 그 캐릭터 기록을 열어요 · 실제 기록이 빠른 순</span>
-          <p class="dojo-picked-label" data-picked-label hidden></p>
-        </div>
-        <div data-records></div>
+        <p class="form-message is-error" data-record-error hidden></p>
       </section>
 
       <div class="dj-grid">
@@ -244,10 +240,6 @@ export async function render(root) {
           <div class="dojo-bands">
             ${floorsTable()}
           </div>
-          <details class="dojo-note">
-            <summary>계산 기준</summary>
-            <p class="hint">구간 전체를 깨는 초를 적습니다. 층에는 쉬는 층도 포함되어 있어서, 5라운드를 마칠 때마다 나오는 쉬는 층(${SAVE_FLOORS.map((floor) => `${saveFloorToFloor(floor)}층`).join(", ")})에서 저장할 수 있고, 이어서 5라운드 단위로 다시 저장할 수 있습니다. 개인은 1~5층(1~5라운드)이 층마다 2점, 팀은 1점입니다. 저장 한 번에 참고 시간 ${SAVE_SECONDS}초를 더합니다. 하루 최대 ${formatCount(DAILY_CAP)}점이고, 검은 허리띠는 ${formatCount(GOAL_SCORE)}점입니다.</p>
-          </details>
           <div class="dj-actions">
             <button class="primary-button dojo-game-button" type="submit" data-save>기록 저장</button>
             <button class="secondary-button" type="button" data-clear>입력 지우기</button>
@@ -261,9 +253,13 @@ export async function render(root) {
           <div class="dj-scroll-cloth">
             <div class="dj-scroll-paper">
               <h2><i aria-hidden="true">◈</i>저장 루트 순위표<i aria-hidden="true">◈</i></h2>
-              <span class="dj-scroll-sub">저장 조합 중 분당 점수가 높은 순</span>
+              <span class="dj-scroll-sub" data-scroll-sub>저장 조합 중 분당 점수가 높은 순</span>
+              <div class="dj-best-tabs-slot" data-best-tabs></div>
+              <p class="dj-scroll-note" data-ref-note hidden>추천 동선은 쉼터(쉬는 층)를 한 번 들를 때마다 ${SAVE_SECONDS}초가 자동으로 더해져요.</p>
               <div class="dojo-best is-empty" data-best></div>
               <div class="dj-route-list" data-route-list></div>
+              <div class="dj-route-all" data-route-all></div>
+              <p class="form-message is-error" data-measured hidden></p>
             </div>
           </div>
           <div class="dj-roller is-bottom" aria-hidden="true"></div>
@@ -274,7 +270,7 @@ export async function render(root) {
         <div class="dj-measure-head">
           <span class="dj-measure-title">
             <h2><i aria-hidden="true">◆</i>실제 시간 기록</h2>
-            <span class="dj-sub">저장 방법을 고르고 한 바퀴를 직접 재면, 참고 시간 대신 실제 시간으로 순위를 매겨요</span>
+            <span class="dj-sub">저장할 층을 고르고 한 바퀴를 재요. 적은 시간은 위 저장 루트 순위표에 실제 기록으로 올라가요</span>
           </span>
           <span class="dj-legend"><span><i class="is-ref"></i>참고 = 구간 초로 계산</span><span><i class="is-act"></i>실제 = 직접 잰 시간</span></span>
         </div>
@@ -309,7 +305,8 @@ export async function render(root) {
 
   const form = root.querySelector("#dojo-form");
   const belts = root.querySelector("[data-belts]");
-  const records = root.querySelector("[data-records]");
+  const recordError = root.querySelector("[data-record-error]");
+  const quickBox = root.querySelector("[data-quick-char]");
   const plan = root.querySelector("[data-plan]");
   const beltHistoryDialog = root.querySelector("[data-belt-history-dialog]");
   let beltTip = document.getElementById("dojo-belt-tip");
@@ -335,7 +332,6 @@ export async function render(root) {
   let clockPressed = false;
   let landedKey = "";
   let landedTimer = 0;
-  let arriveCard = false;
   let savedSnapshot = "";
   // 로그인하러 가기 전에 적던 기록(로그인 뒤 되살림). 다른 캐릭터를 골라도 묻지 않고 그 캐릭터 기록 위에 다시 채운다.
   let carried = null;
@@ -349,6 +345,8 @@ export async function render(root) {
   let shownEntry = null;
   // 두루마리 위쪽 칸에 보여 줄 루트(순위 줄을 누르면 바뀜). 비어 있으면 1위.
   let viewKey = null; // "저장 안 함" 루트의 키가 "" 라서 선택 없음은 null 로 둔다
+  let defaultKey = null; // 고른 줄이 없을 때 위 칸에 나오는 루트(실제 기록/추천 동선 1위)
+  let swapSig = ""; // 위 칸 루트가 바뀔 때만 바뀌는 연출을 넣는다
 
   function partyOf() {
     return form.elements.party.value === "team";
@@ -455,6 +453,15 @@ export async function render(root) {
     }
     const current = form.dataset.openCharacter || form.elements.character_id.value;
     const party = form.elements.party.value || "solo";
+    // 기록이 있는 캐릭터와 지금 고른 캐릭터만 칩으로. 나머지는 "＋ 새 캐릭터"에서 고른다.
+    const shown = characters.filter((character) => character.id === current || recordRows.some((row) => row.character_id === character.id));
+    box.innerHTML = charGroupsHtml(shown, current, party) || `<span class="dj-charbar-note">아직 기록한 캐릭터가 없어요. ＋ 새 캐릭터에서 골라 시작해요.</span>`;
+    box.insertAdjacentHTML("beforeend", `<button type="button" class="dj-char is-new" data-char-new aria-expanded="${!quickBox.hidden}">＋ 새 캐릭터</button>`);
+    if (!quickBox.hidden) paintQuickList();
+  }
+
+  // 캐릭터 칩 묶음(계정별). 칩 줄과 "새 캐릭터" 칸이 같이 쓴다.
+  function charGroupsHtml(list, current, party) {
     const chip = (character) => {
       const on = character.id === current;
       const sheet = sheetFor(character.id, party) ?? sheetFor(character.id, party === "team" ? "solo" : "team");
@@ -467,28 +474,40 @@ export async function render(root) {
     };
     const known = new Set(accounts.map((account) => account.id));
     const groups = accounts
-      .map((account) => ({ name: account.name, members: characters.filter((character) => character.account_id === account.id).sort(compareCharacter) }))
+      .map((account) => ({ name: account.name, members: list.filter((character) => character.account_id === account.id).sort(compareCharacter) }))
       .filter((group) => group.members.length);
-    const loose = characters.filter((character) => !known.has(character.account_id)).sort(compareCharacter);
+    const loose = list.filter((character) => !known.has(character.account_id)).sort(compareCharacter);
     if (loose.length) groups.push({ name: "계정 없음", members: loose });
     const many = groups.length > 1;
-    box.innerHTML = groups
+    return groups
       .map((group) => `<span class="dj-char-group">${many ? `<small class="dj-char-account">${escapeHtml(group.name)}</small>` : ""}${group.members.map(chip).join("")}</span>`)
-      .join("") + `<button type="button" class="dj-char is-new" data-char-new>＋ 새 캐릭터</button>`;
+      .join("");
   }
 
-  // ── 이름만으로 캐릭터 만들기 ──────────────────────────────
-  const quickBox = root.querySelector("[data-quick-char]");
+  // "＋ 새 캐릭터" 칸: 아직 무릉 기록이 없는 등록 캐릭터. 고르면 그 캐릭터로 새 기록을 시작한다.
+  function paintQuickList() {
+    const box = quickBox.querySelector("[data-quick-char-list]");
+    if (!box) return;
+    const current = form.dataset.openCharacter || form.elements.character_id.value;
+    const fresh = characters.filter((character) => character.id !== current && !recordRows.some((row) => row.character_id === character.id));
+    box.innerHTML = fresh.length
+      ? `<span class="dj-quick-char-title">등록된 캐릭터에서 고르기</span><div class="dj-charbar-list">${charGroupsHtml(fresh, current, form.elements.party.value || "solo")}</div><span class="dj-quick-char-title">또는 새로 등록</span>`
+      : "";
+  }
 
-  function showQuickCharacter(hint = "이름만 적으면 바로 캐릭터를 만들어요.", { focus = true } = {}) {
+  // ── 새 기록 시작: 등록된 캐릭터 고르기 · 이름만으로 만들기 ──────────────────────────────
+  function showQuickCharacter(hint = "새로 기록할 캐릭터를 고르거나, 이름만 적어 바로 만들어요.", { focus = true } = {}) {
     quickBox.hidden = false;
     quickBox.querySelector("[data-quick-char-hint]").textContent = hint;
-    if (focus) quickBox.querySelector("[data-quick-char-name]").focus({ preventScroll: false });
+    paintCharChips();
+    paintQuickList();
+    if (focus) (quickBox.querySelector("[data-char-pick]") ?? quickBox.querySelector("[data-quick-char-name]")).focus({ preventScroll: false });
   }
 
   function hideQuickCharacter() {
     quickBox.hidden = true;
     quickBox.querySelector("[data-quick-char-name]").value = "";
+    paintCharChips();
   }
 
   async function createCharacterQuick() {
@@ -540,7 +559,7 @@ export async function render(root) {
   }
 
   function runInput(key, part) {
-    return [...plan.querySelectorAll(`[data-run-part="${part}"]`)].find((input) => input.dataset.runKey === key);
+    return [...form.querySelectorAll(`[data-run-part="${part}"]`)].find((input) => input.dataset.runKey === key);
   }
 
   function readRun(key) {
@@ -558,13 +577,15 @@ export async function render(root) {
   }
 
   function syncRuns() {
-    const inputs = [...plan.querySelectorAll("[data-run-part='min']")];
+    // 순위표에는 고른 루트·펼친 표의 칸만 있다. 화면에 없는 루트 기록은 그대로 둔다.
+    const inputs = [...form.querySelectorAll("[data-run-part='min']")];
     if (!inputs.length) return { ok: true };
-    const next = new Map();
+    const next = new Map(draftRuns);
     for (const input of inputs) {
       const parsed = readRun(input.dataset.runKey);
       if (parsed.error) return parsed;
       if (parsed.seconds != null) next.set(input.dataset.runKey, parsed.seconds);
+      else next.delete(input.dataset.runKey);
     }
     draftRuns = next;
     return { ok: true };
@@ -593,7 +614,7 @@ export async function render(root) {
   }
 
   function setNote(text, isError) {
-    const note = plan.querySelector("[data-measured]");
+    const note = root.querySelector("[data-measured]");
     if (!note) return;
     note.hidden = !text;
     note.className = isError ? "form-message is-error" : "hint";
@@ -724,7 +745,7 @@ export async function render(root) {
     if (!routePending || saving) return;
     const { key, seconds } = routePending;
     routePending = null;
-    // 아직 안 잰 루트는 기록부에 입력칸이 없으므로 칸을 거치지 않고 바로 넣는다(다시 그리면 그 루트 카드가 생긴다).
+    // 그 루트 입력칸이 화면에 없을 수 있으므로 칸을 거치지 않고 바로 넣는다.
     const synced = syncRuns();
     if (synced.error) {
       notify(synced.error, "error");
@@ -732,17 +753,18 @@ export async function render(root) {
       return;
     }
     draftRuns.set(key, seconds);
-    // 방금 적은 카드는 1.4초 동안 금빛(저장 뒤 다시 그려져도 유지)
+    // 순위표 위 칸을 방금 적은 루트로 바꾸고 1.4초 동안 금빛(저장 뒤 다시 그려져도 유지)
+    viewKey = key;
     landedKey = key;
     window.clearTimeout(landedTimer);
     landedTimer = window.setTimeout(() => {
       landedKey = "";
-      for (const card of plan.querySelectorAll(".dj-card.is-landed")) card.classList.remove("is-landed");
+      root.querySelector("[data-best].is-landed")?.classList.remove("is-landed");
     }, 1400);
     paintPlan();
     sfx("check");
-    const card = [...plan.querySelectorAll(".dj-card")].find((item) => item.dataset.chain === key);
-    if (card) burstAt(card, ["#ffe28a", "#ffb08a", "#ffffff"], 22, 1);
+    const goto = plan.querySelector("[data-goto-rank]");
+    if (goto) burstAt(goto, ["#ffe28a", "#ffb08a", "#ffffff"], 22, 1);
     await persistSheet("실제 시간을 저장했습니다.");
   }
 
@@ -762,9 +784,9 @@ export async function render(root) {
     return true;
   }
 
-  // 기록부 ×: 그 루트 실제 시간을 지운다. 로그인해 캐릭터를 골랐으면 바로 저장한다.
+  // 순위표 "기록 지우기": 그 루트 실제 시간을 지운다. 로그인해 캐릭터를 골랐으면 바로 저장한다.
   async function clearRun(key) {
-    for (const input of plan.querySelectorAll("[data-run-part]")) {
+    for (const input of form.querySelectorAll("[data-run-part]")) {
       if (input.dataset.runKey === key) input.value = "";
     }
     draftRuns.delete(key);
@@ -773,7 +795,7 @@ export async function render(root) {
     if (isLoggedIn() && form.elements.character_id.value && (draftRuns.size || floorsOf().times?.size)) await persistSheet("실제 시간을 지웠습니다.");
   }
 
-  // 측정대 "이미 잰 시간이 있으면 □분 □초 [바로 적기]": 지금 고른 루트에 적고 저장한다(기록부에 적기와 같은 흐름).
+  // 측정대 "이미 잰 시간이 있으면 □분 □초 [바로 적기]": 지금 고른 루트에 적고 저장한다(순위표에 적기와 같은 흐름).
   async function applyManual() {
     if (clock?.scope === "route" || saving) return;
     const minutes = readCount(plan.querySelector("[data-manual='min']")?.value ?? "", "분", 0);
@@ -798,8 +820,6 @@ export async function render(root) {
 
   // 스톱워치 참고 시간(지금 고른 저장 조합). 재는 동안 매 0.1초 고리·차이를 바꿀 때 쓴다.
   let watchRef = null;
-  // 기록부 카드 순서가 바뀔 때만 카드가 떠오르게(입력할 때마다 다시 튀지 않게)
-  let bookSig = "";
   let showAllRoutes = false;
 
   function watchState() {
@@ -842,7 +862,7 @@ export async function render(root) {
         parts.push(`<button type="button" class="dj-gate${on ? " is-on" : ""}" data-gate="${round}" aria-pressed="${on}" title="${saveFloorToFloor(round)}층(쉬는 층)에서 저장"${locked ? " disabled" : ""}><small>${saveFloorToFloor(round)}층</small><i aria-hidden="true"></i></button>`);
       }
     }
-    return `<div class="dj-track">${parts.join("")}<div class="dj-track-tip" data-track-tip role="tooltip" hidden></div></div>`;
+    return `<div class="dj-track" data-tip-host>${parts.join("")}<div class="dj-track-tip" data-track-tip role="tooltip" hidden></div></div>`;
   }
 
   function roundToFloorText(round) {
@@ -859,6 +879,10 @@ export async function render(root) {
     watchRef = pick.ref;
     const state = watchState();
     const status = running ? "● 기록 중" : pending ? "반영 전" : pick.actual != null ? `기록 있음 · ${formatDuration(pick.actual)}` : "아직 기록 없음";
+    // 이 루트가 순위표 몇 위인지, 누르면 순위표로 올라간다.
+    const rankLink = pick.rank && !running && !pending
+      ? `<button type="button" class="dj-goto-rank" data-goto-rank>순위표 ${formatCount(pick.rank)}위${pick.listMode === "actual" && pick.actual != null ? " · 실제" : " · 참고"} ↑</button>`
+      : "";
     const statusTone = running ? "is-live" : pending ? "is-pending" : "";
     const quick = QUICK_PICKS.map((picks) => {
       const key = chainKey(picks);
@@ -868,13 +892,13 @@ export async function render(root) {
     const buttons = running
       ? `<button type="button" class="dj-watch-btn is-stop" data-clock-stop>■ 종료</button>`
       : pending
-        ? `<button type="button" class="dj-watch-btn is-apply" data-clock-apply>기록부에 적기</button><button type="button" class="dj-watch-btn is-ghost" data-clock-reset>다시 재기</button>`
+        ? `<button type="button" class="dj-watch-btn is-apply" data-clock-apply>순위표에 적기</button><button type="button" class="dj-watch-btn is-ghost" data-clock-reset>다시 재기</button>`
         : `<button type="button" class="dj-watch-btn is-start" data-clock-start${bandPending || clock ? " disabled" : ""}>▶ 시작</button>`;
     return `<div class="dj-desk">
       <div class="dj-step-block">
         <div class="dj-step-head"><span class="dj-step-num">1</span><strong>저장할 쉬는 층 고르기</strong><small>${running ? "재는 동안은 바꿀 수 없어요" : "층을 눌러 켜고 꺼요"}</small></div>
         ${trackHtml(saves, running)}
-        <div class="dj-pick-line"><strong>${escapeHtml(chainText(saves))}</strong><span>한 바퀴 ${escapeHtml(formatCount(pick.points))}점 · ${saves.length + 1}회차 · 저장 ${saves.length}번</span></div>
+        <div class="dj-pick-line"><strong>${escapeHtml(chainText(saves))}</strong><span>한 바퀴 ${escapeHtml(formatCount(pick.points))}점 · ${saves.length + 1}회차 · 저장 ${saves.length}번</span>${rankLink}</div>
         <div class="dj-quicks">${quick}</div>
       </div>
       <div class="dj-desk-rule" aria-hidden="true"></div>
@@ -901,22 +925,11 @@ export async function render(root) {
   }
 
   // 회차 막대 27칸: 첫 회차는 구간 색, 다시 도는 라운드는 주홍
-  function cellsHtml(saves) {
-    const last = BANDS.at(-1).end;
-    const starts = runStarts(saves).slice(1);
-    return `<span class="dj-card-cells" aria-hidden="true">${Array.from({ length: last }, (_, index) => {
-      const round = index + 1;
-      const rerun = starts.some((start) => round >= start);
-      const gap = round % 5 === 0 && round < last ? " is-gap" : "";
-      return `<i class="${rerun ? "is-rerun" : ""}${gap}" style="--hue:${bandHue(round)}"></i>`;
-    }).join("")}</span>`;
-  }
-
   function runInputs(key, label, actual) {
     const [minutes, seconds] = actual == null ? ["", ""] : [String(Math.floor(actual / 60)), String(actual % 60)];
     return `<span class="dj-time">
-      <label><input class="dojo-run" data-run-key="${escapeHtml(key)}" data-run-part="min" inputmode="numeric" autocomplete="off" aria-label="${escapeHtml(label)} 분" placeholder="분" value="${escapeHtml(minutes)}" /><small>분</small></label>
-      <label><input class="dojo-run" data-run-key="${escapeHtml(key)}" data-run-part="sec" inputmode="numeric" autocomplete="off" aria-label="${escapeHtml(label)} 초" placeholder="초" value="${escapeHtml(seconds)}" /><small>초</small></label>
+      <label><input class="dojo-run" data-run-key="${escapeHtml(key)}" data-run-part="min" inputmode="numeric" autocomplete="off" aria-label="${escapeHtml(label)} 분" placeholder="0" value="${escapeHtml(minutes)}" /><small>분</small></label>
+      <label><input class="dojo-run" data-run-key="${escapeHtml(key)}" data-run-part="sec" inputmode="numeric" autocomplete="off" aria-label="${escapeHtml(label)} 초" placeholder="0" value="${escapeHtml(seconds)}" /><small>초</small></label>
     </span>`;
   }
 
@@ -927,59 +940,47 @@ export async function render(root) {
     return diff < 0 ? { text: `▼ ${formatDuration(-diff)} 빠름`, tone: "is-fast" } : { text: `▲ ${formatDuration(diff)} 느림`, tone: "is-slow" };
   }
 
-  // 기록부 카드 한 장(잰 루트). 1~3위는 금·은·동 순위 칸, 4위부터 사각 인장.
-  function bookCard(row, index, score, enter) {
-    const key = chainKey(row.route.saves);
-    const label = chainText(row.route.saves);
-    const ref = row.route.runs ? row.route.seconds : null;
-    const delta = deltaText(row.seconds, ref);
-    const tier = ["is-gold", "is-silver", "is-bronze"][index] ?? "is-plain";
-    const landed = landedKey === key;
-    const medal = index < 3
-      ? `<span class="dj-medal" aria-hidden="true"><b>${index + 1}</b><i></i><small>${index + 1}위</small></span>`
-      : `<span class="dj-seal-rank" aria-hidden="true">${index + 1}</span>`;
-    return `<article class="dj-card ${tier}${landed ? " is-landed" : ""}${enter ? " is-enter" : ""}" data-chain="${escapeHtml(key)}" style="--i:${index}" aria-label="${index + 1}위 ${escapeHtml(label)}">
-      ${medal}
-      ${index === 0 ? `<span class="dj-card-kicker">최고 기록</span>` : ""}
-      <div class="dj-card-top">
-        <strong>${escapeHtml(label)}</strong>
-        <span>${escapeHtml(formatCount(row.route.points))}점</span>
-        <button type="button" class="dj-card-redo" data-pick-chain="${escapeHtml(key)}">다시 재기</button>
-        <button type="button" class="dj-card-x" data-run-clear="${escapeHtml(key)}" aria-label="${escapeHtml(label)} 기록 지우기" title="기록 지우기">×</button>
+  // 순위표 위 칸 아래: 보고 있는 루트의 실제 시간 칸(기록부를 합친 자리)
+  function editorHtml(route, score) {
+    const key = chainKey(route.saves ?? []);
+    const label = chainText(route.saves ?? []);
+    const actual = draftRuns.get(key) ?? null;
+    const ref = route.runs ? route.seconds : null;
+    const delta = deltaText(actual, ref);
+    const has = actual != null;
+    return `<div class="dj-best-edit${has ? " has-actual" : ""}" data-chain="${escapeHtml(key)}">
+      <div class="dj-best-edit-row">
+        <span class="dj-best-edit-label">실제 시간</span>
+        ${runInputs(key, label, actual)}
+        <span class="dj-card-ref"><small>참고 ${escapeHtml(ref != null ? formatDuration(ref) : "-")}</small><b class="${delta.tone}" data-live="delta">${escapeHtml(has ? delta.text : "아직 안 잼")}</b></span>
+        <span class="dj-card-rate"><b data-live="pm">${has ? `분당 ${escapeHtml(formatPerMinute(route.points, actual))}` : "분당 -"}</b><small>초당 <span data-live="ps">${escapeHtml(has ? formatPointsPerSecond(route.points, actual) : "-")}</span> · 점수당 <span data-live="spp">${escapeHtml(has ? formatSecondsPerPoint(route.points, actual) : "-")}</span></small></span>
       </div>
-      <div class="dj-card-mid">
-        ${runInputs(key, label, row.seconds)}
-        <span class="dj-card-ref"><small>참고 ${escapeHtml(ref != null ? formatDuration(ref) : "-")}</small><b class="${delta.tone}" data-live="delta">${escapeHtml(delta.text)}</b></span>
-        <span class="dj-card-rate"><b data-live="pm">분당 ${escapeHtml(formatPerMinute(row.route.points, row.seconds))}</b><small>초당 <span data-live="ps">${escapeHtml(formatPointsPerSecond(row.route.points, row.seconds))}</span> · 점수당 <span data-live="spp">${escapeHtml(formatSecondsPerPoint(row.route.points, row.seconds))}</span></small></span>
+      <div class="dj-best-edit-foot">
+        <span>검은 허리띠까지 <b data-live="belt">${escapeHtml(has ? beltText(route, actual, score) : "-")}</b></span>
+        <span>시간당 <b data-live="hour">${escapeHtml(has ? hourText(route, actual) : "-")}</b> 메소</span>
+        <span class="dj-best-edit-btns">
+          <button type="button" class="dj-best-redo" data-pick-chain="${escapeHtml(key)}">${has ? "다시 재기" : "이 루트 재기"} ↓</button>
+          ${has ? `<button type="button" class="dj-best-clear" data-run-clear="${escapeHtml(key)}" aria-label="${escapeHtml(label)} 실제 기록 지우기">기록 지우기</button>` : ""}
+        </span>
       </div>
-      ${cellsHtml(row.route.saves)}
-      <div class="dj-card-foot"><span>검은 허리띠까지 <b data-live="belt">${escapeHtml(beltText(row.route, row.seconds, score))}</b></span><span>시간당 <b data-live="hour">${escapeHtml(hourText(row.route, row.seconds))}</b> 메소</span></div>
-    </article>`;
+    </div>`;
   }
 
-  // 기록부(한지): 잰 루트 카드 · 아직 안 잰 추천 루트 3개 · 전체 32개 간이표
-  function bookHtml(ranked, measured, score) {
-    const sig = measured.rows.map((row) => chainKey(row.route.saves)).join("|");
-    const enter = sig !== bookSig;
-    bookSig = sig;
-    const cards = measured.rows.length
-      ? measured.rows.map((row, index) => bookCard(row, index, score, enter)).join("")
-      : `<p class="dj-book-empty">아직 잰 루트가 없어요. 왼쪽에서 한 바퀴를 재 보세요.</p>`;
-    const byRef = ranked.filter((item) => item.row.best).sort((left, right) => compareRoutes(left.row.best, right.row.best));
-    const suggest = byRef.filter((item) => item.actual == null).slice(0, 3).map((item) => {
-      const key = chainKey(item.row.saves);
-      return `<div class="dj-suggest-row">
-        <span><strong>${escapeHtml(chainText(item.row.saves))}</strong><small>${escapeHtml(formatCount(item.points))}점 · 참고 ${escapeHtml(formatDuration(item.row.best.seconds))}</small></span>
-        <b>참고 분당 ${escapeHtml(formatPerMinute(item.points, item.row.best.seconds))}</b>
-        <button type="button" data-pick-chain="${escapeHtml(key)}">이 루트 재기</button>
-      </div>`;
-    }).join("");
-    const allRows = showAllRoutes
+  // 순위표 아래: 전체 저장 조합 표(실제 시간 칸 포함). 기록부의 전체 간이표를 옮겼다.
+  function paintAllRoutes(ranked) {
+    const box = root.querySelector("[data-route-all]");
+    if (!box) return;
+    if (!ranked.length) {
+      box.innerHTML = "";
+      return;
+    }
+    const byRef = ranked.filter((item) => item.row.best);
+    const rows = showAllRoutes
       ? [...byRef, ...ranked.filter((item) => !item.row.best)].map((item) => {
           const key = chainKey(item.row.saves);
           const label = chainText(item.row.saves);
           const seconds = item.actual ?? item.row.best?.seconds ?? null;
-          return `<div class="dj-all-row${key === clockTarget ? " is-picked" : ""}${item.actual != null ? " is-actual" : ""}" data-chain="${escapeHtml(key)}">
+          return `<div class="dj-all-row${key === viewKey ? " is-picked" : ""}${item.actual != null ? " is-actual" : ""}" data-chain="${escapeHtml(key)}">
             <span class="is-name">${escapeHtml(label)}</span>
             <span class="is-num">${escapeHtml(formatCount(item.points))}</span>
             <span class="is-num">${escapeHtml(item.row.best ? formatDuration(item.row.best.seconds) : "-")}</span>
@@ -988,18 +989,12 @@ export async function render(root) {
           </div>`;
         }).join("")
       : "";
-    return `<div class="dj-book">
-      <div class="dj-book-head"><h3>기록부</h3><span>잰 루트 ${formatCount(measured.rows.length)}개 · 실제 분당 점수 순</span></div>
-      <div class="dj-book-cards">${cards}</div>
-      ${suggest ? `<div class="dj-suggest"><span class="dj-suggest-title">아직 안 잰 추천 루트</span>${suggest}</div>` : ""}
-      <button type="button" class="dj-all-toggle" data-all-toggle aria-expanded="${showAllRoutes}">${showAllRoutes ? "전체 루트 접기 ▴" : `전체 ${formatCount(ranked.length)}개 루트 보기 ▾`}</button>
-      ${showAllRoutes ? `<div class="dj-all"><div class="dj-all-row is-head"><span>저장</span><span class="is-num">점수</span><span class="is-num">참고</span><span class="is-center">실제</span><span class="is-num">분당</span></div>${allRows}</div>` : ""}
-      <p class="form-message is-error" data-measured hidden></p>
-    </div>`;
+    box.innerHTML = `<button type="button" class="dj-all-toggle" data-all-toggle aria-expanded="${showAllRoutes}">${showAllRoutes ? "전체 루트 접기 ▴" : `전체 ${formatCount(ranked.length)}개 루트 보기 · 실제 시간 적기 ▾`}</button>
+      ${showAllRoutes ? `<div class="dj-all"><div class="dj-all-row is-head"><span>저장</span><span class="is-num">점수</span><span class="is-num">참고</span><span class="is-center">실제</span><span class="is-num">분당</span></div>${rows}</div>` : ""}`;
   }
 
   function paintLive(key) {
-    const rows = [...plan.querySelectorAll("[data-chain]")].filter((item) => item.dataset.chain === key);
+    const rows = [...form.querySelectorAll("[data-chain]")].filter((item) => item.dataset.chain === key);
     if (!rows.length) return;
     const route = routeForKey(key);
     const seconds = draftRuns.get(key);
@@ -1045,21 +1040,21 @@ export async function render(root) {
   function runRows(route) {
     const last = BANDS.at(-1).end;
     const runs = route?.runs?.length ? route.runs : [{ start: 1, end: last }];
-    return `<div class="dj-runs-grid">${runs
+    return `<div class="dj-runs-grid" data-tip-host>${runs
       .map((run, runIndex) => {
         const cells = Array.from({ length: last }, (_, index) => {
           const round = index + 1;
           const on = round >= run.start;
           const gap = round % 5 === 0 && round < last ? " is-gap" : "";
-          return `<i class="${on ? "is-on" : ""}${gap}" style="--hue:${bandHue(round)};--d:${runIndex * 250 + index * 18}ms"></i>`;
+          return `<i class="${on ? "is-on" : ""}${gap}" style="--hue:${bandHue(round)};--d:${runIndex * 250 + index * 18}ms" data-track-round="${round}" data-track-run="${runIndex + 1}"${on ? "" : " data-track-skip"}></i>`;
         }).join("");
-        return `<div class="dj-run" title="${escapeHtml(spanText(run.start, run.end))}"><span>${runIndex + 1}회차</span><div class="dj-cells">${cells}</div></div>`;
+        return `<div class="dj-run"><span>${runIndex + 1}회차</span><div class="dj-cells">${cells}</div></div>`;
       })
-      .join("")}</div>`;
+      .join("")}<div class="dj-track-tip" data-track-tip role="tooltip" hidden></div></div>`;
   }
 
   function paintBest(entry, meta = {}) {
-    const { hasActual = false, hasRecommend = false, rank = 1, picked = false } = meta;
+    const { hasActual = false, hasRecommend = false, rank = 1, picked = false, view = null } = meta;
     const box = root.querySelector("[data-best]");
     if (!box) return;
     const route = entry?.route ?? null;
@@ -1067,84 +1062,80 @@ export async function render(root) {
     const mode = entry?.mode ?? (hasRecommend ? "recommend" : "actual");
     const score = entry?.score ?? 0;
     const hasRoute = Boolean(route);
-    const tabs = `<div class="dojo-best-tabs" role="tablist" aria-label="1위 루트 보기">
-          <button type="button" class="dojo-best-tab is-actual${mode === "actual" ? " is-active" : ""}" data-best-view="actual" role="tab" aria-selected="${mode === "actual"}"${hasActual ? "" : " disabled"}>실제 기록</button>
-          <button type="button" class="dojo-best-tab is-recommend${mode === "recommend" ? " is-active" : ""}" data-best-view="recommend" role="tab" aria-selected="${mode === "recommend"}"${hasRecommend ? "" : " disabled"}>추천 동선</button>
+    // 토글은 순위표 기준(실제 기록/추천 동선)을 보여 준다. 다른 순위를 올려도 기준은 그대로다.
+    const tab = view ?? mode;
+    const tabs = `<div class="dojo-best-tabs" role="tablist" aria-label="순위표 기준">
+          <button type="button" class="dojo-best-tab is-actual${tab === "actual" ? " is-active" : ""}" data-best-view="actual" role="tab" aria-selected="${tab === "actual"}"${hasActual ? "" : ` disabled title="아직 직접 잰 루트가 없어요"`}>실제 기록</button>
+          <button type="button" class="dojo-best-tab is-recommend${tab === "recommend" ? " is-active" : ""}" data-best-view="recommend" role="tab" aria-selected="${tab === "recommend"}"${hasRecommend ? "" : " disabled"}>추천 동선</button>
         </div>`;
-    box.className = `dojo-best is-${mode}${hasRoute ? "" : " is-empty"}`;
+    const topKey = hasRoute ? chainKey(route.saves ?? []) : "";
+    const swapped = hasRoute && swapSig !== `${topKey}|${mode}` && swapSig !== "";
+    swapSig = hasRoute ? `${topKey}|${mode}` : "";
+    box.className = `dojo-best is-${mode}${hasRoute ? "" : " is-empty"}${picked ? " is-picked" : ""}${swapped ? " is-swap" : ""}`;
+    const tabSlot = root.querySelector("[data-best-tabs]");
+    if (tabSlot) tabSlot.innerHTML = tabs;
+    const sub = root.querySelector("[data-scroll-sub]");
+    const refNote = root.querySelector("[data-ref-note]");
+    if (refNote) refNote.hidden = tab !== "recommend";
+    if (sub) sub.textContent = tab === "actual" ? "직접 잰 루트가 먼저, 분당 점수가 높은 순" : "구간 초로 계산한 참고 시간 기준, 분당 점수가 높은 순";
     if (!hasRoute) {
-      box.innerHTML = `${tabs}<p class="dj-best-empty">구간 초를 모두 입력하면 1위 루트가 여기에 적힙니다.</p>`;
+      box.innerHTML = `<p class="dj-best-empty">구간 초를 모두 입력하면 1위 루트가 여기에 적힙니다.</p>`;
       return;
     }
     const name = route.saves?.length ? chainText(route.saves) : "저장 안 함";
+    box.classList.toggle("is-landed", landedKey === chainKey(route.saves ?? []));
     box.innerHTML = `
       <div class="dj-best">
         <div class="dj-best-top">
           <span class="dj-best-rank">${String(rank).padStart(2, "0")}</span>
           <strong>${escapeHtml(name)}</strong>
-          <span class="dj-best-badge${picked ? " is-picked" : ""}">${picked ? "선택" : mode === "actual" ? "실제" : "추천"}</span>
+          <span class="dj-best-badge${mode === "actual" ? "" : " is-ref"}">${mode === "actual" ? "실제" : picked ? "참고" : "추천"}</span>
           <span class="dj-best-rate">분당 ${escapeHtml(formatPerMinute(route.points, seconds))}</span>
         </div>
         <span class="dj-best-meta">한 바퀴 ${escapeHtml(formatCount(route.points))}점 · ${escapeHtml(formatDuration(seconds))}</span>
         ${runRows(route)}
       </div>
-      <div class="dj-best-foot">${picked ? `<button type="button" class="dj-best-reset" data-best-reset>1위 보기</button>` : ""}${tabs}</div>
+      ${editorHtml(route, score)}
     `;
   }
 
-  // 두루마리 아래 순위 목록: 상위 5개. 실제 시간이 있으면 실제로, 없으면 참고 시간으로 분당 점수를 잰다.
+  // 두루마리 아래 순위 목록: 1~4위 고정. 실제 시간이 있으면 실제로, 없으면 참고 시간으로 분당 점수를 잰다.
+  // 줄을 누르면 그 줄이 "선택됨"이 되고 위 칸에 그 루트를 자세히 보여 준다(기본은 1위).
   // 기록이 없거나 5개보다 적어도 빈 줄로 5칸을 채워 두루마리 크기가 바뀌지 않게 한다.
-  const ROUTE_ROWS = 5; // 1위 칸 + 아래 목록 02~05
+  const ROUTE_ROWS = 5; // 위 칸 + 아래 목록 1~4위
 
-  function paintRouteList(ranked) {
+  function paintRouteList(ranked, topKey = null, mode = "actual") {
     const box = root.querySelector("[data-route-list]");
     if (!box) return;
+    // 추천 동선 기준이면 실제 시간이 있어도 참고 시간으로 줄 세운다.
     const all = ranked
       .filter((item) => item.row.best)
       .map((item) => {
-        const seconds = item.actual ?? item.row.best.seconds;
-        return { ...item, seconds, perMinute: (item.points * 60) / seconds };
+        const actual = mode === "actual" ? item.actual : null;
+        const seconds = actual ?? item.row.best.seconds;
+        return { ...item, actual, seconds, perMinute: (item.points * 60) / seconds };
       });
-    const items = all.slice(1, ROUTE_ROWS);
+    const items = all.slice(0, ROUTE_ROWS - 1).map((item, index) => ({ ...item, rank: index + 1 }));
     // 막대는 1위 대비 비율(시안)
-    const max = all.length ? Math.max(...all.slice(0, ROUTE_ROWS).map((item) => item.perMinute)) : 1;
+    const max = all.length ? Math.max(...all.slice(0, ROUTE_ROWS - 1).map((item) => item.perMinute)) : 1;
     const filled = items.map((item, index) => {
       const key = chainKey(item.row.saves);
-      const picked = viewKey === key ? " is-picked" : "";
-      return `<button type="button" class="dj-route${picked}" aria-pressed="${viewKey === key}" data-chain="${escapeHtml(key)}" style="--i:${index}">
-          <span class="dj-route-rank">${String(index + 2).padStart(2, "0")}</span>
-          <span class="dj-route-copy"><strong>${escapeHtml(chainText(item.row.saves))}</strong><span>${escapeHtml(formatCount(item.points))}점 · ${escapeHtml(formatDuration(item.seconds))}${item.actual != null ? " · 실제" : " · 참고"}</span></span>
+      const picked = key === topKey;
+      return `<button type="button" class="dj-route${picked ? " is-picked" : ""}" data-chain="${escapeHtml(key)}" style="--i:${index}" aria-pressed="${picked}" aria-label="${item.rank}위 ${escapeHtml(chainText(item.row.saves))} 자세히 보기">
+          <span class="dj-route-rank">${String(item.rank).padStart(2, "0")}</span>
+          <span class="dj-route-copy"><strong>${escapeHtml(chainText(item.row.saves))}${picked ? `<em class="dj-route-picked">선택됨</em>` : ""}</strong><span>${escapeHtml(formatCount(item.points))}점 · ${escapeHtml(formatDuration(item.seconds))}${item.actual != null ? " · 실제" : " · 참고"}</span></span>
           <span class="dj-route-rate"><b>${escapeHtml(formatPerMinute(item.points, item.seconds))}/분</b><span class="dj-route-bar"><i style="width:${Math.max(4, (item.perMinute / max) * 100)}%"></i></span></span>
         </button>`;
     });
     const empty = Array.from({ length: ROUTE_ROWS - 1 - filled.length }, (_, offset) => {
       const index = filled.length + offset;
       return `<div class="dj-route is-empty" aria-hidden="true" style="--i:${index}">
-          <span class="dj-route-rank">${String(index + 2).padStart(2, "0")}</span>
+          <span class="dj-route-rank">${String(all.length + offset + 1).padStart(2, "0")}</span>
           <span class="dj-route-copy"><strong>—</strong><span>구간 초를 입력하면 채워집니다</span></span>
           <span class="dj-route-rate"><b>분당 -</b><span class="dj-route-bar"></span></span>
         </div>`;
     });
     box.innerHTML = filled.join("") + empty.join("");
-  }
-
-  // 순위 줄을 눌렀으면 위쪽 칸을 그 루트로 바꾼다. 순위는 목록과 같은 기준(실제 시간 우선)으로 센다.
-  function paintPickedRoute(ranked, score, meta) {
-    if (viewKey == null) return;
-    const all = ranked.filter((item) => item.row.best);
-    const index = all.findIndex((item) => chainKey(item.row.saves) === viewKey);
-    if (index < 0) {
-      viewKey = null;
-      return;
-    }
-    const item = all[index];
-    const entry = {
-      mode: item.actual != null ? "actual" : "recommend",
-      route: item.row.best,
-      seconds: item.actual ?? item.row.best.seconds,
-      score,
-    };
-    paintBest(entry, { ...meta, rank: index + 1, picked: true });
   }
 
   // 명패 판: 정보 칸 3개와 허리띠 게이지
@@ -1200,6 +1191,7 @@ export async function render(root) {
       paintBest(null);
       paintPlaque(0);
       paintRouteList([]);
+      paintAllRoutes([]);
       plan.innerHTML = `<p class="form-message is-error"></p>`;
       plan.querySelector("p").textContent = current.error;
       return;
@@ -1255,7 +1247,6 @@ export async function render(root) {
     const preferRecommend = bestView === "recommend" && hasRecommend;
     const shown = preferRecommend ? recommendEntry : hasActual ? actualEntry : recommendEntry;
     shownEntry = shown;
-    paintBest(shown, { hasActual, hasRecommend });
     paintPlaque(current.score);
     paintBeltSum();
 
@@ -1278,8 +1269,21 @@ export async function render(root) {
         }
         return compareRoutes(left.row.best, right.row.best);
       });
-    paintRouteList(ranked);
-    paintPickedRoute(ranked, current.score, { hasActual, hasRecommend });
+    // 순위표 기준: 실제 기록(잰 루트 먼저) 또는 추천 동선(참고 시간 순). 실제 기록이 없으면 추천 동선만.
+    const mode = shown?.mode ?? "recommend";
+    const withBest = ranked.filter((item) => item.row.best);
+    const order = mode === "recommend" ? [...withBest].sort((left, right) => compareRoutes(left.row.best, right.row.best)) : withBest;
+    defaultKey = order[0] ? chainKey(order[0].row.saves) : null;
+    if (viewKey === defaultKey) viewKey = null;
+    if (viewKey != null && !order.some((item) => chainKey(item.row.saves) === viewKey)) viewKey = null;
+    const topKey = viewKey ?? defaultKey;
+    const topIndex = order.findIndex((item) => chainKey(item.row.saves) === topKey);
+    const top = order[topIndex];
+    const topActual = mode === "actual" ? top?.actual ?? null : null;
+    paintBest(top ? { mode: topActual != null ? "actual" : "recommend", route: top.row.best, seconds: topActual ?? top.row.best.seconds, score: current.score } : null,
+      { hasActual, hasRecommend, rank: topIndex + 1, picked: viewKey != null, view: mode });
+    paintRouteList(order, topKey, mode);
+    paintAllRoutes(ranked);
     // 측정대에서 재는 저장 조합(기존 clockTarget). 없으면 순위 1위.
     if (!ranked.some((item) => chainKey(item.row.saves) === clockTarget)) {
       clockTarget = routePending ? routePending.key : (ranked[0] ? chainKey(ranked[0].row.saves) : "");
@@ -1290,8 +1294,10 @@ export async function render(root) {
       points: picked?.points ?? chainPoints(party, savesOf(clockTarget)),
       ref: picked?.row.best ? picked.row.best.seconds : null,
       actual: picked?.actual ?? null,
+      rank: picked?.row.best ? order.indexOf(picked) + 1 : 0,
+      listMode: mode,
     };
-    plan.innerHTML = `<div class="dj-measure-body">${deskHtml(pick)}${bookHtml(ranked, measured, current.score)}</div>`;
+    plan.innerHTML = `<div class="dj-measure-body">${deskHtml(pick)}</div>`;
   }
 
   function priceEditor(belt, deleteId) {
@@ -1431,18 +1437,11 @@ export async function render(root) {
     hour.textContent = quote.hour != null ? `${formatCount(quote.hour)} 메소` : "-";
   }
 
-  function paintRecords() {
-    if (!recordRows.length) {
-      records.innerHTML = `<p class="empty">저장된 캐릭터가 없습니다.</p>`;
-      return;
-    }
-    const openCharacterId = form.dataset.openCharacter || "";
-    const openParty = form.dataset.openParty || "solo";
-    const ranked = recordRows
-      .map((row) => ({
-        row,
-        actual: measuredRoutes(parseFloors(row.floors), row.party, row.runs).best,
-      }))
+  // 처음 열 때 고를 캐릭터: 실제 1위 루트가 빠른 기록 순(예전 캐릭터별 기록 카드 순서)
+  function rankedRecords() {
+    return recordRows
+      .filter((row) => row.character_id)
+      .map((row) => ({ row, actual: measuredRoutes(parseFloors(row.floors), row.party, row.runs).best }))
       .sort((left, right) => {
         if (left.actual && right.actual) {
           const speed = compareRoutes(
@@ -1453,49 +1452,8 @@ export async function render(root) {
         } else if (left.actual) return -1;
         else if (right.actual) return 1;
         return left.row.character_name.localeCompare(right.row.character_name, "ko");
-      });
-    const body = ranked
-      .map(({ row, actual }) => {
-        const party = row.party ? "team" : "solo";
-        const selected = row.character_id === openCharacterId && party === openParty;
-        const open = row.character_id ? ` data-open="${escapeHtml(row.character_id)}" data-party="${party}" tabindex="0"` : "";
-        const actualChain = actual ? chainText(actual.route.saves) : "-";
-        const actualTime = actual ? formatDuration(actual.seconds) : "-";
-        const perSecond = actual ? formatPointsPerSecond(actual.route.points, actual.seconds) : "-";
-        const perPoint = actual ? formatSecondsPerPoint(actual.route.points, actual.seconds) : "-";
-        const belt = !actual ? "-" : beltText(actual.route, actual.seconds, row.score || 0);
-        const beltFull = !actual ? "-" : beltText(actual.route, actual.seconds, 0);
-        const hour = !actual ? "-" : hourText(actual.route, actual.seconds);
-        const popped = arriveCard && selected ? " is-pop" : "";
-        const face = faceMarkup(characters.find((item) => item.id === row.character_id)?.face_url);
-        const picked = selected ? `<span class="dojo-picked">선택됨</span>` : "";
-        return `<article class="dojo-card${selected ? " is-selected" : ""}${popped}"${open}${selected ? ` aria-current="true"` : ""}>
-          <div class="dojo-card-hero${face ? " has-face" : ""}">
-            <div class="dojo-card-title">
-              <h3>${escapeHtml(row.character_name)}</h3>
-              <span class="dojo-mode ${row.party ? "is-team" : "is-solo"}">${row.party ? "팀" : "개인"}</span>
-              ${picked}
-              <button class="dojo-card-delete" type="button" data-delete="${escapeHtml(row.id)}" aria-label="${escapeHtml(row.character_name)} ${row.party ? "팀" : "개인"} 기록 삭제" title="삭제">×</button>
-            </div>
-            ${face}
-            <div class="dojo-card-hero-text">
-              <span>검은 허리띠까지<em class="dojo-card-score">지금 ${escapeHtml(formatCount(row.score || 0))}점</em></span>
-              <strong>${escapeHtml(belt)}</strong>
-            </div>
-            <p class="dojo-card-meso"><span>시간당 메소</span><b>${escapeHtml(hour)}</b></p>
-          </div>
-          <ul class="dojo-card-extra">
-            <li class="is-route"><span>실제 경로</span><strong>${escapeHtml(actualChain)}</strong></li>
-            <li><span>실제 시간</span><strong>${escapeHtml(actualTime)}</strong></li>
-            <li><span>초당 점수</span><strong>${escapeHtml(perSecond)}</strong></li>
-            <li><span>점수당 초</span><strong>${escapeHtml(perPoint)}</strong></li>
-            <li><span>총 검은띠 시간</span><strong>${escapeHtml(beltFull)}</strong></li>
-          </ul>
-        </article>`;
       })
-      .join("");
-    records.innerHTML = `<div class="dojo-cards">${body}</div>`;
-    arriveCard = false;
+      .map((item) => item.row);
   }
 
   function fillSheet(row, characterId, party) {
@@ -1522,28 +1480,27 @@ export async function render(root) {
     paintPlan();
     paintWho();
     savedSnapshot = snapshot();
-    if (recordRows.length) paintRecords();
   }
 
   function paintWho() {
     const who = root.querySelector("[data-who]");
-    const label = root.querySelector("[data-picked-label]");
     const id = form.dataset.openCharacter || form.elements.character_id.value;
+    const remove = root.querySelector("[data-delete-current]");
+    if (remove) {
+      const sheet = sheetFor(id, form.elements.party.value || "solo");
+      remove.hidden = !sheet;
+      remove.dataset.delete = sheet?.id ?? "";
+    }
     const character = characters.find((row) => row.id === id);
     const mode = form.elements.party.value === "team" ? "팀" : "개인";
     paintCharChips();
     if (!who) return;
     if (!character) {
       who.textContent = "캐릭터를 선택해 주세요";
-      if (label) label.hidden = true;
       return;
     }
     const level = character.level ? `Lv ${formatCount(character.level)}` : "";
     who.textContent = [character.name, character.job, level, mode].filter(Boolean).join(" · ");
-    if (label) {
-      label.hidden = false;
-      label.textContent = `${character.name} · ${mode}`;
-    }
   }
 
   function sheetFor(characterId, party) {
@@ -1621,13 +1578,12 @@ export async function render(root) {
       recordRows = [];
       paintCharacters();
       paintBelts();
-      records.innerHTML = `<p class="empty">로그인하면 캐릭터별 무릉 기록과 효율 순위가 여기 보여요. 지금은 위에 구간 초를 적어 루트를 계산해 볼 수 있어요.</p>`;
       paintPlan();
       paintWho();
       return;
     }
     belts.innerHTML = `<p class="empty">시세를 불러오는 중입니다.</p>`;
-    records.innerHTML = `<p class="empty">기록을 불러오는 중입니다.</p>`;
+    recordError.hidden = true;
     const supabase = await getSupabase();
     if (id !== loadId || !root.isConnected) return;
     const legacyColumns = recordColumns.replace(", runs", "");
@@ -1666,20 +1622,21 @@ export async function render(root) {
       priceRows = priceResult.data ?? [];
       paintBelts();
     }
-    if (recordResult.error) showError(records, recordResult.error);
-    else {
+    if (recordResult.error) {
+      recordError.hidden = false;
+      recordError.textContent = translateDbError(recordResult.error);
+    } else {
       recordRows = recordResult.data ?? [];
-      paintRecords();
+      paintCharChips();
       // 처음 열 때만 효율 순위 첫 캐릭터를 선택한다. 저장·재조회 때 사용자의 선택은 유지한다.
-      const first = records.querySelector("[data-open]");
+      const first = rankedRecords().find((row) => characters.some((character) => character.id === row.character_id));
       if (!form.dataset.openCharacter && first) {
-        fillSheet(sheetFor(first.dataset.open, first.dataset.party), first.dataset.open, first.dataset.party);
+        const party = first.party ? "team" : "solo";
+        fillSheet(sheetFor(first.character_id, party), first.character_id, party);
       }
       if (!runsReady) {
-        records.insertAdjacentHTML(
-          "afterbegin",
-          `<p class="form-message is-error">돌아본 시간을 저장하려면 Supabase SQL Editor에서 sql/018_dojo_character_runs.sql 을 실행해 주세요.</p>`,
-        );
+        recordError.hidden = false;
+        recordError.textContent = "돌아본 시간을 저장하려면 Supabase SQL Editor에서 sql/018_dojo_character_runs.sql 을 실행해 주세요.";
       }
     }
     paintPlan();
@@ -1848,54 +1805,11 @@ export async function render(root) {
     await load();
   }
 
-  let arriveTimer = 0;
-
-  function markArrived() {
-    const editor = form.querySelector(".dj-bands");
-    if (!editor) return;
-    editor.classList.remove("is-arrived");
-    void editor.offsetWidth;
-    editor.classList.add("is-arrived");
-    window.clearTimeout(arriveTimer);
-    arriveTimer = window.setTimeout(() => editor.classList.remove("is-arrived"), 900);
-  }
-
-  function scrollToSheet() {
-    const bar = document.querySelector(".topbar");
-    const offset = (bar?.getBoundingClientRect().height ?? 58) + 14;
-    form.style.scrollMarginTop = `${offset}px`;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const distance = Math.abs(form.getBoundingClientRect().top - offset);
-    if (reduce || distance < 12) {
-      if (distance >= 12) form.scrollIntoView({ block: "start" });
-      markArrived();
-      return;
-    }
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
-    let settled = false;
-    let fallback = 0;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener("scroll", watch);
-      window.removeEventListener("scrollend", finish);
-      window.clearTimeout(fallback);
-      markArrived();
-    };
-    const watch = () => {
-      window.clearTimeout(fallback);
-      fallback = window.setTimeout(finish, 140);
-    };
-    fallback = window.setTimeout(finish, 1400);
-    window.addEventListener("scroll", watch, { passive: true });
-    window.addEventListener("scrollend", finish);
-  }
-
   form.addEventListener("input", (event) => {
     if (event.target.matches("[data-run-part]")) {
-      // 같은 루트가 기록부 카드와 전체 간이표에 함께 있으면 두 칸을 같은 값으로 맞춘다(readRun 은 첫 칸을 읽는다).
+      // 같은 루트가 순위표 위 칸과 전체 표에 함께 있으면 두 칸을 같은 값으로 맞춘다(readRun 은 첫 칸을 읽는다).
       const { runKey, runPart } = event.target.dataset;
-      for (const twin of plan.querySelectorAll(`[data-run-part="${runPart}"]`)) {
+      for (const twin of form.querySelectorAll(`[data-run-part="${runPart}"]`)) {
         if (twin !== event.target && twin.dataset.runKey === runKey) twin.value = event.target.value;
       }
       applyRun(runKey);
@@ -1913,8 +1827,8 @@ export async function render(root) {
     if (event.target.name === "character_id") openSheet(event.target.value, form.elements.party.value);
     if (event.target.name === "party") openSheet(form.elements.character_id.value, event.target.value);
   });
-  // 누르면 다시 그려지는 측정대·기록부 버튼. 실제 시간 칸에서 이 버튼으로 옮겨 갈 때는 칸을 벗어날 때 다시 그리지 않는다(누른 버튼이 사라지지 않게).
-  const CLOCK_CONTROLS = "[data-clock-start], [data-clock-stop], [data-clock-apply], [data-clock-reset], [data-band-start], [data-band-stop], [data-band-apply], [data-band-cancel], [data-manual-apply], [data-pick-chain], [data-run-clear], [data-gate], [data-quick-pick], [data-all-toggle]";
+  // 누르면 다시 그려지는 측정대·순위표 버튼. 실제 시간 칸에서 이 버튼으로 옮겨 갈 때는 칸을 벗어날 때 다시 그리지 않는다(누른 버튼이 사라지지 않게).
+  const CLOCK_CONTROLS = "[data-clock-start], [data-clock-stop], [data-clock-apply], [data-clock-reset], [data-band-start], [data-band-stop], [data-band-apply], [data-band-cancel], [data-manual-apply], [data-pick-chain], [data-run-clear], [data-gate], [data-quick-pick], [data-all-toggle], [data-goto-rank]";
 
   form.addEventListener("focusout", (event) => {
     if (!event.target.matches?.("[data-run-part]")) return;
@@ -1926,13 +1840,6 @@ export async function render(root) {
   });
   form.addEventListener("submit", (event) => {
     saveRecord(event);
-  });
-  records.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const card = event.target.closest("[data-open]");
-    if (!card || event.target.closest("button")) return;
-    event.preventDefault();
-    card.click();
   });
   plan.addEventListener("keydown", (event) => {
     // 이미 잰 시간 칸에서 Enter = 바로 적기(폼 저장으로 가지 않게)
@@ -1966,7 +1873,7 @@ export async function render(root) {
 
   root.addEventListener("pointerdown", (event) => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const control = event.target.closest("button, .dojo-card");
+    const control = event.target.closest("button");
     if (!control || control.disabled) return;
     control.classList.remove("is-tap");
     void control.offsetWidth;
@@ -1974,21 +1881,27 @@ export async function render(root) {
     const start = event.target.closest("[data-band-start], [data-clock-start]");
     if (start && !start.disabled) burstStart(start);
   });
-  // 측정대 층 칸에 마우스를 올리면(모바일은 누르면) 그 층 보스를 말풍선으로 보여준다.
+  // 측정대 층 칸·순위표 회차 막대 칸에 마우스를 올리면(모바일은 누르면) 그 층 보스를 말풍선으로 보여준다.
   function showTrackTip(cell) {
-    const track = cell.closest(".dj-track");
+    const track = cell.closest("[data-tip-host]");
     const tip = track?.querySelector("[data-track-tip]");
     if (!tip) return;
     const round = Number(cell.dataset.trackRound);
     const boss = bandBosses(round, round)[0];
     const { floorLabel } = spanParts(round, round);
-    tip.innerHTML = `<b>${floorLabel}</b><span>${escapeHtml(boss?.name ?? "보스 정보 없음")}</span>${boss?.note ? `<em>${escapeHtml(boss.note)} 주의</em>` : ""}<small>${round}라운드</small>`;
+    // 순위표 회차 막대는 몇 회차인지, 그 회차에 안 도는 층인지도 적는다.
+    const run = cell.dataset.trackRun ? ` · ${cell.dataset.trackRun}회차${cell.hasAttribute("data-track-skip") ? " 안 돎" : ""}` : "";
+    tip.innerHTML = `<b>${floorLabel}</b><span>${escapeHtml(boss?.name ?? "보스 정보 없음")}</span>${boss?.note ? `<em>${escapeHtml(boss.note)} 주의</em>` : ""}<small>${round}라운드${run}</small>`;
     tip.style.setProperty("--hue", bandHue(round));
     tip.hidden = false;
-    for (const other of track.querySelectorAll(".dj-track-cell.is-tip")) other.classList.remove("is-tip");
+    for (const other of track.querySelectorAll("[data-track-round].is-tip")) other.classList.remove("is-tip");
     cell.classList.add("is-tip");
     // 칸 가운데 위에 두되 트랙 밖으로 나가지 않게 좌우를 맞춘다.
-    const center = cell.offsetLeft + cell.offsetWidth / 2;
+    const box = track.getBoundingClientRect();
+    const spot = cell.getBoundingClientRect();
+    const center = spot.left - box.left + spot.width / 2;
+    // 측정대 트랙은 트랙 위에, 순위표 회차 막대는 그 줄 바로 위에 띄운다.
+    tip.style.bottom = track.classList.contains("dj-track") ? "" : `${box.bottom - spot.top + 6}px`;
     const half = tip.offsetWidth / 2;
     const left = Math.min(Math.max(center, half + 4), track.clientWidth - half - 4);
     tip.style.left = `${left}px`;
@@ -1997,7 +1910,7 @@ export async function render(root) {
   function hideTrackTip(track) {
     const tip = track?.querySelector("[data-track-tip]");
     if (tip) tip.hidden = true;
-    for (const cell of track?.querySelectorAll(".dj-track-cell.is-tip") ?? []) cell.classList.remove("is-tip");
+    for (const cell of track?.querySelectorAll("[data-track-round].is-tip") ?? []) cell.classList.remove("is-tip");
   }
   root.addEventListener("pointerover", (event) => {
     const cell = event.target.closest?.("[data-track-round]");
@@ -2019,15 +1932,17 @@ export async function render(root) {
   }
   function touchTrack(event) {
     if (event.pointerType === "mouse" || event.target.closest?.("[data-gate]")) return;
-    const track = event.target.closest?.(".dj-track");
-    const cell = track && trackCellAt(track, event.clientX);
+    const track = event.target.closest?.("[data-tip-host]");
+    // 순위표 회차 막대는 칸이 여러 줄이라 누른 줄에서 고른다.
+    const scope = event.target.closest?.(".dj-run") ?? track;
+    const cell = track && trackCellAt(scope, event.clientX);
     if (cell) showTrackTip(cell);
   }
   root.addEventListener("pointerdown", touchTrack);
   root.addEventListener("pointermove", touchTrack);
   root.addEventListener("pointerout", (event) => {
     if (event.pointerType !== "mouse") return;
-    const track = event.target.closest?.(".dj-track");
+    const track = event.target.closest?.("[data-tip-host]");
     if (track && !track.contains(event.relatedTarget)) hideTrackTip(track);
   });
   root.addEventListener("mousedown", (event) => {
@@ -2044,7 +1959,7 @@ export async function render(root) {
       if (row !== bossRow) row.classList.remove("is-boss-open");
     }
     if (bossRow) bossRow.classList.toggle("is-boss-open");
-    if (!event.target.closest(".dj-track")) for (const track of root.querySelectorAll(".dj-track")) hideTrackTip(track);
+    if (!event.target.closest("[data-tip-host]")) for (const track of root.querySelectorAll("[data-tip-host]")) hideTrackTip(track);
     const clockStart = event.target.closest("[data-clock-start]");
     if (clockStart && !clockStart.disabled) {
       sfx("mid");
@@ -2081,7 +1996,15 @@ export async function render(root) {
       pickRoute(quickPick.dataset.quickPick);
       return;
     }
-    // 기록부 "다시 재기" · 추천 루트 "이 루트 재기": 측정대를 그 루트로 맞추고 측정대로 간다
+    // 측정대 "순위표 n위 ↑": 순위표 위 칸을 이 루트로 바꾸고 순위표로 올라간다
+    if (event.target.closest("[data-goto-rank]")) {
+      viewKey = clockTarget;
+      sfx("tick");
+      paintPlan();
+      root.querySelector(".dj-scroll")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+      return;
+    }
+    // 순위표 "이 루트 재기·다시 재기": 측정대를 그 루트로 맞추고 측정대로 간다
     const pickChain = event.target.closest("[data-pick-chain]");
     if (pickChain) {
       if (pickRoute(pickChain.dataset.pickChain)) plan.querySelector(".dj-desk")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest" });
@@ -2108,14 +2031,20 @@ export async function render(root) {
       const select = form.elements.character_id;
       if (select.value === charPick.dataset.charPick && form.dataset.openCharacter === charPick.dataset.charPick) return;
       sfx("tick");
+      const fromQuick = Boolean(charPick.closest("[data-quick-char]"));
       select.value = charPick.dataset.charPick;
       select.dispatchEvent(new Event("change", { bubbles: true }));
+      if (fromQuick) {
+        hideQuickCharacter();
+        notify("이 캐릭터로 새 기록을 시작해요. 저장을 누르면 기록돼요.", "info");
+      }
       paintCharChips();
       return;
     }
     if (event.target.closest("[data-char-new]")) {
       sfx("tick");
-      showQuickCharacter();
+      if (quickBox.hidden) showQuickCharacter();
+      else hideQuickCharacter();
       return;
     }
     const bandStart = event.target.closest("[data-band-start]");
@@ -2141,18 +2070,12 @@ export async function render(root) {
     const routeItem = event.target.closest(".dj-route[data-chain]");
     if (routeItem) {
       const key = routeItem.dataset.chain;
-      viewKey = viewKey === key ? null : key;
+      viewKey = key === defaultKey ? null : key;
       // 스톱워치로 재는 중이 아니면 재는 대상도 이 루트로 맞춘다(기존 동작).
       if (viewKey != null && clock?.scope !== "route") {
         clockTarget = key;
         if (routePending) routePending.key = clockTarget;
       }
-      sfx("tick");
-      paintPlan();
-      return;
-    }
-    if (event.target.closest("[data-best-reset]")) {
-      viewKey = null;
       sfx("tick");
       paintPlan();
       return;
@@ -2186,15 +2109,6 @@ export async function render(root) {
       openBeltHistory(beltRow.dataset.beltRow);
       return;
     }
-    const openRow = event.target.closest("[data-open]");
-    if (openRow && !event.target.closest("button")) {
-      const characterId = openRow.dataset.open;
-      const party = openRow.dataset.party || "solo";
-      arriveCard = true;
-      if (characterId && openSheet(characterId, party)) scrollToSheet();
-      else arriveCard = false;
-      return;
-    }
     const deleteButton = event.target.closest("[data-delete]");
     if (deleteButton && !deleteButton.closest("[data-delete-price]")) {
       deleteRecord(deleteButton.dataset.delete);
@@ -2210,8 +2124,9 @@ export async function render(root) {
     if (bestViewButton) {
       if (bestViewButton.disabled) return;
       const next = bestViewButton.dataset.bestView;
-      if (next !== bestView) {
+      if (next !== bestView || viewKey != null) {
         bestView = next;
+        viewKey = null;
         paintPlan();
       }
       return;

@@ -12922,9 +12922,6 @@ a.ym-hero-exp-time,
 .dj-route.is-picked .dj-route-rank,
 .dj-route.is-picked strong { color: #7a1d12; }
 .dj-best-badge.is-picked { background: linear-gradient(180deg, oklch(0.86 0.13 85), oklch(0.72 0.14 70)); color: #2a1600; }
-.dj-best-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
-.dj-best-reset { height: 28px; padding: 0 12px; border: 1px solid #c9b48a; border-radius: var(--radius-pill); background: #fffaf0; color: #7a1d12; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; transition: transform 0.4s var(--spring); }
-.dj-best-reset:active { transform: scale(0.9); }
 .dojo-page .dj-scroll .dojo-best-tabs { align-self: auto; }
 
 /* ── 사냥 기록 (시안 hunts: 원형 타이머 · 기록 줄 · 레벨업 예측) ───────────────── */
@@ -15069,41 +15066,7 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .dj-manual button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 한지 기록부 */
-.dj-book { position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 20px; border-radius: 6px; color: var(--dj-ink); background: var(--dj-paper) linear-gradient(180deg, rgba(120, 80, 30, 0.06), transparent 30%, rgba(120, 80, 30, 0.08)); box-shadow: inset 0 0 30px rgba(140, 100, 40, 0.25), 0 16px 30px -10px rgba(0, 0, 0, 0.6); }
-.dj-book-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-.dj-book-head h3 { margin: 0; color: var(--dj-red); font-family: "Gowun Batang", serif; font-size: 20px; font-weight: 700; }
-.dj-book-head span { color: var(--dj-ink2); font-size: 13px; font-weight: 600; }
-.dj-book-cards { display: flex; flex-direction: column; gap: 10px; }
-.dj-book-empty { margin: 0; padding: 26px 16px; border: 2px dashed rgba(122, 29, 18, 0.25); border-radius: 6px; color: var(--dj-ink2); font-size: 14px; text-align: center; }
-.dj-card { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 14px 14px 12px 64px; overflow: hidden; border: 1px solid rgba(122, 29, 18, 0.2); border-radius: 8px; background: rgba(255, 250, 235, 0.5); transition: background-color 0.3s, box-shadow 0.3s; }
-.dj-card.is-enter { animation: ym-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i) * 0.07s); }
-.dj-card.is-gold { padding: 18px 18px 16px 92px; border-color: rgba(168, 116, 28, 0.6); background: #fffaf0; box-shadow: 0 14px 28px -14px rgba(120, 80, 20, 0.5); --metal: linear-gradient(170deg, #e9c26a 10%, #a8741c 55%, #d9a845 80%); --rule: rgba(168, 116, 28, 0.45); --tier-ink: #8a5a12; --col: linear-gradient(180deg, rgba(233, 194, 106, 0.16), rgba(233, 194, 106, 0.04)); }
-.dj-card.is-gold::after { content: ""; position: absolute; inset: 4px; border: 1px solid var(--rule); border-radius: 5px; pointer-events: none; }
-.dj-card.is-silver { padding: 14px 14px 12px 80px; border-color: rgba(108, 116, 128, 0.4); background: rgba(255, 252, 245, 0.8); box-shadow: 0 8px 18px -12px rgba(60, 66, 76, 0.35); --metal: linear-gradient(170deg, #b9c0ca 10%, #6c7480 55%, #9aa2ad 80%); --rule: rgba(108, 116, 128, 0.35); --tier-ink: #5d6672; --col: linear-gradient(180deg, rgba(185, 192, 202, 0.16), rgba(185, 192, 202, 0.03)); }
-.dj-card.is-bronze { padding: 14px 14px 12px 80px; border-color: rgba(138, 78, 38, 0.4); background: rgba(255, 252, 245, 0.7); box-shadow: 0 8px 18px -12px rgba(90, 50, 20, 0.35); --metal: linear-gradient(170deg, #d39a6a 10%, #8a4e26 55%, #b87a4a 80%); --rule: rgba(138, 78, 38, 0.35); --tier-ink: #7a4626; --col: linear-gradient(180deg, rgba(211, 154, 106, 0.16), rgba(211, 154, 106, 0.03)); }
-.dj-card.is-landed { background: #fff1c2; box-shadow: 0 0 0 3px oklch(0.85 0.14 80 / 0.6); }
-.dj-medal { position: absolute; top: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 64px; border-right: 1px solid var(--rule); background: var(--col); }
-.dj-card.is-gold .dj-medal { width: 74px; }
-.dj-medal b { font-family: "Gowun Batang", serif; font-size: 36px; font-weight: 700; line-height: 0.9; background: var(--metal); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.dj-card.is-gold .dj-medal b { font-size: 44px; }
-.dj-medal i { width: 18px; height: 1px; background: var(--rule); }
-.dj-medal small { color: var(--tier-ink); font-size: 12px; font-weight: 800; }
-.dj-seal-rank { position: absolute; top: 14px; left: 12px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 4px; background: var(--dj-ink2); box-shadow: inset 0 0 0 2px rgba(255, 236, 200, 0.35); color: var(--dj-cream); font-family: "Gowun Batang", serif; font-size: 18px; font-weight: 700; transform: rotate(-4deg); }
-.dj-card.is-landed .dj-medal, .dj-card.is-landed .dj-seal-rank { animation: dj-stamp 0.6s var(--spring) both; }
 @keyframes dj-stamp { 0% { opacity: 0; transform: scale(1.8) rotate(-14deg); } 60% { opacity: 1; transform: scale(0.92) rotate(-4deg); } 100% { opacity: 1; transform: scale(1) rotate(var(--rot, 0deg)); } }
-.dj-seal-rank { --rot: -4deg; }
-.dj-card-kicker { color: var(--tier-ink); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; }
-.dj-card-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.dj-card-top strong { font-size: 16px; font-weight: 900; letter-spacing: -0.02em; }
-.dj-card.is-gold .dj-card-top strong { font-size: 19px; }
-.dj-card-top > span { color: var(--dj-ink2); font-size: 12px; font-weight: 600; }
-.dj-card-redo { height: 26px; margin-left: auto; padding: 0 10px; border: 1px solid rgba(122, 29, 18, 0.35); border-radius: var(--radius-pill); background: transparent; color: var(--dj-red); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; transition: background-color 0.2s, transform 0.3s var(--spring); }
-.dj-card-redo:hover { background: rgba(122, 29, 18, 0.08); }
-.dj-card-redo:active { transform: scale(0.9); }
-.dj-card-x { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: #9a7a48; font: inherit; font-size: 16px; cursor: pointer; transition: background-color 0.2s, color 0.2s, transform 0.3s var(--spring); }
-.dj-card-x:hover { background: rgba(122, 29, 18, 0.08); color: var(--dj-red); }
-.dj-card-x:active { transform: scale(0.85); }
-.dj-card-mid { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .dj-time { display: flex; align-items: center; gap: 4px; }
 .dj-time label { display: flex; align-items: center; gap: 2px; height: 34px; padding: 0 8px; border: 1px solid rgba(122, 29, 18, 0.3); border-radius: 6px; background: #fffaf0; }
 .dj-time label:focus-within { border-color: var(--dj-red2); box-shadow: 0 0 0 3px rgba(176, 40, 26, 0.16); }
@@ -15117,25 +15080,7 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .dj-card-ref b.is-slow { color: var(--dj-red2); }
 .dj-card-rate { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-left: auto; }
 .dj-card-rate b { color: #5a4128; font-size: 18px; font-weight: 900; white-space: nowrap; }
-.dj-card.is-gold .dj-card-rate b { color: var(--dj-red); font-size: 22px; }
-.dj-card.is-plain .dj-card-rate b { color: var(--dj-red); }
 .dj-card-rate small { color: var(--dj-ink2); font-size: 11px; white-space: nowrap; }
-.dj-card-cells { display: flex; gap: 2px; min-width: 0; }
-.dj-card-cells i { flex: 1 1 0; min-width: 0; height: 5px; border-radius: 1px; background: oklch(0.66 0.16 var(--hue)); }
-.dj-card-cells i.is-rerun { background: oklch(0.55 0.17 28); }
-.dj-card-cells i.is-gap { margin-right: 4px; }
-.dj-card-foot { display: flex; flex-wrap: wrap; gap: 4px 16px; color: #5a4128; font-size: 12px; }
-.dj-card-foot b { color: var(--dj-ink); }
-.dj-suggest { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-.dj-suggest-title { color: var(--dj-red); font-size: 13px; font-weight: 800; }
-.dj-suggest-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 9px 12px; border: 1px dashed rgba(122, 29, 18, 0.3); border-radius: 6px; background: rgba(255, 250, 235, 0.4); }
-.dj-suggest-row > span { display: flex; flex-direction: column; min-width: 0; }
-.dj-suggest-row strong { font-size: 14px; font-weight: 800; }
-.dj-suggest-row small { color: var(--dj-ink2); font-size: 12px; }
-.dj-suggest-row > b { color: #9a7a48; font-size: 13px; font-weight: 800; white-space: nowrap; }
-.dj-suggest-row button { height: 30px; padding: 0 12px; border: 0; border-radius: var(--radius-pill); background: var(--dj-red); color: var(--dj-cream); font: inherit; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer; transition: transform 0.3s var(--spring), filter 0.2s; }
-.dj-suggest-row button:hover { filter: brightness(1.15); }
-.dj-suggest-row button:active { transform: scale(0.92); }
 .dj-all-toggle { align-self: stretch; height: 38px; border: 1px solid rgba(122, 29, 18, 0.3); border-radius: 6px; background: rgba(122, 29, 18, 0.06); color: var(--dj-red); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; transition: background-color 0.2s; }
 .dj-all-toggle:hover { background: rgba(122, 29, 18, 0.12); }
 .dj-all { display: flex; flex-direction: column; border-top: 2px solid rgba(122, 29, 18, 0.4); animation: ym-fade-up 0.3s var(--ease-out) both; }
@@ -15191,29 +15136,21 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .dojo-page .dj-hero h1 { font-size: 28px; }
   .dj-charbar { flex-direction: column; align-items: stretch; gap: 6px; }
   .dojo-page .dj-measure { padding: 16px; }
-  .dj-desk, .dj-book { padding: 14px; }
+  .dj-desk { padding: 14px; }
   .dj-gate { margin: 0 1px; }
   .dj-gate small { font-size: 10px; }
   .dj-gate i { width: 16px; height: 16px; }
   .dj-track { padding: 10px 6px 8px; gap: 1px; }
   .dj-watch { width: 210px; height: 210px; }
   .dj-watch-face strong { font-size: 38px; }
-  .dj-card { padding-left: 58px; }
-  .dj-card.is-gold { padding-left: 80px; }
-  .dj-card.is-silver, .dj-card.is-bronze { padding-left: 72px; }
-  .dj-medal { width: 58px; }
-  .dj-card.is-gold .dj-medal { width: 66px; }
   .dj-card-rate { margin-left: 0; align-items: flex-start; }
-  .dj-suggest-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .dj-suggest-row > b { grid-column: 1; grid-row: 2; }
-  .dj-suggest-row button { grid-column: 2; grid-row: 1 / 3; }
   .dj-all-row { grid-template-columns: minmax(0, 1fr) 40px 104px 44px; }
   .dj-all-row > :nth-child(3) { display: none; }
   .dj-belt-chips { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dojo-page .dj-hero, .dj-seal, .dj-card.is-enter, .dj-card.is-landed .dj-medal, .dj-card.is-landed .dj-seal-rank, .dj-watch-btn, .dj-all, .dj-beltcard, .dj-watch-status.is-live { animation: none; }
-  .dj-char, .dj-gate, .dj-gate i, .dj-quick, .dj-watch-ring, .dj-watch-btn, .dj-card, .dj-card-redo, .dj-card-x, .dj-beltcard, .dj-track-cell { transition: none; }
+  .dojo-page .dj-hero, .dj-seal, .dj-watch-btn, .dj-all, .dj-beltcard, .dj-watch-status.is-live { animation: none; }
+  .dj-char, .dj-gate, .dj-gate i, .dj-quick, .dj-watch-ring, .dj-watch-btn, .dj-beltcard, .dj-track-cell { transition: none; }
 }
 .dj-charbar .dj-picker[hidden] { display: none; }
 
@@ -15501,3 +15438,104 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .mo-combat-grid dd { margin: 4px 0 0; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .mo-combat-grid > div:first-child { grid-column: 1 / -1; border-color: color-mix(in srgb,var(--gold) 30%,transparent); }
 .mo-combat-grid > div:first-child dd { color: var(--gold); }
+
+/* 무릉 기록 통합(2026-10-29): 기록부를 저장 루트 순위표에 합침 — 위 칸 아래 실제 시간 칸, 아래 전체 루트 표 */
+.dj-best-edit { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px dashed rgba(122, 29, 18, 0.3); }
+.dj-best-edit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.dj-best-edit-label { color: var(--dj-red); font-size: 13px; font-weight: 800; }
+.dj-best-edit-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; color: #5a4128; font-size: 12px; }
+.dj-best-edit-foot b { color: var(--dj-ink); }
+.dj-best-edit-btns { display: flex; gap: 6px; margin-left: auto; }
+.dj-best-redo { height: 28px; padding: 0 12px; border: 1px solid rgba(122, 29, 18, 0.4); border-radius: var(--radius-pill); background: #fffaf0; color: var(--dj-red); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; transition: background-color 0.2s, transform 0.25s var(--spring); }
+.dj-best-redo:hover { background: rgba(122, 29, 18, 0.08); }
+.dj-best-redo:active { transform: scale(0.9); }
+.dj-best-clear { height: 28px; padding: 0 10px; border: 0; border-radius: var(--radius-pill); background: transparent; color: #9a7a48; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: color 0.2s, background-color 0.2s; }
+.dj-best-clear:hover { background: rgba(122, 29, 18, 0.08); color: var(--dj-red); }
+.dj-best-edit.has-actual .dj-card-rate b { color: var(--dj-red); }
+.dojo-page .dj-scroll .dojo-best { transition: background-color 0.4s, box-shadow 0.4s; }
+.dojo-page .dj-scroll .dojo-best.is-landed { background-color: #fff1c2; box-shadow: 0 0 0 3px oklch(0.85 0.14 80 / 0.6); animation: dj-landed 0.6s var(--spring) both; }
+@keyframes dj-landed { 0% { transform: scale(0.97); } 60% { transform: scale(1.015); } 100% { transform: none; } }
+.dj-route-all { display: flex; flex-direction: column; gap: 8px; }
+.dj-route-all:empty { display: none; }
+.dj-scroll [data-measured] { margin: 0; }
+
+/* 측정대만 남은 실제 시간 기록: 넓으면 ① 층 고르기 | ② 한 바퀴 재기 두 칸 */
+.dj-measure-body { grid-template-columns: minmax(0, 1fr); }
+.dj-goto-rank { height: 26px; margin-left: auto; padding: 0 12px; border: 1px solid oklch(0.8 0.13 85 / 0.55); border-radius: var(--radius-pill); background: rgba(255, 236, 200, 0.06); color: var(--dj-cream); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; transition: background-color 0.2s, transform 0.25s var(--spring); }
+.dj-goto-rank:hover { background: rgba(255, 236, 200, 0.14); }
+.dj-goto-rank:active { transform: scale(0.92); }
+@media (min-width: 1000px) {
+  .dj-desk { display: grid; grid-template-columns: minmax(0, 1.3fr) 1px minmax(0, 1fr); align-items: start; gap: 24px; }
+  .dj-desk-rule { align-self: stretch; width: 1px; height: auto; background: linear-gradient(180deg, transparent, oklch(0.8 0.13 85 / 0.4), transparent); }
+}
+@media (max-width: 600px) {
+  .dj-best-edit-btns { margin-left: 0; }
+  .dj-goto-rank { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dojo-page .dj-scroll .dojo-best.is-landed { animation: none; }
+  .dojo-page .dj-scroll .dojo-best, .dj-best-redo, .dj-best-clear, .dj-goto-rank { transition: none; }
+}
+.dj-best-edit .dj-card-rate b { font-size: 15px; }
+
+/* 순위표 회차 막대 칸에도 층·보스 말풍선(측정대와 같은 모양) */
+.dj-runs-grid { position: relative; }
+.dj-run .dj-cells i[data-track-round] { cursor: help; transition: transform 0.18s var(--spring), box-shadow 0.18s; }
+.dj-run .dj-cells i.is-tip { box-shadow: 0 0 0 1px #7a1d12, 0 0 10px oklch(0.75 0.15 var(--hue) / 0.9); transform: scaleY(1.35); }
+@media (hover: none) { .dj-runs-grid { touch-action: pan-y; } }
+@media (prefers-reduced-motion: reduce) { .dj-run .dj-cells i[data-track-round] { transition: none; } .dj-run .dj-cells i.is-tip { transform: none; } }
+
+/* 구간 기록: 층 이름에 "보스" 표시가 붙어도 게이지가 침범하지 않게 첫 칸을 내용 폭만큼 */
+.dojo-page .dj-bands .dojo-band { grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) auto; }
+.dojo-page .dj-bands .dojo-band-floor { white-space: nowrap; }
+@media (max-width: 800px) { .dojo-page .dj-bands .dojo-band { grid-template-columns: minmax(0, 1fr) auto; } }
+
+/* 명패: 통합 점수 기록 보기 · 이 기록 삭제 */
+.dj-plaque-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.dj-plaque-log.is-danger { color: #ff9b84; }
+.dj-plaque-log[hidden] { display: none; }
+/* 새 캐릭터 칸: 등록된 캐릭터 고르기 */
+.dj-quick-char-list:empty { display: none; }
+.dj-quick-char-list { display: flex; flex-direction: column; gap: 8px; }
+.dj-quick-char-title { color: var(--dj-sub); font-size: 12px; font-weight: 800; }
+.dj-quick-char-list .dj-charbar-list { animation: ym-fade-up 0.3s var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) { .dj-quick-char-list .dj-charbar-list { animation: none; } }
+/* 새 캐릭터 칸은 grid라 가로로 긴 캐릭터 목록이 칸을 넓히지 않게 열을 화면 폭에 묶는다 */
+.dj-quick-char { grid-template-columns: minmax(0, 1fr); }
+.dj-quick-char-list, .dj-quick-char-list .dj-charbar-list { min-width: 0; }
+
+/* 순위표: 실제 기록/추천 동선 토글은 위 칸 맨 위, 아래 1~4위 중 누른 줄이 "선택됨"이고 위 칸에 자세히 */
+.dojo-page .dj-scroll .dojo-best > .dojo-best-tabs { align-self: flex-start; }
+.dj-best-badge.is-ref { background: #9a7a48; }
+.dojo-page .dj-scroll .dojo-best.is-swap .dj-best { animation: dj-swap-in 0.45s var(--spring) both; }
+.dojo-page .dj-scroll .dojo-best.is-swap .dj-best-edit { animation: ym-fade-up 0.35s var(--ease-out) 0.08s both; }
+@keyframes dj-swap-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+.dj-route.is-picked { box-shadow: inset 3px 0 0 var(--dj-red2); }
+.dj-route.is-picked .dj-route-rank { color: var(--dj-red2); }
+.dj-route-picked { display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 4px; background: var(--dj-red2); color: #fff4dc; font-size: 11px; font-style: normal; font-weight: 800; vertical-align: 2px; animation: ym-pop-in 0.35s var(--spring) both; }
+@media (prefers-reduced-motion: reduce) {
+  .dojo-page .dj-scroll .dojo-best.is-swap .dj-best, .dojo-page .dj-scroll .dojo-best.is-swap .dj-best-edit, .dj-route-picked { animation: none; }
+}
+/* 구간 기록: 기록 저장 · 입력 지우기 버튼을 같은 크기로(색으로만 구분) */
+.dojo-page .dj-actions .dojo-game-button, .dojo-page .dj-actions .secondary-button { min-width: 132px; min-height: 48px; padding: 0 24px; border-radius: var(--radius-pill); font-size: 16px; font-weight: 900; }
+.dojo-page .dj-actions .secondary-button { border-width: 2px; }
+@media (max-width: 600px) { .dojo-page .dj-actions > button { flex: 1 1 0; min-width: 0; } }
+
+/* 순위표 기준 토글: 두루마리 머리말 바로 아래 가운데(실제 기록이 없으면 실제 기록은 누를 수 없음) */
+.dj-best-tabs-slot { display: flex; justify-content: center; }
+.dj-best-tabs-slot:empty { display: none; }
+.dojo-page .dj-scroll .dj-best-tabs-slot .dojo-best-tabs { align-self: center; }
+.dojo-page .dj-scroll .dj-best-tabs-slot .dojo-best-tab { height: 34px; padding: 0 18px; font-size: 13px; }
+.dojo-page .dj-scroll .dj-best-tabs-slot .dojo-best-tab:disabled { cursor: not-allowed; }
+/* 구간 기록이 옆 순위표 높이를 채우게: 구간 줄을 조금 키우고 남는 높이를 줄마다 나눠 갖는다(전체 루트 표를 펼치면 원래 크기) */
+@media (min-width: 801px) {
+  .dojo-page .dj-bands { display: flex; flex-direction: column; }
+  .dojo-page .dj-bands .dojo-bands { display: flex; flex: 1; flex-direction: column; gap: 8px; }
+  .dojo-page .dj-bands .dojo-band { flex: 1 1 auto; align-content: center; min-height: 72px; max-height: 112px; padding: 12px 14px; }
+  .dojo-page .dj-bands .dojo-band-floor { font-size: 17px; }
+  .dojo-page .dj-grid:has(.dj-all) .dj-bands .dojo-band { flex-grow: 0; }
+}
+/* 추천 동선 기준일 때만: 쉼터 저장마다 5초 더함 안내 */
+.dj-scroll-note { margin: -4px 0 0; color: #7a5a38; font-size: 12px; font-weight: 700; text-align: center; animation: ym-fade-up 0.3s var(--ease-out) both; }
+.dj-scroll-note[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .dj-scroll-note { animation: none; } }
