@@ -15539,3 +15539,64 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .dj-scroll-note { margin: -4px 0 0; color: #7a5a38; font-size: 12px; font-weight: 700; text-align: center; animation: ym-fade-up 0.3s var(--ease-out) both; }
 .dj-scroll-note[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .dj-scroll-note { animation: none; } }
+
+/* 몬스터 도감(2026-10-30): 목록 | (상세 ┆ 드랍) 한 카드. 드랍은 상세 옆, 가운데 점선으로 나눈다. 카드는 조금 작게 해서 한 줄에 더 많이 */
+.mo-layout { grid-template-columns: minmax(0, 1fr) auto; }
+.mo-side { display: block; max-height: none; overflow: visible; border-radius: 0; }
+.mo-combo { display: grid; grid-template-columns: 290px 1px 246px; align-items: start; gap: 14px; padding: 16px; max-height: calc(100vh - 100px); }
+.mo-combo > .mo-detail, .mo-combo > .mo-drops-panel { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-height: calc(100vh - 140px); overflow-y: auto; scrollbar-width: thin; }
+.mo-combo-rule { align-self: stretch; width: 0; border-left: 2px dashed rgba(255, 255, 255, 0.16); }
+.mo-page .mo-stage { height: 128px; }
+.mo-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.mo-card { gap: 8px; padding: 8px 8px 12px; border-radius: 18px; }
+.mo-page .mo-art { height: 74px; border-radius: 13px; }
+.mo-art b { font-size: 32px; }
+.mo-name strong { font-size: 15px; }
+.mo-stats strong { font-size: 13px; }
+.mo-eff-top { font-size: 11px; }
+.mo-page .mo-card .mo-tag { height: 21px; padding: 0 7px; font-size: 11px; }
+.mo-tags { min-height: 21px; gap: 4px; }
+
+.mo-combo > .mo-drops-panel { gap: 10px; }
+.mo-drops-head { display: flex; align-items: center; gap: 8px; }
+.mo-drops-head h3 { margin: 0; font-size: 17px; font-weight: 800; }
+.mo-drops-count { padding: 2px 9px; border-radius: var(--radius-pill); background: oklch(0.86 0.15 85 / 0.14); color: oklch(0.9 0.12 85); font-size: 12px; font-weight: 800; }
+.mo-drops-hint { margin: -4px 0 0; color: #a59dbd; font-size: 12px; }
+.mo-drop-list { display: flex; flex-direction: column; gap: 6px; }
+.mo-drop-row {
+  --tier: #8a83a0;
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 10px 7px 7px;
+  border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.07); background: rgba(255, 255, 255, 0.04); color: #e6e0f3; text-decoration: none;
+  transition: transform 0.45s var(--spring), background 0.25s, border-color 0.25s; animation: ym-fade-up 0.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 0.035s);
+}
+.mo-drop-row.is-common { --tier: oklch(0.82 0.14 160); }
+.mo-drop-row.is-uncommon { --tier: oklch(0.86 0.15 85); }
+.mo-drop-row.is-rare { --tier: oklch(0.76 0.14 250); }
+.mo-drop-row.is-epic { --tier: oklch(0.76 0.17 330); border-color: oklch(0.76 0.17 330 / 0.28); box-shadow: inset 0 0 18px -10px oklch(0.76 0.17 330 / 0.9); }
+.mo-drop-row:hover, .mo-drop-row:focus-visible { transform: translateX(3px); background: rgba(255, 255, 255, 0.08); border-color: color-mix(in srgb, var(--tier) 55%, transparent); outline: none; }
+.mo-drop-row:active { transform: scale(0.97); }
+.mo-drop-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--tier) 26%, transparent), rgba(0, 0, 0, 0.25) 75%); }
+.mo-drop-icon i { display: grid; place-items: center; width: 36px; height: 36px; font-style: normal; font-size: 15px; font-weight: 900; color: var(--tier); }
+.mo-drop-copy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.mo-drop-copy strong { overflow: hidden; font-size: 13px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
+.mo-drop-bar { display: block; height: 5px; border-radius: var(--radius-pill); background: rgba(0, 0, 0, 0.35); overflow: hidden; }
+.mo-drop-bar i { display: block; width: var(--w); height: 100%; border-radius: inherit; background: var(--tier); box-shadow: 0 0 8px color-mix(in srgb, var(--tier) 70%, transparent); animation: ym-exp-fill 0.7s var(--spring) both; animation-delay: calc(0.1s + var(--i, 0) * 0.035s); }
+.mo-drop-rate { color: var(--tier); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 1359px) { .mo-combo { grid-template-columns: 272px 1px 226px; gap: 12px; } }
+@media (max-width: 1100px) {
+  .mo-layout { grid-template-columns: minmax(0, 1fr); }
+  .mo-side { position: static; }
+  .mo-combo { grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); max-height: none; }
+  .mo-combo > .mo-detail, .mo-combo > .mo-drops-panel { max-height: none; overflow: visible; }
+}
+@media (max-width: 640px) {
+  .mo-combo { grid-template-columns: minmax(0, 1fr); }
+  .mo-combo-rule { width: auto; height: 0; border-left: 0; border-top: 2px dashed rgba(255, 255, 255, 0.16); }
+  .mo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mo-page .mo-art { height: 64px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mo-drop-row, .mo-drop-bar i { animation: none; }
+  .mo-drop-row { transition: none; }
+}

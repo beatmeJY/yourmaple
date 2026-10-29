@@ -49,14 +49,14 @@ try{for(const width of [1280,375]){
  await page.waitForFunction(()=>[...document.querySelectorAll('img[src="img/horntail.png"]')].some(i=>i.complete&&i.naturalWidth>0));
  assert((await page.locator('.mo-card img[src="img/horntail.png"]').count())>0);
  await page.screenshot({path:`/private/tmp/catalog-boss-fallback-${width}.png`,fullPage:true});
- await page.waitForSelector('.mo-drop-grid .mo-drop');assert.equal(await page.locator('.mo-drop-grid .mo-drop').count(),2);
- assert.deepEqual(await page.locator('.mo-drop-grid small').allTextContents(),['0.008%','0.002%']);
+ await page.waitForSelector('.mo-drop-list .mo-drop-row');assert.equal(await page.locator('.mo-drop-list .mo-drop-row').count(),2);
+ assert.deepEqual(await page.locator('.mo-drop-list .mo-drop-rate').allTextContents(),['0.008%','0.002%']);
  assert.equal(await page.evaluate(()=>window.catalogCalls.filter(c=>c.name==='catalog_search_monsters').length),1);
  const reads=await page.evaluate(()=>window.catalogReads);assert(reads.filter(r=>r.table==='catalog_changes').every(r=>r.filters===2&&r.limit===6));assert(!reads.some(r=>r.table==='catalog_monsters'));assert(reads.filter(r=>r.table==='catalog_monster_drops').every(r=>r.filters>0));
  await page.locator('[data-page-next]').click();await page.waitForFunction(()=>document.querySelector('.mo-card .mo-name strong')?.textContent==='몬스터25');await openHistory();
  await page.waitForFunction(()=>document.querySelector('[data-monster-history]')?.textContent.includes('변경된 정보가 아직 없습니다'));assert.equal(await page.locator('[data-monster-history] [data-history-nav]').isVisible(),false);await page.locator('[data-history-close]').click();await page.waitForFunction(()=>!document.querySelector('.catalog-history-dialog'));
  await page.locator('[data-search]').fill('몬스터59');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===1);assert.match(await page.locator('.mo-card').innerText(),/몬스터59/);
- await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-grid a');
+ await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-list a');
  await page.evaluate(async()=>{
   const c=await(await import('/js/supabase-client.js')).getSupabase();const original=c.rpc;
   c.rpc=async(name,args)=>{
@@ -69,8 +69,8 @@ try{for(const width of [1280,375]){
  await page.locator('[data-search]').fill('느린검색');await page.waitForTimeout(350);
  await page.locator('[data-search]').fill('빠른검색');await page.waitForFunction(()=>document.querySelector('.mo-card .mo-name strong')?.textContent==='최신 응답');await page.waitForTimeout(1100);assert.match(await page.locator('.mo-card').innerText(),/최신 응답/);
  await page.locator('[data-search]').fill('오류검색');await page.waitForFunction(()=>document.querySelector('[data-list]').textContent.includes('SQL047'));
- await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-grid a');
- await page.locator('.mo-drop-grid a').first().click();await page.waitForSelector('.catalog-stat');await page.waitForSelector('.catalog-image-fallback');
+ await page.locator('[data-search]').fill('');await page.waitForFunction(()=>document.querySelectorAll('.mo-card').length===24);await page.waitForSelector('.mo-drop-list a');
+ await page.locator('.mo-drop-list a').first().click();await page.waitForSelector('.catalog-stat');await page.waitForSelector('.catalog-image-fallback');
  assert.match(await page.locator('[data-item-detail]').innerText(),/청갑충/);assert.match(await page.locator('.catalog-stat').innerText(),/30 ~ 38/);assert.match(await page.locator('.catalog-item-hero').innerText(),/DEX\s+100.*도적/s);assert.equal(await page.locator('.equipment-job.is-allowed').count(),1);assert.equal(await page.locator('.equipment-stat').first().evaluate(el=>getComputedStyle(el).flexDirection),'row');assert.equal(await page.locator('.equipment-requirements > div').count(),6);const equipmentBox=await page.locator('.equipment-card').boundingBox(),droppersBox=await page.locator('.equipment-droppers').boundingBox();if(width>=1100){assert(droppersBox.x>=equipmentBox.x+equipmentBox.width);assert(Math.abs(droppersBox.y-equipmentBox.y)<2);assert(Math.abs(droppersBox.height-equipmentBox.height)<2);assert(Math.abs(droppersBox.width-equipmentBox.width)<2);}else{assert(droppersBox.y>=equipmentBox.y+equipmentBox.height);}assert.equal(await page.locator('[data-item-history]').count(),0);
  await openHistory();await page.waitForSelector('.catalog-change');assert.match(await page.locator('.catalog-change').innerText(),/33.*34/s);assert(!(await page.locator('.catalog-history-dialog').innerText()).includes('혼테일'));assert.equal(await page.locator('.catalog-history-dialog').evaluate(el=>el.scrollWidth>el.clientWidth),false);await closeHistory();
  await page.waitForSelector('.catalog-dropper');assert.equal(await page.locator('.catalog-dropper').count(),2);

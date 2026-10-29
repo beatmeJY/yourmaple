@@ -120,14 +120,41 @@ export function render(root) {
   const dropsCache = new Map();
 
 
-  // 오른쪽 상세: 공용 그림·수치·속성·명중 계산·드랍템(읽기 전용).
+  // 드랍 칸: 확률이 높은 순, 막대는 0.01%~100%를 로그 눈금으로(희귀 드랍도 보이게). 확률은 합산하지 않는다.
+  function dropTier(rate) {
+    if (rate == null) return "is-unknown";
+    return rate >= 10 ? "is-common" : rate >= 1 ? "is-uncommon" : rate >= 0.1 ? "is-rare" : "is-epic";
+  }
+  function dropsHtml(drops) {
+    if (!drops.length) return `<div class="mo-drops-head"><h3>드랍 아이템</h3><span class="mo-drops-count">0개</span></div><p class="mo-muted">등록된 드랍 정보가 없어요.</p>`;
+    const rate = (drop) => (drop.rate_percent == null ? null : Number(drop.rate_percent));
+    const sorted = drops.map((drop, index) => ({ drop, index })).sort((left, right) => (rate(right.drop) ?? -1) - (rate(left.drop) ?? -1) || left.index - right.index);
+    const rows = sorted.map(({ drop }, index) => {
+      const value = rate(drop);
+      const width = value == null ? 0 : Math.max(4, Math.min(100, ((Math.log10(Math.max(value, 0.0001)) + 2) / 4) * 100));
+      const label = value == null ? "확률 미상" : `${escapeHtml(drop.rate_percent)}%`;
+      const name = drop.item?.name ?? "아이템 정보 없음";
+      return `<a class="mo-drop-row ${dropTier(value)}" href="#/item-catalog?id=${encodeURIComponent(drop.item_id)}" style="--i:${Math.min(index, 14)}" title="${escapeHtml(name)} · ${label}">
+        <span class="mo-drop-icon">${catalogImage(drop.item?.image_url, "catalog-drop-image", 36) || `<i aria-hidden="true">${escapeHtml(initial(drop.item?.name))}</i>`}</span>
+        <span class="mo-drop-copy"><strong>${escapeHtml(name)}</strong><span class="mo-drop-bar" aria-hidden="true"><i style="--w:${width}%"></i></span></span>
+        <b class="mo-drop-rate">${label}</b>
+      </a>`;
+    }).join("");
+    return `<div class="mo-drops-head"><h3>드랍 아이템</h3><span class="mo-drops-count">${drops.length}개</span></div>
+      <p class="mo-drops-hint">확률 높은 순 · 누르면 아이템 정보로 가요</p>
+      <div class="mo-drop-list">${rows}</div>`;
+  }
+
+  // 오른쪽 상세: 공용 그림·수치·속성·명중 계산. 드랍템은 그 옆 칸(넓은 화면) 또는 아래 칸.
   function paintDetail() {
     const box = root.querySelector("[data-mo-detail]");
+    const dropsBox = root.querySelector("[data-mo-drops]");
     if (!box) return;
     const request = ++detailLoadId;
     const row = allRows.find((item) => item.id === selectedId);
     if (!row) {
       box.innerHTML = `<p class="mo-muted">${allRows.length ? "몬스터를 고르면 자세히 보여 줘요." : "공용 도감이 준비되면 명중과 드랍템을 볼 수 있어요."}</p>`;
+      if (dropsBox) dropsBox.innerHTML = `<p class="mo-muted">몬스터를 고르면 드랍 아이템을 보여 줘요.</p>`;
       return;
     }
     const ratio = hpPerExp(row.hp, row.exp);
@@ -154,10 +181,8 @@ export function render(root) {
         <div class="mo-acc-out" data-acc-out></div>
         <p class="mo-muted" data-acc-note></p>
       </div>
-      <div class="mo-drops" data-monster-drops><p class="mo-muted">드랍 정보를 불러오는 중입니다.</p></div>
-
-
 `;
+    if (dropsBox) dropsBox.innerHTML = `<div class="mo-drops-head"><h3>드랍 아이템</h3></div><p class="mo-muted">${escapeHtml(row.name)} 드랍 정보를 불러오는 중입니다.</p>`;
     paintAccuracy();
     void catalogRpc("catalog_monster_detail", { p_id: row.id }).then(result => {
       if (request !== detailLoadId || !root.isConnected || selectedId !== row.id) return;
@@ -175,14 +200,13 @@ export function render(root) {
     const pending = cached && Date.now() - cached.time < 30_000 ? Promise.resolve(cached.result) : monsterDrops(row.id);
     void pending.then(result => {
       if (request !== detailLoadId || !root.isConnected || selectedId !== row.id) return;
-      const slot = box.querySelector("[data-monster-drops]");
-      if (result.error) { slot.innerHTML = `<p class="mo-muted">${escapeHtml(catalogError(result.error))}</p>`; return; }
+      if (!dropsBox) return;
+      if (result.error) { dropsBox.innerHTML = `<div class="mo-drops-head"><h3>드랍 아이템</h3></div><p class="mo-muted">${escapeHtml(catalogError(result.error))}</p>`; return; }
       dropsCache.set(row.id, { time: Date.now(), result });
       while (dropsCache.size > 24) dropsCache.delete(dropsCache.keys().next().value);
-      const drops = result.data ?? [];
-      slot.innerHTML = `<span class="mo-d-label">드랍 아이템 <small>${drops.length}개 항목</small></span>${drops.length ? `<div class="mo-drop-grid">${drops.map((drop, index) => `<a class="mo-drop" href="#/item-catalog?id=${encodeURIComponent(drop.item_id)}" style="--i:${Math.min(index,12)}">${catalogImage(drop.item?.image_url, "catalog-drop-image", 36) || `<i aria-hidden="true">${escapeHtml(initial(drop.item?.name))}</i>`}<span>${escapeHtml(drop.item?.name ?? "아이템 정보 없음")}</span><small>${drop.rate_percent == null ? "확률 미상" : `${escapeHtml(drop.rate_percent)}%`}</small></a>`).join("")}</div>` : `<p class="mo-muted">등록된 드랍 정보가 없어요.</p>`}`;
+      dropsBox.innerHTML = dropsHtml(result.data ?? []);
     }).catch(() => {
-      if (request === detailLoadId && root.isConnected) box.querySelector("[data-monster-drops]").textContent = "드랍 조회에 실패했습니다. 몬스터를 다시 선택해주세요.";
+      if (request === detailLoadId && root.isConnected && dropsBox) dropsBox.innerHTML = `<div class="mo-drops-head"><h3>드랍 아이템</h3></div><p class="mo-muted">드랍 조회에 실패했습니다. 몬스터를 다시 선택해주세요.</p>`;
     });
   }
 
@@ -269,7 +293,11 @@ export function render(root) {
           </div>
           <aside class="mo-side">
 
-            <section class="mo-panel mo-detail" data-mo-detail><p class="mo-muted">몬스터를 고르면 자세히 보여 줘요.</p></section>
+            <section class="mo-panel mo-combo">
+              <div class="mo-detail" data-mo-detail><p class="mo-muted">몬스터를 고르면 자세히 보여 줘요.</p></div>
+              <span class="mo-combo-rule" aria-hidden="true"></span>
+              <div class="mo-drops-panel" data-mo-drops aria-live="polite"><p class="mo-muted">몬스터를 고르면 드랍 아이템을 보여 줘요.</p></div>
+            </section>
           </aside>
         </div>
       </div>`,
