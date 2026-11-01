@@ -5,6 +5,7 @@ import { applyExpCoupons, asBig, buildPlan, formatMinutes, formatPerMinute, form
 import { findJob, jobStyle, normalizeJobName } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
+import { isHiddenRoute } from "../routes.js";
 import { isLoggedIn } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -181,7 +182,7 @@ export async function render(root) {
             </div>
             <p class="lp-note" data-plan-note></p>
           </section>
-          <section class="lp-panel lp-quests">
+          <section class="lp-panel lp-quests"${isHiddenRoute("quests") ? " hidden" : ""}>
             <h2>퀘스트로 채우면</h2>
             <div data-quest-fill><p class="lp-muted">불러오는 중입니다.</p></div>
           </section>

@@ -22,6 +22,10 @@ const CHAOS_TYPES = {
   Shoulder: "어깨장식",
 };
 const MAX_SLOTS = 99;
+// 자주 바르는 장비는 아이콘으로 바로 고른다(2026-11-01 사용자 지정). 나머지는 이름으로 찾는다.
+// 도감 이름과 띄어쓰기만 달라도 맞도록 띄어쓰기를 빼고 비교한다.
+const FAVORITE_ITEMS = ["검은색 허리띠", "부보안관 은뱃지", "혼테일의 목걸이", "얼음결정 페이스페인팅"];
+const squash = (text) => String(text ?? "").replace(/\s+/g, "");
 
 function loadStore() {
   try {
@@ -76,8 +80,10 @@ export function render(root) {
         <section class="cs-panel cs-setup ym-glass" aria-labelledby="cs-setup-title">
           <h2 id="cs-setup-title">내 아이템</h2>
           <div class="cs-pick">
-            <label class="cs-field"><span>도감에서 장비 고르기</span><input data-item-search type="search" autocomplete="off" placeholder="이름 일부로 좁히기 (예: 혼목)" /></label>
-            <p class="cs-hint">혼돈의 주문서는 펜던트·벨트·반지·얼굴장식·눈장식·어깨장식에만 쓸 수 있어서, 이 중 업그레이드 가능 횟수가 있는 장비만 보여요.</p>
+            <span class="cs-field-label">자주 쓰는 장비</span>
+            <div class="cs-favs" data-favs role="group" aria-label="자주 쓰는 장비"></div>
+            <label class="cs-field"><span>다른 장비 찾기</span><input data-item-search type="search" autocomplete="off" placeholder="이름 일부로 찾기 (예: 혼목)" /></label>
+            <p class="cs-hint">혼돈의 주문서는 펜던트·벨트·반지·얼굴장식·눈장식·어깨장식에만 쓸 수 있어서, 이 중 업그레이드 가능 횟수가 있는 장비만 찾아져요.</p>
             <div class="cs-pick-results" data-item-results role="listbox" aria-label="장비 검색 결과"></div>
             <div class="cs-picked" data-item-picked></div>
           </div>
@@ -220,18 +226,39 @@ export function render(root) {
     allowedItems = (out.data ?? []).filter((row) => Number(row.base_options?.remaining_upgrades) > 0);
     return allowedItems;
   }
+  // 자주 쓰는 장비 아이콘. 도감에 없으면(이름이 바뀌었거나 아직 미등록) 그 칸만 뺀다.
+  const favs = root.querySelector("[data-favs]");
+  function paintFavorites() {
+    if (!allowedItems) {
+      favs.innerHTML = `<p class="cs-hint">장비를 불러오는 중…</p>`;
+      return;
+    }
+    const rows = FAVORITE_ITEMS.map((name) => allowedItems.find((row) => squash(row.name) === squash(name))).filter(Boolean);
+    favs.innerHTML = rows.length
+      ? rows.map((row, index) => `<button type="button" class="cs-fav${row.id === picked?.id ? " is-on" : ""}" data-pick-item="${escapeHtml(row.id)}" aria-pressed="${row.id === picked?.id}" title="${escapeHtml([row.name, typeName(row), optionText(row)].filter(Boolean).join(" · "))}" style="--i:${index}">
+          <span class="cs-fav-art">${catalogImage(row.image_url, "cs-fav-image", 40) || `<i aria-hidden="true">${escapeHtml([...row.name][0] ?? "?")}</i>`}</span>
+          <span class="cs-fav-name">${escapeHtml(row.name)}</span>
+        </button>`).join("")
+      : `<p class="cs-hint">자주 쓰는 장비가 도감에 아직 없어요. 아래에서 찾아 주세요.</p>`;
+  }
   async function searchItems(query) {
     const request = ++searchId;
-    if (!allowedItems) results.innerHTML = `<p class="cs-hint">장비를 불러오는 중…</p>`;
     const out = await loadAllowed();
     if (request !== searchId || !root.isConnected) return;
     if (out.error) {
+      favs.innerHTML = "";
       results.innerHTML = `<p class="cs-hint">${escapeHtml(catalogError(out.error))}</p>`;
+      return;
+    }
+    paintFavorites();
+    // 빈 검색이면 목록을 펼치지 않는다(자주 쓰는 장비는 위 아이콘으로).
+    if (!query) {
+      results.innerHTML = "";
       return;
     }
     // 아이템 검색과 같은 규칙(글자 순서·별명). 분류 이름(예: 벨트)으로도 좁힌다.
     const rows = out
-      .map((row) => ({ row, rank: !query ? 0 : nameMatchRank(row.name, query) ?? (typeName(row).includes(query) ? 2 : null) }))
+      .map((row) => ({ row, rank: nameMatchRank(row.name, query) ?? (typeName(row).includes(query) ? 2 : null) }))
       .filter((item) => item.rank != null)
       .sort((left, right) => left.rank - right.rank)
       .map((item) => item.row);
@@ -240,7 +267,7 @@ export function render(root) {
           <span class="cs-pick-art">${catalogImage(row.image_url, "cs-pick-image", 32) || `<i aria-hidden="true">${escapeHtml([...row.name][0] ?? "?")}</i>`}</span>
           <span class="cs-pick-copy"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml([typeName(row), row.required_level == null ? "" : `Lv.${row.required_level}`, optionText(row)].filter(Boolean).join(" · "))}</small></span>
         </button>`).join("")
-      : `<p class="cs-hint">${query ? "이름이 맞는 장비가 없어요." : "도감에 쓸 수 있는 장비가 아직 없어요."}</p>`;
+      : `<p class="cs-hint">이름이 맞는 장비가 없어요.</p>`;
   }
 
   function paintPicked() {
@@ -396,6 +423,7 @@ export function render(root) {
       persist({ picked: null });
       paintPicked();
       paintRanges({});
+      if (allowedItems) paintFavorites();
       return;
     }
     if (event.target.closest("[data-start]")) {

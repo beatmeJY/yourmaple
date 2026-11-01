@@ -15,6 +15,7 @@ import { filterRows, readLevelFilter } from "../filters.js";
 import { availableLabel } from "../homework-calc.js";
 import { loadHomeworkStatus } from "../homework-status.js";
 import { findJob, jobDisplayName, jobLabel, jobRecord, jobStyle } from "../job-label.js";
+import { isHiddenRoute } from "../routes.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 
@@ -417,7 +418,7 @@ export async function render(root) {
           ${faceHtml(row)}
           <span class="character-copy">
             <span class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong><span class="character-level">Lv.${escapeHtml(formatCount(row.level))}</span></span>
-            <span class="character-job">${jobText}${row.quests_hidden ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
+            <span class="character-job">${jobText}${row.quests_hidden && !isHiddenRoute("quests") ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
           </span>
         </button>
         ${expBar(row)}
@@ -645,7 +646,8 @@ export async function render(root) {
     curve = new Map((curveResult.error ? [] : curveResult.data ?? []).map((row) => [row.level, row.exp_to_next]));
     for (const field of form.querySelectorAll("[data-progress-field]")) field.hidden = !progressReady;
     syncFaceField();
-    questsHiddenFields.hidden = !questsHiddenReady;
+    // 퀘스트 화면을 숨긴 동안(routes.js dev)은 퀘스트 관련 칸·배지도 숨긴다.
+    questsHiddenFields.hidden = !questsHiddenReady || isHiddenRoute("quests");
     accounts = sortByName(accountResult.data ?? []);
     jobs = jobResult.data ?? [];
     rows = characters.data ?? [];

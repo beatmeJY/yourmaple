@@ -18,7 +18,7 @@ const allCategories = [
   { id: "maker", label: "메이커", glyph: "◆", icon: "img/maker-icon.png", hue: 210, routes: [{ id: "maker", label: "보석 제작" }, { id: "maker-craft", label: "리버스 제작" }, { id: "maker-enchant", label: "장비 옵션 부여" }] },
   { id: "enhance", label: "강화", glyph: "⚒", icon: "img/enhance-icon.png", hue: 285, routes: [{ id: "chaos-scroll", label: "혼돈의 주문서" }, { id: "enhance", label: "강화 계산", dev: true }] },
   { id: "trade", label: "거래 내역", glyph: "⇄", icon: "img/trade-icon.png", hue: 180, routes: [{ id: "trades", label: "거래 내역", auth: true }] },
-  { id: "quest", label: "퀘스트 정보", glyph: "Q", icon: "img/quest-icon.png", hue: 85, routes: [{ id: "quests", label: "퀘스트 정보", auth: true }] },
+  { id: "quest", label: "퀘스트 정보", glyph: "Q", icon: "img/quest-icon.png", hue: 85, routes: [{ id: "quests", label: "퀘스트 정보", auth: true, dev: true }] }, // 2026-11-01 등록된 퀘스트가 없어 숨김
   { id: "monster", label: "몬스터 정보", glyph: "M", icon: "img/monster-icon.png", hue: 65, routes: [{ id: "monsters", label: "몬스터 도감" }] },
   { id: "item", label: "아이템 정보", glyph: "템", hue: 75, routes: [{ id: "item-catalog", label: "아이템 정보" }] },
   { id: "memo", label: "메모", glyph: "✎", hue: 340, routes: [{ id: "notes", label: "메모", auth: true }] },
