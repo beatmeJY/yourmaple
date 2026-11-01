@@ -15755,3 +15755,5 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs-pick-row.is-on { border-color: color-mix(in srgb, var(--cs-gold) 55%, transparent); background: color-mix(in srgb, var(--cs-gold) 10%, transparent); }
 /* 도감 아이템 설명의 줄바꿈을 그대로 보인다(예: 혼돈의 주문서 "…조정한다.\n성공률 60%") */
 .catalog-detail-panel > p { white-space: pre-line; }
+/* 몬스터 카드 그림: 그림 칸(.mo-art)의 고정 높이를 물려받아 96px 속성 그대로 커지며 잘리지 않게 */
+.mo-art .catalog-monster-image { height: inherit; }
