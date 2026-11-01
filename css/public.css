@@ -44,3 +44,10 @@ footer p { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--muted); }
 @keyframes arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 700px) { .site-header, main, footer { width: calc(100% - 40px); } .site-header { min-height: 84px; gap: 12px; } .brand { font-size: 16px; } .back-link { font-size: 12px; } .hero { padding-top: 40px; } .lead { font-size: 17px; } .notice { padding: 16px 18px; } .document-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } .contents { position: static; padding: 18px; background: var(--panel); border-radius: 16px; } .contents p { margin-top: 0; } h2 { font-size: 21px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .hero { animation: none; } .contents a { transition: none; } }
+/* 위탁·국외 이전 표: 좁은 화면에서는 표만 가로로 스크롤 */
+.table-wrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: 12px; }
+table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; color: var(--muted); }
+th { color: var(--gold); font-size: 12px; letter-spacing: .04em; background: var(--panel); }
+tr:last-child td { border-bottom: 0; }
+td strong { color: var(--text); }

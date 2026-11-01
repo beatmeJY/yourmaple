@@ -200,6 +200,36 @@ end $$;
 공개용 키를 숨기는 것만으로는 데이터가 보호되지 않습니다.  
 테이블마다 RLS를 켜고, `user_id`가 로그인한 사용자와 같을 때만 조회/수정/삭제가 되게 합니다.
 
+## 탈퇴 계정 삭제 Edge Function (2026-11-01)
+
+탈퇴 신청 후 7일이 지난 계정을 매일 한국 시간 정오에 지웁니다. 얼굴 이미지 파일은 Storage API로 지워야 실제로 사라지므로(SQL로 `storage.objects` 행만 지우면 파일이 남음) Edge Function이 처리합니다. 코드: `supabase/functions/purge-account-deletions/`(`index.ts`, `purge.js`, 검사 `purge.check.mjs`). 서비스 키는 Supabase가 함수에 자동으로 넣어 주며 저장소·브라우저에 두지 않습니다. 함수는 **Verify JWT를 끄고** 요청 헤더 `x-cron-secret`을 함수 비밀 `CRON_SECRET`과 비교해 예약 작업만 받습니다. 스프링으로 옮길 계획은 `docs/spring-migration.md` 1번.
+
+1. **비밀값 만들기**(터미널, 값은 어디에도 공유하지 않음): `openssl rand -hex 32`
+2. **함수 비밀 저장**: 대시보드 Edge Functions → Secrets에 `CRON_SECRET` = 1의 값.
+3. **Vault 비밀 저장**(SQL Editor):
+   ```sql
+   select vault.create_secret('https://<Project ID>.supabase.co', 'project_url');
+   select vault.create_secret('<1과 같은 값>', 'cron_secret');
+   ```
+   이미 있으면 `select vault.update_secret((select id from vault.secrets where name='cron_secret'), '<값>');`
+4. **함수 배포**: Edge Functions → Deploy a new function → Via Editor, 이름 `purge-account-deletions`. `index.ts`를 붙여 넣고 같은 함수에 파일 `purge.js`를 추가해 붙여 넣은 뒤 Deploy. (CLI: `supabase functions deploy purge-account-deletions --project-ref <Project ID>`) 함수 설정의 **Verify JWT는 끔**.
+5. **`sql/056_purge_via_edge_function.sql` 실행**: 매일 작업을 Edge Function 호출로 바꿉니다(재실행 가능).
+6. **확인**(SQL Editor): 아래 두 호출 뒤 몇 초 기다려 응답을 봅니다.
+   ```sql
+   -- 비밀값을 실은 정상 호출 → 200
+   select net.http_post(
+     url := (select decrypted_secret from vault.decrypted_secrets where name='project_url') || '/functions/v1/purge-account-deletions',
+     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='cron_secret')),
+     body := '{}'::jsonb);
+   -- 비밀값 없는 호출 → 401
+   select net.http_post(
+     url := (select decrypted_secret from vault.decrypted_secrets where name='project_url') || '/functions/v1/purge-account-deletions',
+     headers := jsonb_build_object('Content-Type','application/json'),
+     body := '{}'::jsonb);
+   select id, status_code, content from net._http_response order by id desc limit 2;
+   ```
+   비밀값을 실은 호출이 `200`과 `{"deleted":…,"files":…,"orphanFolders":…,"failed":[]}`, 비밀값 없는 호출이 `401 unauthorized`면 정상입니다. 예전 방식으로 남은 이미지가 있었다면 `orphanFolders`에 개수가 나옵니다. `404`는 함수 이름·배포 확인, `500`·`failed`는 함수 Logs 탭 확인.
+
 ## DBeaver로 운영 DB 보기 (2026-10-28)
 
 `postgres` 계정은 RLS를 건너뛰어 **모든 사용자의 기록이 보이고 지울 수도 있습니다.** 보기 전용으로 연결합니다.
@@ -324,6 +354,7 @@ Secret key 는 Secret 에도 넣지 않습니다.
 - `sql/053_chaos_scroll_description.sql`: 혼돈의 주문서 60%(외부 ID 2049100) 설명을 "펜던트, 벨트, 반지, 얼굴장식, 눈장식, 어깨장식에 사용하여 현재 옵션을 더 좋거나 나쁘게 조정한다. / 성공률 60%"로 교체. 바꾸기 전 원문은 `catalog_import_private.item_text_backup`에 보관, 공개 변경 이력 1건. SQL Editor 또는 DBeaver 쓰기 연결에서 전체 실행(재실행 가능).
 - `sql/054_catalog_item_fuzzy_search.sql`: 아이템 검색을 띄어쓰기 무시·글자 순서 검색(혼주문 → 혼돈의 주문서 60%)·별명(`catalog_search_aliases`, 기본 혼줌 → 혼돈의 주문서)으로 바꿉니다. 검색어가 있으면 이름 그대로 → 글자 순서만 맞음 → 분류·번호, 짧은 이름 먼저. 빈 검색 결과·순서와 반환 형식·권한은 그대로. 별명 추가는 `insert into public.catalog_search_aliases(alias,target) values('별명','본래이름')`(둘 다 띄어쓰기 없는 소문자). SQL Editor 또는 DBeaver 쓰기 연결에서 전체 실행(재실행 가능).
 - `sql/055_add_ice_crystal_face_paint.sql`: 도감에 없던 얼음결정 페이스페인팅(외부 ID 1012281)을 사용자 제공 옵션(메이플랜드 밸런스 패치 후: 착용 레벨 90·전 직업·얼굴장식·올스탯 +3·HP/MP +30·업그레이드 3·1회 교환 가능, 옵션 범위 올스탯 2~4·HP/MP 20~40)으로 추가. 이미 있으면 바꾸지 않음. SQL Editor 또는 DBeaver 쓰기 연결에서 전체 실행(재실행 가능).
+- `sql/056_purge_via_edge_function.sql`: 탈퇴 7일 뒤 삭제를 Edge Function으로 옮김(얼굴 이미지 파일을 Storage API로 지운 뒤 계정 삭제, 예전에 남은 고아 이미지도 정리). **먼저 아래 "탈퇴 계정 삭제 Edge Function" 1~4단계를 한 뒤** 실행. Vault 비밀(project_url·cron_secret)이 없으면 아무것도 바꾸지 않고 멈춤(재실행 가능).
   - 운영 적용 확인(2026-10-29 사용자 실행). 로컬 새 화면에서 실제 익명 응답의 전투 수치와 변경 이력 확인 완료. 화면 변경은 아직 미배포입니다.
 
 ### 도감 상세 화면

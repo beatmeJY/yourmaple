@@ -41,7 +41,7 @@ export function renderLogin(root, { failure = "", reason = "" } = {}) {
         ${reason ? `<p class="auth-reason"><b>로그인이 필요해요</b><span></span></p>` : ""}
         <div class="auth-providers">${providerButtons("data-oauth")}</div>
         <p class="auth-note">Your Maple은 비밀번호를 받지 않아요. 로그인은 Google·Discord가 처리해요.</p>
-        <p class="auth-legal">계속하면 <a href="./terms.html">이용약관</a>과 <a href="./privacy.html">개인정보 처리방침</a>에 동의하는 것으로 봅니다.</p>
+        <p class="auth-legal">만 14세 이상만 로그인할 수 있어요. 계속하면 <a href="./terms.html">이용약관</a>과 <a href="./privacy.html">개인정보 처리방침</a>에 동의하는 것으로 봅니다.</p>
       </div>
     </section>
   `;
