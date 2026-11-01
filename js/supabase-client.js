@@ -82,6 +82,7 @@ export async function getSupabase() {
   const mock = mockRequest();
   if (mock) {
     const { createMockClient, mountMockBadge, resetMockDb, setMockAuth } = await import("./dev-mock.js");
+    if (mock !== "keep") sessionStorage.setItem("ym-mock-review-admin", mock === "reviewer" ? "1" : "0");
     if (mock === "reset") resetMockDb();
     if (mock === "guest") setMockAuth(false);
     else if (mock !== "keep") setMockAuth(true);

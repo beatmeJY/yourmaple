@@ -15,6 +15,7 @@ const pages = {
   "chaos-scroll": () => import("./pages/chaos-scroll.js"),
   monsters: () => import("./pages/monsters.js"),
   "item-catalog": () => import("./pages/item-catalog.js"),
+  "catalog-review": () => import("./pages/catalog-review.js"),
   trades: () => import("./pages/trades.js"),
   quests: () => import("./pages/quests.js"),
   notes: () => import("./pages/notes.js"),
@@ -145,5 +146,5 @@ export function renderCrumb(crumb, activeId) {
   const route = routes.find((item) => item.id === activeId);
   crumb.innerHTML = category
     ? `<span class="crumb-cat" style="--cat:${hueColor(category.hue)}"><i aria-hidden="true"></i>${category.label}</span><span class="crumb-sep" aria-hidden="true">›</span><span class="crumb-page">${route?.label ?? ""}</span>`
-    : `<span class="crumb-page">${homeRoute.label}</span>`;
+    : `<span class="crumb-page">${activeId === "catalog-review" ? "비공개 검토" : homeRoute.label}</span>`;
 }

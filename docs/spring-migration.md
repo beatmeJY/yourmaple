@@ -18,6 +18,8 @@
 | 6 | 도감 정규화 | 트리거 `catalog_item_columns`·`catalog_item_relations`(`sql/044`→`049`·`050`), `catalog_monster_columns`(`sql/052`), `catalog_import_private.monster_stat` | 원문(source_data)에서 분류·착용 조건·옵션 범위·직업·몬스터 전투 수치를 정식 컬럼·관계표로 풀기 | 도감 표 쓰기 때 자동 | 5번 배치 안에서 저장 전에 계산하도록 옮기면 트리거를 없앨 수 있다 |
 | 7 | 도감 변경 이력 | 트리거 `record_catalog_change`(`sql/047`→`049`→`052`), 표 `catalog_changes`, 비공개 `change_backups` | 도감이 바뀔 때 공개 이력·비공개 원문 저장, 리비전 올리기 | 도감 표 쓰기 때 자동 | 5번 배치가 이력을 직접 남기도록. 공개 이력에서 숨기는 항목(source_url 등) 유지 |
 
+- 2026-11-01 (Codex) 비공개 도감 검토 추가: `sql/057`의 `can_review_catalog`, `catalog_review_list/detail/save`, `catalog_review_private.reviewer/items/edits` → Spring 운영자 권한·검토 API와 트랜잭션으로 이전. 검증된 Google identity 연결·729개 비공개 범위·revision 충돌·비공개 수정 이력을 유지하고 공개 도감 반영은 별도 승인으로 둡니다. 호출은 `js/catalog-review.js`, `js/pages/catalog-review.js`입니다. [실측]
+
 ## 2. 조회 API (옮기면 좋은 것)
 
 | 기능 | 지금 위치 | 메모 |

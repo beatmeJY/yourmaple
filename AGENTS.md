@@ -71,6 +71,8 @@
 
 - 2026-11-01 (Claude) 방침·약관 확정본·만 14세 문구·탈퇴 삭제 Edge Function 코드·sql/056·스프링 이전 목록 6369a6c 배포(Pages 성공·공개 v=6369a6c, 공개 privacy/terms 시행 2026-11-01·문의 메일·초안 표시 없음(변경 이력 줄만), login/dashboard JS 만 14세 문구, supabase/ 경로 404로 사이트 미노출) [실측]. design_handoff_dojo_v2/는 로컬 자료라 커밋 제외
 
+- 2026-11-01 (Codex) codex/catalog-review-editor 별도작업: 사용자 승인729종(보류660/수치차이69) 비공개 검토 보관함 SQL057/운영자 진입/자료설명·수치선택·직접수정·초안/완료저장 구현. 지정Google UUID+검증identity권한, 비공개 원문/초안/수정이력·revision충돌차단, 공개쓰기 없음. 격리DB729/권한·동일이메일Discord차단·재실행초안보존·공개도감/이력불변 및 ChromePC1280/375 설명선택·저장재조회·미저장보호·일반계정차단 검증 통과. 통합설치SQL은 로컬비공개 생성, 사용자 실행 필요. 운영접속/커밋/배포/다른에이전트변경반영 없음. [실측·진술]
+
 - 2026-11-01 (Claude) 탈퇴 삭제 Edge Function 운영 호출 확인: 비밀값 실은 호출 200 `{deleted:0,files:0,orphanFolders:0,failed:[]}`, 비밀값 없는 호출 401 unauthorized(사용자 SQL Editor 실행 결과) [진술]. 고아 이미지 폴더 없음. 정책 페이지 등 나머지 변경은 미커밋·미배포
 
 - 2026-11-01 (Claude) 사용자 sql/056 실행 완료(cron.schedule 결과 작업 번호 2) [진술]. 함수 호출 확인(200/401) 대기

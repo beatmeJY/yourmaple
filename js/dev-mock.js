@@ -373,7 +373,35 @@ const storage = {
 // DB 함수 흉내: 거래 저장·취소(sql/037 replace_my_trades)만. 실제 함수의 "다른 곳에서 바뀜" 검사는 하지 않는다.
 // 탈퇴처럼 되돌릴 수 없는 함수는 목업에서 실행하지 않는다.
 const strip = ({ user_id: _userId, ...row }) => row;
+
+const reviewAllowed = () => loggedIn() && sessionStorage.getItem("ym-mock-review-admin") === "1";
+function mockReviewRows() {
+  const db = tables();
+  if (!db.catalog_review_items) {
+    const draft = {name:"연습용 아이템",description:"보완할 설명입니다.",effect_description:"HP를 50 회복합니다.",base_options:{attack:5,remaining_upgrades:7},requirements:{level:10,fame:0},review_note:""};
+    db.catalog_review_items = [
+      {source_id:"1000001",category:"장비",review_kind:"different",image_url:null,status:"draft",revision:1,comparison:{differences:[{field:"공격력",api:5,reference:7}],unknown:[]},proposals:{api:{description:"자료 A의 설명입니다.",base_options:{attack:5},requirements:{level:10}},comparison:{description:"자료 B의 설명입니다.",base_options:{attack:7},requirements:{level:10}}},draft:{...draft}},
+      {source_id:"2000001",category:"소비",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 설명 검토 필요"]},proposals:{api:{description:"HP를 50 회복합니다.",base_options:{},requirements:{}},comparison:{description:"HP를 100 회복합니다.",base_options:{},requirements:{}}},draft:{...draft,name:"연습용 포션"}},
+      {source_id:"4000001",category:"기타",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 미제공"]},proposals:{},draft:{...draft,name:"연습용 재료"}},
+    ];
+    save();
+  }
+  return db.catalog_review_items;
+}
+function assertMockReviewer() { if (!reviewAllowed()) throw Object.assign(new Error("검토 권한이 없습니다"),{code:"42501"}); }
+
 const RPCS = {
+  can_review_catalog() { return reviewAllowed(); },
+  catalog_review_list({p_query="",p_kind="",p_status="",p_page=0}={}) {
+    assertMockReviewer();const all=mockReviewRows();const rows=all.filter(x=>(!p_query||x.draft.name.includes(p_query)||x.source_id===p_query)&&(!p_kind||x.review_kind===p_kind)&&(!p_status||x.status===p_status));
+    return {total:rows.length,counts:{all:all.length,ready:all.filter(x=>x.status==="ready").length},rows:rows.slice(p_page*24,p_page*24+24).map(x=>({...x,name:x.draft.name}))};
+  },
+  catalog_review_detail({p_id}) { assertMockReviewer();return structuredClone(mockReviewRows().find(x=>x.source_id===p_id)||null); },
+  catalog_review_save({p_id,p_revision,p_draft,p_status}) {
+    assertMockReviewer();const row=mockReviewRows().find(x=>x.source_id===p_id);if(!row)throw new Error("검토 항목이 없습니다");
+    if(row.revision!==p_revision)throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
+    row.draft=structuredClone(p_draft);row.status=p_status;row.revision++;row.updated_at=iso();save();return structuredClone(row);
+  },
   catalog_search_items({p_query="",p_page=0}={}) {
     // sql/054 와 같은 규칙: 이름 그대로 → 글자 순서만 맞음 → 분류·외부 ID, 같은 순위는 짧은 이름 먼저
     const q=p_query.toLowerCase();
@@ -413,7 +441,7 @@ const RPCS = {
 
 async function rpc(name, args) {
   if (!RPCS[name]) return { data: null, error: { message: `목업에서는 ${name} 함수를 실행하지 않습니다.`, code: "MOCK" } };
-  return { data: RPCS[name](args), error: null };
+  try { return { data: RPCS[name](args), error: null }; } catch (error) { return {data:null,error:{message:error.message,code:error.code}}; }
 }
 
 export function createMockClient() {
