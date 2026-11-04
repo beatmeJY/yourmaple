@@ -2,7 +2,7 @@ import { translateDbError } from "../db-error.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
 import { matchesPointLevel, matchesText, readLevelFilter } from "../filters.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
-import { asBig, formatPerMinute, formatSigned, hourMeso, perHour, shortCount } from "../hunt-calc.js";
+import { asBig, formatPerMinute, formatSigned, hourMeso, perHour, shortCount, timerGain } from "../hunt-calc.js";
 import { findJob, jobDisplayName, jobStyle, normalizeJobName } from "../job-label.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { getSupabase } from "../supabase-client.js";
@@ -36,6 +36,23 @@ function writeGrouped(input, amount) {
 
 function groupDigits(text) {
   return text.replace(/\D/g, "").replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// 타이머 획득량 칸: 시작·끝 값을 적으면 차이로, 시작을 비우면 획득량을 직접 적는다.
+function gainBoxHtml(kind, label, word) {
+  return `<div class="hu-gain" data-gain="${kind}">
+    <div class="hu-gain-head">
+      <span class="hu-gain-title">${label}</span>
+      <span class="hu-gain-mode" data-gain-mode>직접 입력</span>
+      <b class="hu-gain-total" data-gain-total aria-live="polite"></b>
+    </div>
+    <div class="hu-gain-grid">
+      <label class="hu-well"><span>시작할 때 내 ${word}</span><input data-timer-field="${kind}Start" inputmode="numeric" data-grouped autocomplete="off" placeholder="모르면 비워 두기" /></label>
+      <span class="hu-gain-arrow" aria-hidden="true">→</span>
+      <label class="hu-well"><span>끝날 때 내 ${word}</span><input data-timer-field="${kind}End" inputmode="numeric" data-grouped autocomplete="off" placeholder="끝나고 적기" /></label>
+    </div>
+    <label class="hu-well hu-gain-direct"><span data-gain-direct-label>획득 ${label} 직접 입력</span><input data-timer-field="${kind}" inputmode="numeric" data-grouped autocomplete="off" placeholder="0" /></label>
+  </div>`;
 }
 
 function applyGrouped(input) {
@@ -74,7 +91,7 @@ function consumePendingAdd() {
 
 // 사냥 타이머: 다른 화면에 갔다 오거나 새로고침해도 이어지도록 시작 시각을 브라우저에 기억한다.
 const TIMER_KEY = "maple-note-hunt-timer";
-const blankTimer = { running: false, startedAt: 0, before: 0, title: "", exp: "", meso: "", potion: "", leech: "" };
+const blankTimer = { running: false, startedAt: 0, before: 0, title: "", exp: "", meso: "", expStart: "", expEnd: "", mesoStart: "", mesoEnd: "", potion: "", leech: "" };
 
 function readTimer() {
   try {
@@ -137,7 +154,7 @@ export async function render(root) {
             <div class="hu-timer-body">
               <div class="hu-timer-copy">
                 <h2>사냥 타이머</h2>
-                <span data-timer-hint>시작을 누르고 사냥하세요. 1시간 기준 효율로 자동 환산해요.</span>
+                <span data-timer-hint>시작할 때 내 경험치·메소를 적어 두고 시작을 누르세요. 1시간 기준 효율로 자동 환산해요.</span>
               </div>
               <label class="hu-well"><span>기록할 캐릭터</span><select data-timer-character aria-label="기록할 캐릭터"></select></label>
               <div class="hu-measure" role="group" aria-label="직접 측정 시간">
@@ -147,9 +164,9 @@ export async function render(root) {
               </div>
               <div class="hu-wells">
                 <label class="hu-well is-wide"><span>사냥터</span><input data-timer-field="title" autocomplete="off" placeholder="예: 엘나스 헥터" /></label>
-                <label class="hu-well"><span>획득 EXP</span><input data-timer-field="exp" inputmode="numeric" data-grouped autocomplete="off" placeholder="0" /></label>
-                <label class="hu-well"><span>획득 메소</span><input data-timer-field="meso" inputmode="numeric" data-grouped autocomplete="off" placeholder="0" /></label>
               </div>
+              ${gainBoxHtml("exp", "EXP", "경험치")}
+              ${gainBoxHtml("meso", "메소", "메소")}
               <div class="hu-wells hu-costs">
                 <label class="hu-well"><span>측정 동안 쓴 물약값</span><input data-timer-field="potion" inputmode="numeric" data-grouped placeholder="없으면 0" /></label>
                 <label class="hu-well"><span>측정 동안 쩔값 (+받음 / −지불)</span><input data-timer-field="leech" inputmode="text" data-grouped data-signed placeholder="내가 내면 -" /></label>
@@ -714,18 +731,59 @@ export async function render(root) {
     box.querySelector("[data-clock]").textContent = clockText(seconds);
     box.querySelector("[data-clock-state]").textContent = timer.running ? "사냥 중" : seconds ? "일시정지" : "대기";
     box.querySelector("[data-timer-hint]").textContent = timer.running
-      ? "타이머가 돌고 있어요. 끝나면 획득량을 적고 기록을 남기세요."
+      ? "타이머가 돌고 있어요. 끝나면 지금 내 경험치·메소(또는 획득량)를 적고 기록을 남기세요."
       : seconds
-        ? `${spanText(seconds)} 동안 사냥했어요. 획득량을 적고 기록을 남기세요.`
-        : "시작을 누르고 사냥하세요. 1시간 기준 효율로 자동 환산해요.";
+        ? `${spanText(seconds)} 동안 사냥했어요. 끝날 때 내 경험치·메소(또는 획득량)를 적고 기록을 남기세요.`
+        : "시작할 때 내 경험치·메소를 적어 두고 시작을 누르세요. 1시간 기준 효율로 자동 환산해요.";
     box.querySelector("[data-timer-toggle]").textContent = timer.running ? "일시정지" : seconds ? "다시 시작" : "사냥 시작";
     box.querySelector("[data-timer-finish]").disabled = !seconds;
     box.querySelector("[data-timer-reset]").hidden = !seconds;
   }
 
+  function readTimerGain(kind, label, minimum) {
+    return timerGain({ start: timer[`${kind}Start`], end: timer[`${kind}End`], direct: timer[kind] }, label, minimum);
+  }
+
+  function focusGainField(kind, gain) {
+    const name = gain.mode === "range" ? (gain.field === "start" ? `${kind}Start` : `${kind}End`) : kind;
+    root.querySelector(`[data-timer-field="${name}"]`)?.focus();
+  }
+
+  // 시작 값이 있으면 직접 입력 칸을 잠그고 끝 − 시작을 보여 준다.
+  function paintGain(kind) {
+    const box = root.querySelector(`[data-gain="${kind}"]`);
+    if (!box) return;
+    const label = kind === "exp" ? "EXP" : "메소";
+    const gain = readTimerGain(kind, label, kind === "exp" ? 1n : 0n);
+    const range = gain.mode === "range";
+    const direct = box.querySelector(`[data-timer-field="${kind}"]`);
+    box.classList.toggle("is-range", range);
+    box.classList.toggle("is-error", Boolean(gain.error));
+    box.querySelector("[data-gain-mode]").textContent = range ? "시작·끝으로 계산" : "직접 입력";
+    box.querySelector("[data-gain-direct-label]").textContent = range ? `획득 ${label} (자동 계산)` : `획득 ${label} 직접 입력`;
+    direct.disabled = range;
+    if (range) direct.value = gain.value != null ? formatCount(gain.value) : "";
+    else if (direct.value !== (timer[kind] || "")) direct.value = timer[kind] || "";
+    const total = box.querySelector("[data-gain-total]");
+    const before = total.textContent;
+    total.textContent = gain.error ? "확인 필요" : gain.value != null ? `+${formatCount(gain.value)}` : "";
+    total.title = gain.error || "";
+    if (total.textContent && total.textContent !== before && !gain.error) {
+      total.classList.remove("is-pop");
+      void total.offsetWidth;
+      total.classList.add("is-pop");
+    }
+  }
+
+  function paintGains() {
+    paintGain("exp");
+    paintGain("meso");
+  }
+
   function fillTimerFields() {
     if (!timer.running && timer.before > 0 && timer.before % 60 === 0) root.querySelector("[data-measured-time]").value = String(timer.before / 60);
     for (const input of root.querySelectorAll("[data-timer-field]")) input.value = timer[input.dataset.timerField] || "";
+    paintGains();
   }
 
   let tick = 0;
@@ -766,21 +824,23 @@ export async function render(root) {
     if (!measuredInput.checkValidity()) { measuredInput.reportValidity(); return; }
     const seconds = elapsedSeconds();
     if (!seconds) return;
-    const exp = readBig(timer.exp, "획득 EXP", 1n);
+    const exp = readTimerGain("exp", "EXP", 1n);
     if (exp.error || exp.value == null) {
-      notify(exp.error || "획득 EXP를 적어 주세요.", "error");
-      root.querySelector('[data-timer-field="exp"]')?.focus();
+      notify(exp.error || (exp.mode === "range" ? "끝날 때 내 경험치를 적어 주세요." : "획득 EXP를 적어 주세요."), "error");
+      focusGainField("exp", exp);
       return;
     }
-    const meso = readBig(timer.meso, "획득 메소", 0n);
-    if (meso.error) {
-      notify(meso.error, "error");
+    const meso = readTimerGain("meso", "메소", 0n);
+    if (meso.error || (meso.mode === "range" && meso.value == null)) {
+      notify(meso.error || "끝날 때 내 메소를 적어 주세요.", "error");
+      focusGainField("meso", meso);
       return;
     }
     const expHour = perHour(exp.value, seconds);
     const mesoHour = perHour(meso.value ?? 0n, seconds);
     const title = String(timer.title || "").trim() || "새 사냥";
-    const memo = `타이머 ${spanText(seconds)} · EXP ${formatCount(exp.value)} · 메소 ${formatCount(meso.value ?? 0n)}`;
+    const rangeNote = (kind, gain) => gain.mode === "range" ? `(${formatCount(readBig(timer[`${kind}Start`], "", 0n).value)}→${formatCount(readBig(timer[`${kind}End`], "", 0n).value)})` : "";
+    const memo = `타이머 ${spanText(seconds)} · EXP ${formatCount(exp.value)}${rangeNote("exp", exp)} · 메소 ${formatCount(meso.value ?? 0n)}${rangeNote("meso", meso)}`;
     const potion = readBig(timer.potion, "물약값", 0n);
     const leech = readLeech(timer.leech);
     if (potion.error || leech.error) { notify(potion.error || leech.error, "error"); return; }
@@ -912,6 +972,8 @@ export async function render(root) {
     if (timerField) {
       timer = { ...timer, [timerField.dataset.timerField]: timerField.value };
       saveTimer();
+      const gainBox = timerField.closest("[data-gain]");
+      if (gainBox) paintGain(gainBox.dataset.gain);
     }
     if (event.target.form === huntForm && ["meso_amount", "leech_fee", "potion_cost"].includes(event.target.name)) {
       paintHuntNet();

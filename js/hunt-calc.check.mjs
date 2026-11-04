@@ -56,3 +56,19 @@ assert.equal(shortCount(1500000000000n), "1조 5,000억");
 assert.equal(perHour(1300000n, 1200), 3900000n);
 assert.equal(perHour(100n, 450), 800n);
 assert.equal(perHour(0n, 60), 0n);
+
+// 타이머 획득량: 시작·끝 값 또는 직접 입력
+{
+  const { timerGain } = await import("./hunt-calc.js");
+  assert.deepEqual(timerGain({ start: "1,000", end: "3,500", direct: "9" }, "EXP", 1n), { mode: "range", value: 2500n });
+  assert.deepEqual(timerGain({ start: "", end: "3,500", direct: "1,234" }, "EXP", 1n), { mode: "direct", value: 1234n });
+  assert.deepEqual(timerGain({ start: "", end: "", direct: "" }, "메소", 0n), { mode: "direct", value: null });
+  assert.equal(timerGain({ start: "100", end: "", direct: "5" }, "EXP", 1n).value, null);
+  assert.match(timerGain({ start: "500", end: "100", direct: "" }, "EXP", 1n).error, /레벨이 올랐다면/);
+  assert.match(timerGain({ start: "500", end: "500", direct: "" }, "EXP", 1n).error, /1 이상/);
+  assert.deepEqual(timerGain({ start: "500", end: "500", direct: "" }, "메소", 0n), { mode: "range", value: 0n });
+  assert.match(timerGain({ start: "1a", end: "5", direct: "" }, "EXP", 1n).error, /숫자만/);
+  // 시작 값이 아주 커도 BigInt로 정확히
+  assert.equal(timerGain({ start: "9007199254740993", end: "9007199254740999", direct: "" }, "메소").value, 6n);
+}
+console.log("hunt-calc timerGain ok");

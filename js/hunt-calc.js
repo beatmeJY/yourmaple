@@ -227,3 +227,30 @@ export function shortCount(value) {
 export function perHour(amount, seconds) {
   return mulDivRound(amount, 3600n, BigInt(Math.max(1, Math.round(Number(seconds)))));
 }
+
+// 타이머 획득량: 시작 값을 적었으면 끝 − 시작, 안 적었으면 직접 적은 획득량을 쓴다.
+// 입력은 쉼표가 섞인 문자열. 반환 { mode: "range" | "direct", value, error, field }
+function readAmount(text, label) {
+  const raw = String(text ?? "").trim().replaceAll(",", "").replaceAll(" ", "");
+  if (!raw) return { value: null };
+  if (!/^\d+$/.test(raw) || raw.length > 40) return { error: `${label}에는 숫자만 입력해 주세요.` };
+  return { value: BigInt(raw) };
+}
+
+export function timerGain({ start, end, direct }, label, minimum = 0n) {
+  const from = readAmount(start, `시작 ${label}`);
+  if (from.error) return { mode: "range", error: from.error, field: "start" };
+  if (from.value == null) {
+    const gain = readAmount(direct, `획득 ${label}`);
+    if (gain.error) return { mode: "direct", error: gain.error, field: "direct" };
+    if (gain.value != null && gain.value < minimum) return { mode: "direct", error: `획득 ${label} 값은 ${minimum.toString()} 이상이어야 합니다.`, field: "direct" };
+    return { mode: "direct", value: gain.value };
+  }
+  const to = readAmount(end, `끝 ${label}`);
+  if (to.error) return { mode: "range", error: to.error, field: "end" };
+  if (to.value == null) return { mode: "range", value: null, field: "end" };
+  if (to.value < from.value) return { mode: "range", error: `끝 ${label}가 시작보다 작아요. 레벨이 올랐다면 시작 값을 지우고 획득 ${label}를 직접 적어 주세요.`, field: "end" };
+  const value = to.value - from.value;
+  if (value < minimum) return { mode: "range", error: `획득 ${label} 값은 ${minimum.toString()} 이상이어야 합니다.`, field: "end" };
+  return { mode: "range", value };
+}

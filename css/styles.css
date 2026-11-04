@@ -16063,3 +16063,30 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .cs2 .cs-tip-stats li, .cs2 .cs-delta, .cs2 .cs-tip-fx, .cs2 .cs-orb-ring, .cs2 .cs-scroll, .cs2 .cs-scroll-orb img, .cs2 .cs-log-list li { animation: none !important; }
   .cs2 .cs-start, .cs2 .cs-scroll, .cs2 .cs-fav, .cs2 .cs-delta-bar > i, .cs2 .cs-stage-glow { transition: none; }
 }
+
+/* ── 사냥 타이머 획득량: 시작·끝 값 또는 직접 입력 ── */
+.hu-gain { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); transition: border-color 0.25s, box-shadow 0.25s; }
+.hu-gain.is-range { border-color: oklch(0.82 0.14 150 / 0.35); box-shadow: inset 0 0 24px -12px oklch(0.82 0.14 150 / 0.5); }
+.hu-gain.is-error { border-color: oklch(0.7 0.18 25 / 0.5); }
+.hu-gain-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hu-gain-title { font-size: 13px; font-weight: 800; color: #f3effb; }
+.hu-gain-mode { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #a59dbd; background: rgba(255, 255, 255, 0.06); transition: color 0.2s, background 0.2s; }
+.hu-gain.is-range .hu-gain-mode { color: oklch(0.9 0.12 150); background: oklch(0.82 0.14 150 / 0.16); }
+.hu-gain-total { margin-left: auto; font-size: 15px; font-weight: 800; color: oklch(0.9 0.13 150); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hu-gain.is-error .hu-gain-total { color: oklch(0.78 0.16 25); cursor: help; }
+.hu-gain-total.is-pop { animation: hu-gain-pop 0.45s var(--spring, cubic-bezier(0.34, 1.56, 0.64, 1)); }
+@keyframes hu-gain-pop { 0% { transform: scale(0.8); opacity: 0.4; } 100% { transform: scale(1); opacity: 1; } }
+.hu-gain-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
+.hu-gain-arrow { color: #8f87a8; font-weight: 800; }
+.hu-gain.is-range .hu-gain-arrow { color: oklch(0.85 0.13 150); }
+.hu-gain-direct { transition: opacity 0.2s; }
+.hu-gain.is-range .hu-gain-direct { opacity: 0.6; border-style: dashed; }
+.hu-page .hu-gain-direct input:disabled { color: oklch(0.9 0.12 150); -webkit-text-fill-color: oklch(0.9 0.12 150); cursor: default; }
+@media (max-width: 520px) {
+  .hu-gain-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .hu-gain-arrow { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hu-gain, .hu-gain-mode, .hu-gain-direct { transition: none; }
+  .hu-gain-total.is-pop { animation: none; }
+}
