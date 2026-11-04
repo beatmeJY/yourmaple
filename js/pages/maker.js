@@ -330,12 +330,16 @@ function marketProfitBlock(item, profits) {
   `;
 }
 
-function reverseMaterialRow(material) {
+// 리버스 v2 디자인: 등급 색(정옵~+5)과 재료 아이콘 색
+const REVERSE_GRADE_COLORS = ["oklch(0.82 0.03 290)", "oklch(0.8 0.14 150)", "oklch(0.75 0.14 235)", "oklch(0.72 0.19 305)", "oklch(0.84 0.15 80)", "oklch(0.7 0.21 30)"];
+const REVERSE_MATERIAL_HUES = { orihalcon: 55, monster_b: 200, monster_a: 150, time_piece: 280 };
+
+function reverseMaterialRow(material, index) {
   return `
-    <label class="reverse-material-card">
-      <span class="reverse-material-icon" aria-hidden="true">◆</span>
-      <span class="reverse-material-name"><strong>${escapeHtml(material.label)}</strong><small>${formatCount(material.count)}개 필요 · ${material.optional ? "선택 · 비우면 0메소" : "필수"}</small></span>
-      <span class="reverse-material-input"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="40" autocomplete="off" spellcheck="false" data-reverse-price="${material.id}" aria-label="${escapeHtml(material.label)} 개당 시세" placeholder="${material.optional ? "선택 · 0메소" : "필수 · 개당 시세"}" /><small data-reverse-reading="${material.id}">메소</small></span>
+    <label class="reverse-material-card" data-reverse-material="${material.id}" style="--hue:${REVERSE_MATERIAL_HUES[material.id] ?? 260};--i:${index}">
+      <span class="reverse-material-icon" aria-hidden="true">${escapeHtml([...material.label][0])}</span>
+      <span class="reverse-material-name"><strong>${escapeHtml(material.label)}</strong><small>${formatCount(material.count)}개 · ${material.optional ? "선택 · 비우면 0메소" : "필수"}</small></span>
+      <span class="reverse-material-input"><span class="reverse-material-field"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="40" autocomplete="off" spellcheck="false" data-reverse-price="${material.id}" aria-label="${escapeHtml(material.label)} 개당 시세" placeholder="${material.optional ? "선택" : "필수"}" /><em>/개</em></span><small data-reverse-reading="${material.id}">메소</small></span>
       <b data-reverse-total="${material.id}">-</b>
     </label>
   `;
@@ -344,27 +348,27 @@ function reverseMaterialRow(material) {
 function reverseGemSelectorHtml() {
   return `
     <div class="reverse-gem-select">
-      <div class="enchant-slots reverse-enchant-slots">
+      <div class="reverse-gem-divider"><span>상급 보석·크리스탈 3개 · 필수</span><small>보석 제작에 기록한 상급 실거래가를 써요.</small></div>
+      <div class="reverse-enchant-slots">
         ${[0, 1, 2]
           .map(
             (index) => `
-              <article class="enchant-slot reverse-enchant-slot" data-reverse-gem-slot="${index}" style="--i:${index}">
-                <div class="enchant-slot-head"><span>상급 보석 슬롯 ${index + 1} · 필수</span></div>
-                <button type="button" class="enchant-material-button" data-reverse-slot="${index}" aria-expanded="false">
-                  <span class="enchant-slot-empty" aria-hidden="true">+</span>
-                  <span><strong>상급 보석·크리스탈 선택</strong><small>상급만 선택 · 시세 필수</small></span>
+              <article class="reverse-enchant-slot" data-reverse-gem-slot="${index}" style="--i:${index}">
+                <button type="button" class="reverse-slot-button" data-reverse-slot="${index}" aria-expanded="false" aria-label="상급 재료 슬롯 ${index + 1}">
+                  <span class="reverse-slot-box"><span class="enchant-slot-empty" aria-hidden="true">+</span></span>
+                  <span class="reverse-slot-text"><strong>슬롯 ${index + 1}</strong><small>상급 재료 고르기</small></span>
                 </button>
-                <button type="button" class="reverse-gem-price-add enchant-price-add" data-reverse-add-price="${index}" hidden>시세 입력</button>
-                <div class="enchant-slot-cost"><span>상급 재료 시세</span><b data-reverse-total="high_${index + 1}">-</b></div>
+                <button type="button" class="reverse-gem-price-add" data-reverse-add-price="${index}" hidden>시세 입력</button>
+                <b class="reverse-slot-cost" data-reverse-total="high_${index + 1}">-</b>
               </article>
             `,
           )
           .join("")}
       </div>
       <div class="reverse-gem-picker" data-reverse-gem-picker hidden>
-        <div class="reverse-gem-picker-head"><strong>상급 재료 선택</strong><small>같은 재료를 여러 번 선택할 수 있습니다.</small></div>
+        <div class="reverse-gem-picker-head"><strong data-reverse-picker-title>상급 재료 선택</strong><small>같은 재료는 한 슬롯에만 들어가요. 이미 쓴 재료를 고르면 자리를 옮겨요.</small><button type="button" class="reverse-picker-close" data-reverse-picker-close aria-label="닫기">×</button></div>
         <div class="reverse-gem-picker-grid">
-          ${MAKER_ITEMS.map((item) => `<button type="button" data-reverse-gem="${item.id}" aria-pressed="false">${stageIcon(item.id, "high", `상급 ${item.name}`)}<span>${escapeHtml(item.name)}</span></button>`).join("")}
+          ${MAKER_ITEMS.map((item) => `<button type="button" data-reverse-gem="${item.id}" aria-pressed="false">${stageIcon(item.id, "high", `상급 ${item.name}`)}<span>${escapeHtml(item.name)}</span><small data-reverse-gem-price="${item.id}">-</small></button>`).join("")}
         </div>
       </div>
     </div>
@@ -372,58 +376,58 @@ function reverseGemSelectorHtml() {
 }
 
 function reverseCalculatorHtml() {
+  const valueRows = REVERSE_CATALYST_ODDS.filter((row) => row.bonus != null);
   return `
-    <div class="reverse-workshop" data-reverse-calculator>
+    <div class="reverse-workshop rv2" data-reverse-calculator>
       <div class="reverse-workshop-head">
-        <div><span class="reverse-kicker">REVERSE FORGE</span><h2>리버스 제작 비용</h2><p>재료의 개당 시세를 입력하면 제작 1회 비용과 파괴 위험까지 계산합니다.</p></div>
-        <label class="reverse-catalyst-toggle"><input type="checkbox" data-reverse-catalyst checked /><span aria-hidden="true"></span><strong>촉진제 사용</strong><small>+${formatCount(REVERSE_CATALYST_FEE)}메소</small></label>
+        <div><span class="reverse-kicker">REVERSE FORGE</span><h2>리버스 제작 비용</h2><p>재료 시세를 적으면 1회 제작비와 파괴 위험, 공격력별 적정 판매가까지 계산해요.</p></div>
+        <label class="reverse-catalyst-toggle"><input type="checkbox" data-reverse-catalyst checked /><span class="reverse-switch" aria-hidden="true"><i></i></span><span class="reverse-switch-text"><strong>촉진제 사용</strong><small>+${formatCount(REVERSE_CATALYST_FEE)} 메소 · 파괴 10%</small></span></label>
       </div>
-      <section class="reverse-panel">
-        <div class="reverse-panel-title"><span>01</span><div><strong>재료 시세 입력</strong><small>시간 조각과 상급 보석 3개의 시세는 필수입니다. 나머지 재료는 비우면 0메소로 계산합니다.</small></div></div>
-        <div class="reverse-material-grid">${REVERSE_RECIPE.filter((material) => !material.id.startsWith("high_")).map(reverseMaterialRow).join("")}</div>
-        <div class="reverse-gem-divider"><span>상급 보석·크리스탈 3개</span><small>보석 제작에 기록한 상급 실거래가를 사용합니다.</small></div>
-        ${reverseGemSelectorHtml()}
-      </section>
-      <section class="reverse-panel reverse-value-panel" data-reverse-value-panel>
-        <div class="reverse-panel-title"><span>02</span><div><strong>공격력별 적정 판매가</strong><small>전체 제작비를 정옵~+5에 1/6씩 배분한 뒤, 각 옵션의 예상 수량으로 나눕니다. 파괴 10%도 비용에 포함됩니다.</small></div></div>
-        <label class="reverse-base-attack"><span>정옵 공격력</span><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" data-reverse-base-attack placeholder="예: 120" /><small>입력하면 +1~+5 공격력이 자동으로 채워집니다.</small></label>
-        <div class="reverse-value-list">
-          ${REVERSE_CATALYST_ODDS.filter((row) => row.bonus != null)
-            .map(
-              (row) => `
-                <article class="reverse-value-row">
-                  <span class="reverse-value-grade">${escapeHtml(row.label)}</span>
-                  <strong data-reverse-attack-label="${row.bonus}">공격력 -</strong>
-                  <em>${row.percent}% · 101회 중 ${(101 * row.percent / 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}개</em>
-                  <b data-reverse-fair-price="${row.bonus}">제작비 입력 대기</b>
-                  <details class="reverse-market-detail"><summary>실거래가로 비교 · 선택</summary><span class="reverse-value-input"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="40" autocomplete="off" spellcheck="false" data-reverse-output-price="${row.bonus}" aria-label="${escapeHtml(row.label)} 실거래가" placeholder="비교할 실거래가" /><small data-reverse-output-reading="${row.bonus}">선택 입력</small></span></details>
-                </article>
-              `,
-            )
-            .join("")}
-          <div class="reverse-value-row is-destroy">
-            <span class="reverse-value-grade">파괴</span><strong>장비 없음</strong><em>10% · 101회 중 10.1회</em><b>판매가 0메소</b><span class="reverse-value-zero">회수 금액 없음</span>
+      <section class="reverse-summary" data-reverse-result aria-live="polite"></section>
+      <div class="reverse-columns">
+        <section class="reverse-panel reverse-material-panel">
+          <div class="reverse-panel-title"><span>01</span><div><strong>재료</strong><small>시간조각과 상급 재료 3개는 필수예요. 나머지는 비우면 0메소로 계산해요.</small></div></div>
+          <div class="reverse-material-grid">${REVERSE_RECIPE.filter((material) => !material.id.startsWith("high_")).map(reverseMaterialRow).join("")}</div>
+          ${reverseGemSelectorHtml()}
+          <div class="reverse-receipt reverse-fixed-panel" aria-label="고정 제작 비용">
+            <div><span>기본 제작비</span><b>${formatCount(REVERSE_BASE_FEE)}</b></div>
+            <div><span>상급 추가비 <small>${formatCount(REVERSE_HIGH_EXTRA_FEE)} × 3</small></span><b>${formatCount(REVERSE_HIGH_EXTRA_FEE * 3n)}</b></div>
+            <div data-reverse-catalyst-fee><span>촉진제</span><b>${formatCount(REVERSE_CATALYST_FEE)}</b></div>
+            <div class="is-total"><span>고정 비용 합계</span><b data-reverse-fixed-total>-</b></div>
           </div>
-        </div>
-        <p class="hint">계산식: 1회 제작비 ÷ 6 ÷ 옵션 확률. 희귀한 옵션일수록 높은 기준 가격이 됩니다. 이 가격으로 모든 결과물을 판매하면 예상 판매 총액과 제작비가 일치합니다(메소 반올림 차이 제외). 실제 시장 가격을 예측하는 값은 아니며, 실거래가는 비교용 선택 입력입니다.</p>
-        <div class="reverse-value-summary" data-reverse-value-summary></div>
-        <div class="reverse-target-results" data-reverse-target-results></div>
-      </section>
-      <section class="reverse-panel reverse-fixed-panel">
-        <div class="reverse-panel-title"><span>03</span><div><strong>고정 제작 비용</strong><small>재료 시세와 별도로 항상 들어가는 메소입니다.</small></div></div>
-        <div class="reverse-fixed-grid">
-          <div><span>기본 제작비</span><b>${formatCount(REVERSE_BASE_FEE)}</b></div>
-          <div><span>상급 재료 추가비</span><small>${formatCount(REVERSE_HIGH_EXTRA_FEE)} × 3개</small><b>${formatCount(REVERSE_HIGH_EXTRA_FEE * 3n)}</b></div>
-          <div data-reverse-catalyst-fee><span>촉진제 비용</span><b>${formatCount(REVERSE_CATALYST_FEE)}</b></div>
-        </div>
-      </section>
-      <section class="reverse-panel" data-reverse-odds-panel>
-        <div class="reverse-panel-title"><span>04</span><div><strong>촉진제 제작 결과</strong><small>완성 성공률 90% · 파괴 확률 10%</small></div></div>
-        <div class="reverse-odds-grid">
-          ${REVERSE_CATALYST_ODDS.map((row) => `<div class="reverse-odd${row.bonus == null ? " is-destroy" : row.bonus >= 3 ? " is-rare" : ""}"><span>${escapeHtml(row.label)}</span><b>${row.percent}%</b><i style="--p:${row.percent}%"></i></div>`).join("")}
-        </div>
-      </section>
-      <section class="reverse-result" data-reverse-result></section>
+        </section>
+        <section class="reverse-panel reverse-value-panel" data-reverse-value-panel>
+          <div class="reverse-panel-title"><span>02</span><div><strong>공격력별 적정 판매가</strong><small>제작비를 정옵~+5에 1/6씩 나눈 뒤 각 옵션의 예상 수량으로 나눠요. 파괴 10%도 비용에 들어가요.</small></div></div>
+          <label class="reverse-base-attack"><span>정옵 공격력</span><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" data-reverse-base-attack placeholder="예: 120" /><small>적으면 +1~+5 공격력이 채워져요.</small></label>
+          <div class="reverse-odds-strip" data-reverse-odds-panel role="img" aria-label="촉진제 제작 결과 확률: ${REVERSE_CATALYST_ODDS.map((row) => `${row.label} ${row.percent}%`).join(", ")}">
+            ${REVERSE_CATALYST_ODDS.map((row, index) => `<i style="--w:${row.percent};--c:${row.bonus == null ? "rgba(255,255,255,.14)" : REVERSE_GRADE_COLORS[index]};--i:${index}" title="${escapeHtml(row.label)} ${row.percent}%"></i>`).join("")}
+          </div>
+          <div class="reverse-value-list">
+            ${valueRows
+              .map(
+                (row, index) => `
+                  <details class="reverse-market-detail reverse-grade" style="--c:${REVERSE_GRADE_COLORS[index]};--i:${index}">
+                    <summary>
+                      <span class="reverse-grade-badge">${escapeHtml(row.label)}</span>
+                      <span class="reverse-grade-main"><strong data-reverse-attack-label="${row.bonus}">공격력 -</strong><em>${row.percent}% · 101회 중 ${(101 * row.percent / 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}개</em></span>
+                      <b class="reverse-grade-fair" data-reverse-fair-price="${row.bonus}">제작비 입력 대기</b>
+                      <span class="reverse-grade-chev" aria-hidden="true">›</span>
+                    </summary>
+                    <div class="reverse-grade-body">
+                      <span class="reverse-value-input"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="40" autocomplete="off" spellcheck="false" data-reverse-output-price="${row.bonus}" aria-label="${escapeHtml(row.label)} 실거래가" placeholder="실거래가 · 선택" /><small data-reverse-output-reading="${row.bonus}">비교할 때만 적어요</small></span>
+                      <span class="reverse-grade-diff" data-reverse-diff="${row.bonus}"></span>
+                    </div>
+                  </details>
+                `,
+              )
+              .join("")}
+            <div class="reverse-grade is-destroy"><span class="reverse-grade-badge">파괴</span><span class="reverse-grade-main"><strong>장비 없음</strong><em>10% · 101회 중 10.1회</em></span><b class="reverse-grade-fair">0메소</b></div>
+          </div>
+          <p class="hint">계산식: 1회 제작비 ÷ 6 ÷ 옵션 확률. 이 가격으로 모두 팔면 예상 판매 총액과 제작비가 같아져요(메소 반올림 차이 제외). 시장 가격을 예측하는 값은 아니고, 실거래가는 비교용 선택 입력이에요.</p>
+          <div class="reverse-value-summary" data-reverse-value-summary></div>
+          <div class="reverse-target-results" data-reverse-target-results></div>
+        </section>
+      </div>
     </div>
   `;
 }
@@ -1146,17 +1150,23 @@ export async function render(root, mode = "gem") {
       const market = item ? latestPrice(item.id, "high") : null;
       slot.classList.toggle("has-selection", Boolean(item));
       slot.classList.toggle("is-missing-price", Boolean(item && !market));
-      button.classList.toggle("is-active", reverseActiveSlot === index);
+      slot.classList.toggle("is-active", reverseActiveSlot === index);
       button.setAttribute("aria-expanded", String(reverseActiveSlot === index));
       button.innerHTML = item
-        ? `${stageIcon(item.id, "high", `상급 ${item.name}`)}<span><strong>상급 ${escapeHtml(item.name)}</strong><small>${market ? `실거래 ${meso(market.price)}` : "등록된 상급 시세 없음"}</small></span>`
-        : `<span class="enchant-slot-empty" aria-hidden="true">+</span><span><strong>상급 보석·크리스탈 선택</strong><small>상급만 선택 · 시세 필수</small></span>`;
+        ? `<span class="reverse-slot-box">${stageIcon(item.id, "high", `상급 ${item.name}`)}</span><span class="reverse-slot-text"><strong>상급 ${escapeHtml(item.name)}</strong><small>${market ? escapeHtml(priceReading(String(market.price))) : "등록된 상급 시세 없음"}</small></span>`
+        : `<span class="reverse-slot-box"><span class="enchant-slot-empty" aria-hidden="true">+</span></span><span class="reverse-slot-text"><strong>슬롯 ${index + 1}</strong><small>상급 재료 고르기</small></span>`;
       addButton.hidden = !item || Boolean(market);
     }
+    const title = reverseCalculator.querySelector("[data-reverse-picker-title]");
+    if (title) title.textContent = reverseActiveSlot == null ? "상급 재료 선택" : `슬롯 ${reverseActiveSlot + 1}에 넣을 상급 재료`;
     for (const option of reverseCalculator.querySelectorAll("[data-reverse-gem]")) {
       const selected = reverseActiveSlot != null && reverseHighSelections[reverseActiveSlot] === option.dataset.reverseGem;
       option.classList.toggle("is-selected", selected);
+      option.classList.toggle("is-used", !selected && reverseHighSelections.includes(option.dataset.reverseGem));
       option.setAttribute("aria-pressed", String(selected));
+      const market = latestPrice(option.dataset.reverseGem, "high");
+      const price = option.querySelector("[data-reverse-gem-price]");
+      if (price) price.textContent = market ? meso(market.price) : "시세 없음";
     }
   }
 
@@ -1175,28 +1185,32 @@ export async function render(root, mode = "gem") {
     const result = reverseCraftCost(prices, useCatalyst);
     for (const row of result.rows) {
       reverseCalculator.querySelector(`[data-reverse-total="${row.id}"]`).textContent = row.cost == null ? "-" : `${formatCount(row.cost)}메소`;
+      // 필수 재료가 비어 있으면 줄을 주황 테두리로 표시합니다.
+      reverseCalculator.querySelector(`[data-reverse-material="${row.id}"]`)?.classList.toggle("is-missing", row.unitPrice == null);
     }
     reverseCalculator.querySelector("[data-reverse-catalyst-fee]").hidden = !useCatalyst;
     reverseCalculator.querySelector("[data-reverse-odds-panel]").hidden = !useCatalyst;
     reverseCalculator.querySelector("[data-reverse-value-panel]").hidden = !useCatalyst;
+    reverseCalculator.querySelector("[data-reverse-fixed-total]").textContent = formatCount(result.fixedCost);
+    reverseCalculator.classList.toggle("is-no-catalyst", !useCatalyst);
     const missing = result.rows.filter((row) => row.unitPrice == null);
-    const completion = result.complete
-      ? `<div class="reverse-result-main"><span>제작 1회 총비용</span><b>${formatCount(result.attemptCost)}<small>메소</small></b></div>`
-      : `<div class="reverse-result-wait"><strong>${missing.length}개 재료의 시세를 더 입력해 주세요</strong><span>${missing.map((row) => escapeHtml(row.label)).join(" · ")}</span></div>`;
+    const attemptCard = result.complete
+      ? `<article class="reverse-card is-main"><span>제작 1회 총비용</span><b>${formatCount(result.attemptCost)}<small>메소</small></b><em>${escapeHtml(priceReading(result.attemptCost.toString()))}</em></article>`
+      : `<article class="reverse-card is-main is-waiting"><span>제작 1회 총비용</span><b>${missing.length}개 재료 시세 필요</b><em>${missing.map((row) => escapeHtml(row.label)).join(" · ")}</em></article>`;
+    const averageCard = result.complete
+      ? `<article class="reverse-card"><span>완성품 1개 평균 투입비</span><b>${formatCount(result.averageCompletedCost)}<small>메소</small></b><em>${useCatalyst ? `파괴 후 다시 만드는 비용 포함 · 1회당 파괴 위험분 ${formatCount(result.destructionLoss)}` : "촉진제 없이 만들면 파괴 없음"}</em></article>`
+      : `<article class="reverse-card is-waiting"><span>완성품 1개 평균 투입비</span><b>-</b><em>${useCatalyst ? "파괴 후 다시 만드는 비용 포함" : "촉진제 없이 만들면 파괴 없음"}</em></article>`;
     reverseCalculator.querySelector("[data-reverse-result]").innerHTML = `
-      <div class="reverse-result-head"><span>계산 결과</span><small>${useCatalyst ? "촉진제 사용" : "촉진제 미사용"}</small></div>
-      ${completion}
-      <div class="reverse-result-grid">
-        <div><span>${result.complete ? "재료 합계" : "입력된 재료 합계"}</span><b>${formatCount(result.materialCost)}</b></div>
-        <div><span>고정 비용 합계</span><b>${formatCount(result.fixedCost)}</b></div>
-        ${result.complete && useCatalyst ? `<div class="is-risk"><span>1회당 파괴 위험분</span><b>${formatCount(result.destructionLoss)}</b></div><div class="is-highlight"><span>완성품 1개 평균 투입비</span><b>${formatCount(result.averageCompletedCost)}</b><small>파괴 후 재제작 포함</small></div>` : ""}
-      </div>
+      ${attemptCard}
+      ${averageCard}
+      <article class="reverse-card"><span>${result.complete ? "재료 합계" : "입력된 재료 합계"} + 고정 비용</span><b>${formatCount(result.materialCost)}<small>+ ${formatCount(result.fixedCost)}</small></b><em>${useCatalyst ? "촉진제 사용" : "촉진제 미사용"}</em></article>
+      <article class="reverse-card" data-reverse-profit-card><span>기대 손익</span><b>-</b><em>${useCatalyst ? "실거래가를 적으면 계산" : "촉진제를 쓸 때만 계산해요"}</em></article>
     `;
-    updateReverseExpectedValue(result);
+    updateReverseExpectedValue(result, useCatalyst);
     updateReverseGemSlots();
   }
 
-  function updateReverseExpectedValue(craftResult) {
+  function updateReverseExpectedValue(craftResult, useCatalyst = true) {
     const baseInput = reverseCalculator.querySelector("[data-reverse-base-attack]");
     const baseParsed = readBig(baseInput.value, "정옵 공격력", 0n);
     const baseAttack = baseParsed.value ?? null;
@@ -1211,11 +1225,26 @@ export async function render(root, mode = "gem") {
       reverseCalculator.querySelector(`[data-reverse-attack-label="${row.bonus}"]`).textContent = row.attack == null ? "공격력 -" : `공격력 ${formatCount(row.attack)}`;
       reverseCalculator.querySelector(`[data-reverse-fair-price="${row.bonus}"]`).innerHTML = row.fairPrice == null
         ? "제작비 입력 대기"
-        : `<span>적정가</span> ${meso(row.fairPrice)}<small class="reverse-fair-reading">${escapeHtml(priceReading(row.fairPrice.toString()))}</small>`;
+        : `<span class="reverse-fair-main">${meso(row.fairPrice)}</span><small class="reverse-fair-reading">${escapeHtml(priceReading(row.fairPrice.toString()))}</small>`;
+      // 실거래가를 적은 줄은 적정가와의 차이를 알약 모양으로 보여 줍니다.
+      const diff = reverseCalculator.querySelector(`[data-reverse-diff="${row.bonus}"]`);
+      const price = outcomePrices[row.bonus];
+      if (price == null || row.fairPrice == null) {
+        diff.className = "reverse-grade-diff";
+        diff.textContent = row.fairPrice == null ? "재료 시세를 모두 적으면 비교해요" : "실거래가를 적으면 적정가와 비교해요";
+      } else {
+        const gap = price - row.fairPrice;
+        diff.className = `reverse-grade-diff ${gap >= 0n ? "is-gain" : "is-loss"}`;
+        diff.textContent = gap === 0n ? "적정가와 같음" : gap > 0n ? `적정가보다 ${meso(gap)} 높음 · 이득` : `적정가보다 ${meso(-gap)} 낮음 · 손해`;
+      }
     }
-    const missingPrices = expected.rows.filter((row) => row.bonus != null && row.price == null).length;
+    const valueRows = expected.rows.filter((row) => row.bonus != null);
+    const filled = valueRows.filter((row) => row.price != null).length;
+    const missingPrices = valueRows.length - filled;
+    const profitCard = reverseCalculator.querySelector("[data-reverse-profit-card]");
     const summary = reverseCalculator.querySelector("[data-reverse-value-summary]");
     if (baseAttack == null || missingPrices) {
+      if (profitCard && useCatalyst) profitCard.querySelector("em").textContent = `실거래가 ${filled}/${valueRows.length} · 모두 적으면 계산`;
       const needs = [baseAttack == null ? "정옵 공격력" : null, missingPrices ? `${missingPrices}개 공격력의 실거래가` : null].filter(Boolean).join("과 ");
       summary.innerHTML = craftResult.attemptCost == null
         ? `<span>적정가 계산 대기</span><b>재료 시세를 모두 입력해 주세요</b>`
@@ -1229,6 +1258,16 @@ export async function render(root, mode = "gem") {
       profit = expected.expectedProfit >= 0n
         ? `<span class="is-gain">제작 1회당 +${meso(expected.expectedProfit)} 기대 이득</span>`
         : `<span class="is-loss">제작 1회당 −${meso(-expected.expectedProfit)} 기대 손해</span>`;
+    }
+    if (profitCard && useCatalyst) {
+      if (expected.expectedProfit == null) {
+        profitCard.querySelector("em").textContent = "재료 시세를 모두 적으면 계산";
+      } else {
+        const gain = expected.expectedProfit >= 0n;
+        profitCard.classList.add(gain ? "is-gain" : "is-loss");
+        profitCard.querySelector("b").innerHTML = `${gain ? "+" : "−"}${formatCount(gain ? expected.expectedProfit : -expected.expectedProfit)}<small>메소</small>`;
+        profitCard.querySelector("em").textContent = `제작 1회당 기대 ${gain ? "이득" : "손해"} · 실거래가 ${filled}/${valueRows.length}`;
+      }
     }
     summary.className = `reverse-value-summary${expected.expectedProfit != null && expected.expectedProfit < 0n ? " is-loss" : " is-complete"}`;
     summary.innerHTML = `<span>입력한 실거래가 기준 1회 기대 판매가</span><b>${meso(expected.expectedSale)}</b>${profit}`;
@@ -1392,6 +1431,12 @@ export async function render(root, mode = "gem") {
     if (enchantAddPrice) {
       const selection = enchantSelections[Number(enchantAddPrice.dataset.enchantAddPrice)];
       if (selection?.itemId) openQuickPrice(selection.itemId);
+      return;
+    }
+    if (event.target.closest("[data-reverse-picker-close]")) {
+      reverseActiveSlot = null;
+      reverseCalculator.querySelector("[data-reverse-gem-picker]").hidden = true;
+      updateReverseGemSlots();
       return;
     }
     const reverseSlot = event.target.closest("[data-reverse-slot]");

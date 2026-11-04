@@ -28,6 +28,9 @@ export function paletteHue(name) {
 const SOUNDS = {
   entrance: [[98, 0, 0.9, "triangle", 0.12], [147, 0.1, 0.9, "triangle", 0.09], [196, 0.22, 0.8, "triangle", 0.1], [294, 0.4, 0.9, "triangle", 0.1], [392, 0.55, 0.9, "triangle", 0.08]],
   tick: [[1320, 0, 0.06, "sine", 0.05]],
+  // 혼돈의 주문서 성공(4음 상승)·실패(낮은 2음) — 2026-11-04 디자인 v2
+  chaosOk: [[784, 0, 0.06, "triangle", 0.1], [988, 0.05, 0.06, "triangle", 0.1], [1175, 0.1, 0.06, "triangle", 0.1], [1568, 0.15, 0.24, "triangle", 0.1]],
+  chaosFail: [[247, 0, 0.12, "triangle", 0.1], [175, 0.1, 0.28, "triangle", 0.1]],
   check: [[660, 0, 0.12, "triangle", 0.12], [990, 0.07, 0.2, "triangle", 0.12]],
   uncheck: [[440, 0, 0.12, "sine", 0.07]],
   low: [[600, 0, 0.16, "triangle", 0.11]],

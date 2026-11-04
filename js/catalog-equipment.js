@@ -22,22 +22,40 @@ export function equipmentCard({ item, stats = [], requirements = [], jobs = [], 
   const repeatedAttributes = new Set(["level", "str", "dex", "int", "luk", "fame", "pop", "REQ JOB", "GENDER", "상점가", "공격속도", "업그레이드 가능 횟수"]);
   const extraAttributes = attributes.filter(attribute => !repeatedAttributes.has(attribute.attribute_name?.trim()));
   const required = Object.fromEntries(requirements.map(row => [row.requirement_key, row.required_value]));
-  const conditions = [["착용 레벨", item.required_level], ...["str", "dex", "int", "luk"].map(key => [key.toUpperCase(), required[key]]), ["인기도", required.fame ?? required.pop]];
+  const conditions = [["레벨", item.required_level], ...["str", "dex", "int", "luk"].map(key => [key.toUpperCase(), required[key]]), ["인기도", required.fame ?? required.pop]];
   const jobNames = ["전사", "마법사", "궁수", "도적", "해적"];
   const allJobs = jobs.includes("공용");
   const price = readBig(item.shop_sell_price, "상점 판매가").value;
-  const row = (label, value, range = null) => `<div class="catalog-stat equipment-stat"><dt>${text(label)}</dt><dd><strong>${text(value)}</strong><small class="equipment-range${range == null ? " is-unknown" : ""}">${range == null ? "—" : range}</small></dd></div>`;
+  const typeName = types[item.subcategory] || item.subcategory || "장비";
+  const path = [item.category, item.middle_category, types[item.subcategory] || item.subcategory].filter(Boolean).join(" · ");
+  // 가능 범위는 막대로, 기본값은 막대 위 점으로 보여 줍니다. 범위가 없으면 —만 둡니다.
+  const rangeBar = (base, min, max) => {
+    if (min == null && max == null) return `<small class="equipment-range is-unknown">—<span class="sr-only"> 범위 미제공</span></small>`;
+    const low = Number(min), high = Number(max), value = Number(base);
+    const pos = Number.isFinite(low) && Number.isFinite(high) && Number.isFinite(value) && base != null
+      ? (high > low ? Math.min(100, Math.max(0, ((value - low) / (high - low)) * 100)) : 50) : null;
+    return `<span class="equipment-range-bar" aria-hidden="true"><i></i>${pos == null ? "" : `<b style="left:${pos.toFixed(1)}%"></b>`}</span><small class="equipment-range">${text(min)} ~ ${text(max)}</small>`;
+  };
+  const row = (label, value, range = `<small class="equipment-range is-unknown">—<span class="sr-only"> 범위 미제공</span></small>`, index = 0) => `<div class="catalog-stat equipment-stat" style="--i:${index}"><dt>${text(label)}</dt><dd><strong>${text(value)}</strong><span class="equipment-range-cell">${range}</span></dd></div>`;
   const order = itemOptionFields.map(field => field.key);
   const ordered = [...stats].sort((a, b) => {
     return (order.indexOf(a.stat_key) < 0 ? 999 : order.indexOf(a.stat_key)) - (order.indexOf(b.stat_key) < 0 ? 999 : order.indexOf(b.stat_key));
   });
-  return `<article class="equipment-card ym-glass catalog-item-hero"><header><span class="ym-chip">${text(types[item.subcategory] || "장비 정보")}</span><h1>${text(item.name)}</h1></header>
-    <div class="equipment-overview"><div class="equipment-art catalog-detail-art">${catalogImage(item.image_url, "", 120) || `<span>${text([...item.name][0])}</span>`}<span class="equipment-art-label">ITEM</span></div><dl class="equipment-requirements">${conditions.map(([label, value]) => `<div><dt>${text(label)}</dt><dd>${text(value)}</dd></div>`).join("")}</dl></div>
-    <div class="equipment-jobs" aria-label="착용 가능 직업">${jobNames.map(job => `<span class="equipment-job${allJobs || jobs.includes(job) ? " is-allowed" : ""}">${job}<span class="sr-only">${allJobs || jobs.includes(job) ? " 착용 가능" : jobs.length ? " 착용 불가" : " 정보 미제공"}</span></span>`).join("")}</div>${jobs.length ? "" : `<p class="hint">착용 직업 미제공</p>`}
-    <p class="equipment-type">장비 분류 · ${text(types[item.subcategory] || item.subcategory || item.middle_category || item.category)}${item.gender_restriction && item.gender_restriction !== "공용" ? ` <span class="ym-chip">${text(item.gender_restriction)}</span>` : ""}</p>
-    <div class="equipment-options-head"><h2>기본 옵션</h2><span>기본값</span><span>가능 범위</span></div>
-    <dl class="equipment-stats">${item.attack_speed_label != null || item.attack_speed != null ? row("공격속도", item.attack_speed_label ?? item.attack_speed) : ""}${ordered.map(stat => row(stat.stat_key === "remaining_upgrades" ? "업그레이드 가능 횟수" : detailLabels[stat.stat_key] || labels[stat.stat_key] || stat.stat_key, stat.base_value == null ? null : `${Number(stat.base_value) > 0 && !stat.stat_key.includes("upgrades") ? "+" : ""}${stat.base_value}`, stat.minimum_value == null && stat.maximum_value == null ? null : `(${text(stat.minimum_value)} ~ ${text(stat.maximum_value)})`)).join("") || `<p class="hint">제공된 수치 옵션이 없습니다.</p>`}</dl><p class="equipment-options-note">범위는 획득 시 가능한 옵션입니다. —는 범위 미제공이며, 실제 거래 옵션은 물건마다 다를 수 있습니다.</p>
+  const hasSpeed = item.attack_speed_label != null || item.attack_speed != null;
+  const statRows = ordered.map((stat, index) => row(
+    stat.stat_key === "remaining_upgrades" ? "업그레이드 가능 횟수" : detailLabels[stat.stat_key] || labels[stat.stat_key] || stat.stat_key,
+    stat.base_value == null ? null : `${Number(stat.base_value) > 0 && !stat.stat_key.includes("upgrades") ? "+" : ""}${stat.base_value}`,
+    rangeBar(stat.base_value, stat.minimum_value, stat.maximum_value),
+    index + (hasSpeed ? 1 : 0),
+  )).join("");
+  return `<article class="equipment-card ym-glass catalog-item-hero"><span class="equipment-glow" aria-hidden="true"></span>
+    <header class="equipment-head"><div class="equipment-art catalog-detail-art">${catalogImage(item.image_url, "", 120) || `<span class="equipment-initial">${text([...item.name][0])}</span>`}<span class="equipment-art-label">ITEM</span></div>
+      <div class="equipment-title"><div class="equipment-chips"><span class="equipment-chip is-type">${text(typeName)}</span>${path ? `<span class="equipment-chip">${text(path)}</span>` : ""}${item.gender_restriction && item.gender_restriction !== "공용" ? `<span class="equipment-chip">${text(item.gender_restriction)}</span>` : ""}</div><h1>${text(item.name)}</h1>
+      <div class="equipment-jobs" aria-label="착용 가능 직업">${jobNames.map(job => `<span class="equipment-job${allJobs || jobs.includes(job) ? " is-allowed" : ""}"><i aria-hidden="true"></i>${job}<span class="sr-only">${allJobs || jobs.includes(job) ? " 착용 가능" : jobs.length ? " 착용 불가" : " 정보 미제공"}</span></span>`).join("")}</div>${jobs.length ? "" : `<p class="hint">착용 직업 미제공</p>`}</div></header>
+    <dl class="equipment-requirements" aria-label="착용 조건">${conditions.map(([label, value]) => `<div class="${value == null || value === "" ? "is-empty" : ""}"><dt>${text(label)}</dt><dd>${value == null || value === "" ? `—<span class="sr-only">미제공</span>` : text(value)}</dd></div>`).join("")}</dl>
+    <section class="equipment-options"><div class="equipment-options-head"><h2>기본 옵션</h2><span>기본값</span><span>가능 범위</span></div>
+    <dl class="equipment-stats">${hasSpeed ? row("공격속도", item.attack_speed_label ?? item.attack_speed) : ""}${statRows || (hasSpeed ? "" : `<p class="hint">제공된 수치 옵션이 없습니다.</p>`)}</dl><p class="equipment-options-note">범위는 얻을 때 붙을 수 있는 옵션이에요. —는 범위 미제공이고, 거래되는 물건마다 다를 수 있어요.</p></section>
     <footer><span>상점 판매가</span><strong>${price == null ? "미제공" : `${text(formatCount(price))} 메소`}</strong></footer>
-    ${extraAttributes.length ? `<details><summary>추가 정보</summary><dl class="catalog-facts">${extraAttributes.map(attribute => `<div><dt>${text(attribute.attribute_name)}</dt><dd>${text(attribute.value_text)}</dd></div>`).join("")}</dl></details>` : ""}
+    ${extraAttributes.length ? `<details class="equipment-extra"><summary>추가 정보<span aria-hidden="true">›</span></summary><dl class="catalog-facts">${extraAttributes.map(attribute => `<div><dt>${text(attribute.attribute_name)}</dt><dd>${text(attribute.value_text)}</dd></div>`).join("")}</dl></details>` : ""}
   </article>`;
 }

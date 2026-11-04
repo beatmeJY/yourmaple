@@ -15,3 +15,6 @@ desktop.ini
 # 외부 수집 캐시·전체 데이터·생성 SQL(로컬 실행 산출물)
 data/local/
 __pycache__/
+
+# 디자인 원본·시안(로컬 전용, 2026-11-01). 새 디자인 자료도 design/ 아래에 둔다.
+/design/

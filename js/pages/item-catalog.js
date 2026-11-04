@@ -39,7 +39,7 @@ export async function render(root) {
   await load();
 }
 async function renderDetail(root,id) {
-  root.innerHTML = `<section class="catalog-page"><a class="catalog-history-link" href="#/item-catalog">← 아이템 목록</a><div data-item-detail><p class="empty">아이템 정보를 불러오는 중입니다.</p></div></section>`;
+  root.innerHTML = `<section class="catalog-page item-detail-page"><div class="catalog-detail-actions"><a class="catalog-back-link" href="#/item-catalog">← 아이템 목록</a><span class="catalog-detail-actions-gap"></span></div><div data-item-detail><p class="empty">아이템 정보를 불러오는 중입니다.</p></div></section>`;
   const result = await catalogRpc("catalog_item_detail", {p_id:id});
   if (!root.isConnected) return;
   const slot = root.querySelector("[data-item-detail]");
@@ -47,9 +47,10 @@ async function renderDetail(root,id) {
   const {item,stats=[],requirements=[],jobs=[],attributes=[]} = result.data;
   const req = [item.required_level == null ? "레벨 미제공" : `Lv.${item.required_level}`,...requirements.map(r=>`${labels[r.requirement_key] ?? r.requirement_key} ${r.required_value}`),jobs.join(" · "),item.gender_restriction].filter(Boolean);
   const basicDetail = `<header class="catalog-item-hero ym-glass"><div class="catalog-detail-art">${catalogImage(item.image_url,"",120) || `<span>${text([...item.name][0])}</span>`}</div><div><span class="ym-chip">${text([item.category,item.middle_category,item.subcategory].filter(Boolean).join(" · "))}</span><h1>${text(item.name)}</h1><p>${text(req.join(" · "))}</p><p class="hint">기본 옵션과 가능한 범위입니다. 실제 거래 옵션은 물건마다 다를 수 있어요.</p></div></header><div class="catalog-detail-layout"><section class="catalog-detail-panel ym-glass"><h2>기본 옵션</h2><div class="catalog-stat-grid">${stats.length ? stats.map(r=>`<div class="catalog-stat"><span>${text(labels[r.stat_key] ?? r.stat_key)}</span><strong>${text(r.base_value)}</strong>${r.minimum_value == null ? "" : `<small>${text(r.minimum_value)} ~ ${text(r.maximum_value)}</small>`}</div>`).join("") : `<p class="hint">제공된 수치 옵션이 없습니다.</p>`}</div></section><section class="catalog-detail-panel ym-glass"><h2>아이템 정보</h2><dl class="catalog-facts"><div><dt>공격속도</dt><dd>${text(item.attack_speed_label ?? item.attack_speed)}</dd></div><div><dt>상점 판매가</dt><dd>${item.shop_sell_price == null ? "미제공" : `${text(formatCount(item.shop_sell_price))} 메소`}</dd></div></dl>${item.description ? `<p>${text(item.description)}</p>` : ""}${item.effect_description && item.effect_description !== item.description ? `<p>${text(item.effect_description)}</p>` : ""}${attributes.length ? `<details><summary>추가 정보</summary><dl class="catalog-facts">${attributes.map(a=>`<div><dt>${text(a.attribute_name)}</dt><dd>${text(a.value_text)}</dd></div>`).join("")}</dl></details>` : ""}</section></div>`;
-  slot.innerHTML = `<div class="catalog-detail-actions"><button type="button" class="mo-ghost" data-item-refresh>새로 확인</button><button type="button" class="catalog-history-button" data-open-history>변경 이력</button></div><div class="${isEquipment(item) ? "equipment-detail-columns" : "catalog-detail-main"}">${isEquipment(item) ? equipmentCard(result.data) : basicDetail}<section class="catalog-detail-panel equipment-droppers ym-glass"><div class="equipment-droppers-content"><h2 class="equipment-droppers-title">이 아이템을 주는 몬스터 <span class="equipment-monster-count" data-drop-species aria-live="polite" hidden></span></h2><p class="hint">같은 몬스터의 별개 드랍 항목은 각각 표시합니다. 확률을 합산하지 않습니다.</p><div data-item-drops></div></div></section></div>`;
-  slot.querySelector("[data-item-refresh]").addEventListener("click", () => { clearCatalogCache(); void renderDetail(root,id); });
-  mountHistoryDialog(slot.querySelector("[data-open-history]"), item.id, "item", item.name);
+  root.querySelector(".catalog-detail-actions").insertAdjacentHTML("beforeend", `<button type="button" class="catalog-pill-button" data-item-refresh>새로 확인</button><button type="button" class="catalog-history-button" data-open-history>변경 이력</button>`);
+  slot.innerHTML = `<div class="${isEquipment(item) ? "equipment-detail-columns" : "catalog-detail-main"}">${isEquipment(item) ? equipmentCard(result.data) : basicDetail}<section class="catalog-detail-panel equipment-droppers ym-glass"><div class="equipment-droppers-content"><h2 class="equipment-droppers-title">이 아이템을 주는 몬스터 <span class="equipment-monster-count" data-drop-species aria-live="polite" hidden></span></h2><p class="hint">같은 몬스터의 다른 드랍 항목은 따로 보여요. 확률은 합치지 않아요.</p><div data-item-drops></div></div></section></div>`;
+  root.querySelector("[data-item-refresh]").addEventListener("click", () => { clearCatalogCache(); void renderDetail(root,id); });
+  mountHistoryDialog(root.querySelector("[data-open-history]"), item.id, "item", item.name);
   void mountItemDrops(slot.querySelector("[data-item-drops]"),item.id);
 }
 
@@ -90,10 +91,15 @@ async function mountItemDrops(slot, id) {
     }
     rowsSlot.insertAdjacentHTML("beforeend", rows.map(drop => {
       const monster = drop.monster;
-      if (!monster) return `<div class="catalog-dropper ym-glass"><span>몬스터 정보 미제공</span><strong>${drop.rate_percent == null ? "확률 미상" : `${text(drop.rate_percent)}%`}</strong></div>`;
+      const rate = drop.rate_percent == null ? null : Number(drop.rate_percent);
+      const rateText = drop.rate_percent == null ? "확률 미상" : `${text(drop.rate_percent)}%`;
+      const bar = `<span class="catalog-dropper-bar" aria-hidden="true"><i data-drop-rate="${Number.isFinite(rate) ? rate : ""}"></i></span>`;
+      const unknown = drop.rate_percent == null ? " is-unknown" : "";
+      if (!monster) return `<div class="catalog-dropper${unknown}"><div class="catalog-dropper-art"><span aria-hidden="true">?</span></div><span><span class="catalog-dropper-name"><b>몬스터 정보 미제공</b></span>${bar}</span><strong>${rateText}</strong></div>`;
       const query = monster.source_id || monster.name;
-      return `<a class="catalog-dropper ym-glass" href="#/monsters?q=${encodeURIComponent(query)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small><b>${text(monster.name)}</b></span><strong>${drop.rate_percent == null ? "확률 미상" : `${text(drop.rate_percent)}%`}</strong></a>`;
+      return `<a class="catalog-dropper${unknown}" href="#/monsters?q=${encodeURIComponent(query)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><span class="catalog-dropper-name"><b>${text(monster.name)}</b><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small></span>${bar}</span><strong>${rateText}</strong></a>`;
     }).join(""));
+    paintRateBars(rowsSlot);
     count += rows.length;
     page++;
     hasMore = Boolean(result.hasMore);
@@ -114,4 +120,14 @@ async function mountItemDrops(slot, id) {
   }, { passive: true });
   more.addEventListener("click", () => void load());
   await load();
+}
+
+// 막대는 지금까지 불러온 드랍 중 가장 높은 확률을 100%로 잡습니다(최소 8%로 보이게).
+function paintRateBars(rowsSlot) {
+  const bars = [...rowsSlot.querySelectorAll("[data-drop-rate]")];
+  const max = Math.max(0, ...bars.map(bar => Number(bar.dataset.dropRate) || 0));
+  for (const bar of bars) {
+    const rate = bar.dataset.dropRate === "" ? null : Number(bar.dataset.dropRate);
+    bar.style.width = rate == null || !max || rate <= 0 ? "0%" : `${Math.max(8, (rate / max) * 100)}%`;
+  }
 }
