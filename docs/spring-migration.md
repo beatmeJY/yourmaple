@@ -52,3 +52,5 @@
 - 2026-11-01 (Codex) 검토 목록 삭제/복구: `catalog_review_set_deleted`(`sql/058`) → 관리자 API에서 소프트 삭제·revision·비공개 감사 이력으로 이전, 공개 도감은 삭제하지 않습니다. [실측]
 
 - 2026-11-04 (Codex) 아이템 상세 수정 `catalog_item_edit_detail/save`(`sql/059`) → Spring 관리자 조회/수정 API. Google 운영자 검증·행 버전 충돌(409)·공개 도감/정규화/이력/검토 버전 무효화 한 트랜잭션·UUID/관계 보존·비공개 검토 초안 보존을 유지합니다. 호출 `js/catalog-item-editor.js`, 공개 설명 렌더 `js/catalog-equipment.js`. [실측]
+
+- 2026-11-04 (Codex) 상세 옵션 범위 최신 정의 `sql/060`의 `catalog_item_edit_detail/save`: 범위 전체 전달·최소/기본/최대 검증·빈 범위 제거·0 보존·범위만 수정도 이력 기록. Spring 이전 시 p_ranges 미전달 구 화면 호환과 범위 지원 버전 확인도 유지합니다. [실측]
