@@ -178,6 +178,16 @@ end $$;
 
 몬스터 도감과 아이템 정보는 공용 데이터이므로 로그인하지 않아도 열립니다. 일반 사용자는 도감을 수정하지 못하며, 거래의 실제 옵션만 자신의 기록에서 수정합니다.
 
+### Google 공식 로그인 버튼 (2026-11-04)
+
+예전 이동 방식은 Google이 로그인 결과를 Supabase 주소로 보내서 Google 창에 `…supabase.co(으)로 이동`이 보입니다. 공식 버튼은 결과를 yourmaple.kr 화면이 직접 받고 Supabase에는 토큰만 넘깁니다(`signInWithIdToken`). Client ID 설정이 없으면 예전 버튼이 그대로 나옵니다.
+
+1. Google Cloud 콘솔 → Google Auth Platform → Clients → Supabase에 넣은 **웹 애플리케이션** 클라이언트 → **승인된 JavaScript 원본**에 `https://yourmaple.kr` 추가(승인된 리디렉션 URI의 Supabase 콜백은 그대로 둡니다).
+2. Supabase → Authentication → Sign In / Providers → Google: Client ID가 같은 웹 클라이언트인지 확인, **Skip nonce checks는 끈 상태** 유지.
+3. GitHub 저장소 → Settings → Secrets and variables → Actions → **Variables**에 `GOOGLE_CLIENT_ID` = 웹 클라이언트 ID(`…apps.googleusercontent.com`, 공개 값). 다음 배포부터 `js/config.js`의 `googleClientId`에 들어갑니다. 로컬에서 쓰려면 `js/config.js`에 `googleClientId`를 넣고 1번 원본에 `http://localhost:5500`도 추가합니다(공개 전에는 지워도 됩니다).
+4. 앱 이름·로고까지 보이려면 Google Auth Platform → Branding에 이름(Your Maple)·로고·홈페이지·개인정보 처리방침 주소를 넣고 브랜드 인증을 받습니다(며칠 걸림). 인증 전에는 주소(yourmaple.kr)가 보입니다.
+5. `?mock`(가짜 DB)에서는 공식 버튼을 쓰지 않습니다.
+
 ## 로컬에서 로그인 없이 확인하기 (?mock, 2026-10-20)
 
 `127.0.0.1`·`localhost` 에서만 주소에 붙여 씁니다. 실제 Supabase 는 부르지 않고, 브라우저 안의 가짜 DB(`js/dev-mock.js`)로 엽니다. 운영 주소(yourmaple.kr)에서는 붙여도 무시합니다.

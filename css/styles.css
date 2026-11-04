@@ -16098,3 +16098,10 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .catalog-public-description{white-space:pre-wrap;overflow-wrap:anywhere}
 
 .catalog-edit-stat-head,.catalog-edit-stat-row{display:grid;grid-template-columns:minmax(96px,1.3fr) repeat(3,minmax(0,1fr));gap:10px;align-items:center}.catalog-edit-stat-head{font-size:12px;color:var(--muted);padding:6px 0}.catalog-edit-stat-head span:not(:first-child){text-align:right}.catalog-edit-stat-row{padding:5px 0;border-bottom:1px solid var(--line)}.catalog-edit-stat-row>span{font-size:13px}.catalog-edit-stat-row label>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.catalog-edit-stat-row input{height:34px;padding:5px 7px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}@media(max-width:600px){.catalog-edit-stat-head,.catalog-edit-stat-row{grid-template-columns:minmax(72px,1.2fr) repeat(3,minmax(0,1fr));gap:5px}.catalog-edit-stat-row>span{font-size:12px}.catalog-edit-stat-row input{padding:5px 3px;font-size:13px}}
+
+/* ── Google 공식 로그인 버튼 자리(2026-11-04): 기존 버튼 칸 크기를 유지하고 안의 Google 버튼만 보인다 ── */
+.auth-provider.is-gsi, .ym-guest-providers .auth-provider.is-gsi { display: flex; align-items: center; justify-content: center; padding: 0; background: transparent; border-color: transparent; box-shadow: none; cursor: default; overflow: hidden; color-scheme: light; }
+.auth-provider.is-gsi:hover { filter: none; box-shadow: none; }
+.auth-provider.is-gsi:active { transform: none; }
+.auth-provider.is-gsi > div { max-width: 100%; }
+.auth-provider[hidden] { display: none; }

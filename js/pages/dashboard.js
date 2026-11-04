@@ -1,4 +1,4 @@
-import { signInWithProvider, translateAuthError } from "../auth.js";
+import { mountGoogleButton, signInWithProvider, translateAuthError } from "../auth.js";
 import { providerButtons } from "./login.js";
 import { notify } from "../toast.js";
 import { bosses, formatPossible, formatRemain, formatStamp, todaySlot } from "../boss-cooldown.js";
@@ -116,6 +116,21 @@ function renderGuest(root) {
       </div>
     </div>`;
   let signingIn = false;
+  // Google은 설정이 있으면 공식 버튼으로 바꾼다(Google 창에 이 사이트 주소가 보이게). 없으면 기존 버튼 그대로.
+  mountGoogleButton(root.querySelector('[data-home-oauth="google"]'), {
+    onStart: () => {
+      signingIn = true;
+      rememberNext("dashboard", "");
+      for (const item of root.querySelectorAll("[data-home-oauth]")) item.disabled = true;
+      root.querySelector("[data-gsi-button]")?.classList.add("is-busy");
+    },
+    onError: (message) => {
+      if (!root.isConnected) return;
+      notify(message, "error");
+      signingIn = false;
+      for (const item of root.querySelectorAll("[data-home-oauth]")) item.disabled = false;
+    },
+  });
   root.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-home-oauth]");
     if (button) {

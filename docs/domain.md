@@ -270,6 +270,7 @@
 ## 비로그인 홈 소셜 로그인
 
 - 2026-10-28 (Codex) 사용자 요청: 홈의 통합 로그인 버튼을 Google/Discord 로고·색상 버튼으로 분리, 각각 기존 signInWithProvider로 바로 연결한다. PC는2열·모바일은1열, 요청 중 양쪽 잠금·실패하면 안내 후 복원. 약관/개인정보 처리방침 링크를 함께 제공한다. 실제 인증은 기존 Supabase OAuth 사용. [진술·실측]
+- 2026-11-04 (Claude) 사용자 요청: Google 창에 `…supabase.co(으)로 이동` 대신 이 사이트가 보이게, Google 버튼을 Google 공식 버튼(Google Identity Services `renderButton`, 팝업)으로 바꾸고 받은 신원 토큰을 `signInWithIdToken`(nonce: Google엔 SHA-256 해시, Supabase엔 원래 값, 실패하면 새 nonce로 다시 그림)으로 넘긴다. 페이지 이동 없이 SIGNED_IN → 앱 화면. Client ID(`config.googleClientId`, 배포는 저장소 Variables `GOOGLE_CLIENT_ID`)가 없거나 스크립트를 못 불러오거나 `?mock`이면 예전 이동 방식 버튼을 그대로 쓴다. 버튼 모양은 Google 규칙(흰 바탕·알약형·"Google 계정으로 계속하기")이라 Discord 버튼과 높이가 다르다. Discord는 그대로 이동 방식. 앱 이름(Your Maple)은 Google Branding 브랜드 인증 뒤에 보인다. 개인정보 처리방침 외부 연결에 Google 로그인 스크립트 추가. [진술·실측]
 
 ## 사냥 기록 측정 입력
 

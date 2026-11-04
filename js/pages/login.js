@@ -1,4 +1,4 @@
-import { OAUTH_PROVIDERS, signInWithProvider } from "../auth.js";
+import { OAUTH_PROVIDERS, mountGoogleButton, signInWithProvider } from "../auth.js";
 import { notify } from "../toast.js";
 
 export function renderSetup(root, message, title = "설정이 필요합니다") {
@@ -63,4 +63,16 @@ export function renderLogin(root, { failure = "", reason = "" } = {}) {
   for (const button of root.querySelectorAll("[data-oauth]")) {
     button.addEventListener("click", () => runQuick(button, () => signInWithProvider(button.dataset.oauth)));
   }
+  // Google은 설정이 있으면 공식 버튼으로 바꾼다(Google 창에 이 사이트 주소가 보이게). 없으면 위 버튼 그대로.
+  const google = root.querySelector('[data-oauth="google"]');
+  mountGoogleButton(google, {
+    onStart: () => {
+      for (const item of quickButtons) item.disabled = true;
+      root.querySelector("[data-gsi-button]")?.classList.add("is-busy");
+    },
+    onError: (message) => {
+      notify(message, "error");
+      for (const item of quickButtons) item.disabled = false;
+    },
+  });
 }

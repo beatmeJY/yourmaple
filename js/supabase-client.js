@@ -77,6 +77,19 @@ function mockRequest() {
   }
 }
 
+// Google 공식 로그인 버튼용 OAuth 웹 클라이언트 ID(공개 값). 없거나 가짜 DB면 "" → 예전 이동 방식 버튼을 쓴다.
+const GOOGLE_CLIENT_ID = /^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/;
+export async function googleClientId() {
+  if (mockRequest()) return "";
+  try {
+    const { config } = await import("./config.js");
+    const id = String(config?.googleClientId ?? "").trim();
+    return GOOGLE_CLIENT_ID.test(id) ? id : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function getSupabase() {
   if (client) return client;
   const mock = mockRequest();
