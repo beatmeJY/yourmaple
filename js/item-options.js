@@ -38,8 +38,10 @@ export function stableJson(value) {
   return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
 }
 
+// 합치는 기준은 이름·도감 ID·실제 옵션이다. 도감 기본 정보(스냅샷)는 도감 수정으로 바뀔 수 있어 비교하지 않는다(2026-11-04 사용자 결정).
+// 합칠 때는 먼저 있던 거래의 스냅샷을 그대로 둔다(combineLots 가 첫 거래 값을 쓴다).
 export function tradeItemKey(row) {
-  return stableJson([String(row.name ?? "").trim(), row.item_id ?? null, row.item_snapshot ?? {}, row.item_options ?? {}]);
+  return stableJson([String(row.name ?? "").trim(), row.item_id ?? null, row.item_options ?? {}]);
 }
 
 export function itemSnapshot(item) {

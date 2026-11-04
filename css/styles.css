@@ -16243,3 +16243,82 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .tr2 .trade-board-bar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .tr2 .trade-segments { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ── 아이템 수정창 공격속도 고르기(2026-11-04 사용자 요청: 등급 버튼 + 등급별 숫자) ── */
+.speed-picker { display: grid; gap: 10px; margin-top: 8px; }
+.speed-grades { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.speed-grade {
+  --tone: hsl(calc(150 - var(--speed-tone, 2) * 38) 75% 60%);
+  display: grid; justify-items: center; gap: 4px; min-height: 74px; padding: 10px 6px 8px;
+  color: var(--muted); background: var(--glass, rgba(255,255,255,.04)); border: 1px solid var(--line); border-radius: 14px;
+  cursor: pointer; font: inherit; transition: transform .25s var(--spring, cubic-bezier(.34,1.56,.64,1)), border-color .2s, box-shadow .2s, color .2s, background .2s;
+}
+.speed-grade b { font-size: 14px; color: var(--text); font-weight: 700; }
+.speed-grade small { font-size: 12px; font-variant-numeric: tabular-nums; }
+.speed-grade:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--tone) 55%, var(--line)); }
+.speed-grade:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+.speed-grade.is-picked {
+  color: var(--text); border-color: var(--tone);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 22%, transparent), color-mix(in srgb, var(--tone) 6%, transparent));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent), 0 6px 18px color-mix(in srgb, var(--tone) 25%, transparent);
+  animation: speed-pop .32s var(--spring, cubic-bezier(.34,1.56,.64,1));
+}
+.speed-grade-blank, .speed-grade-other { --tone: var(--gold, #e8c46b); }
+.speed-bars { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+.speed-bars i { width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.speed-bars i:nth-child(1) { height: 5px; } .speed-bars i:nth-child(2) { height: 7px; } .speed-bars i:nth-child(3) { height: 9px; }
+.speed-bars i:nth-child(4) { height: 11px; } .speed-bars i:nth-child(5) { height: 14px; }
+.speed-bars i.is-on { background: var(--tone); }
+.speed-grade.is-picked .speed-bars i.is-on { box-shadow: 0 0 6px var(--tone); }
+.speed-numbers { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 12px; }
+.speed-numbers.is-new { animation: ym-fade-up .28s ease both; }
+.speed-number {
+  min-width: 48px; min-height: 40px; padding: 0 14px; font: inherit; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+  transition: transform .2s var(--spring, cubic-bezier(.34,1.56,.64,1)), border-color .2s, background .2s;
+}
+.speed-number:hover { transform: translateY(-1px); border-color: var(--accent); }
+.speed-number:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.speed-number.is-picked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, transparent); animation: speed-pop .28s var(--spring, cubic-bezier(.34,1.56,.64,1)); }
+.speed-number-unknown { font-size: 13px; font-weight: 600; }
+.speed-fixed { font-size: 13px; color: var(--muted); }
+.speed-preview { margin: 0; }
+.speed-preview strong { color: var(--gold, #e8c46b); }
+.speed-grade:disabled, .speed-number:disabled { opacity: .55; cursor: default; transform: none; }
+@keyframes speed-pop { 0% { transform: scale(.94); } 100% { transform: scale(1); } }
+@media (max-width: 520px) { .speed-grades { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) {
+  .speed-grade, .speed-number { transition: none; }
+  .speed-grade.is-picked, .speed-number.is-picked, .speed-numbers.is-new { animation: none; }
+  .speed-grade:hover, .speed-number:hover { transform: none; }
+}
+
+/* ── 아이템 수정창 착용 직업 고르기(2026-11-04 사용자 요청: 직업 버튼 여러 개 선택) ── */
+.catalog-edit-jobs { display: grid; gap: 6px; margin: 12px 0 14px; font-size: 13px; }
+.job-picker { display: grid; gap: 8px; }
+.job-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.job-chip {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--muted);
+  background: var(--glass, rgba(255,255,255,.04)); border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+  transition: transform .22s var(--spring, cubic-bezier(.34,1.56,.64,1)), border-color .2s, background .2s, color .2s, box-shadow .2s;
+}
+.job-chip i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid currentColor; display: grid; place-items: center; transition: background .2s, border-color .2s; }
+.job-chip:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.job-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.job-chip.is-picked {
+  color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent); animation: speed-pop .28s var(--spring, cubic-bezier(.34,1.56,.64,1));
+}
+.job-chip.is-picked i { background: var(--accent); border-color: var(--accent); }
+.job-chip.is-picked i::after { content: ""; width: 4px; height: 7px; margin-top: -2px; border: solid var(--bg); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.job-chip-all { --accent: var(--gold, #e8c46b); }
+.job-chip-other { --accent: var(--gold, #e8c46b); cursor: default; }
+.job-chip:disabled { opacity: .55; cursor: default; transform: none; }
+.job-preview { margin: 0; }
+.job-preview strong { color: var(--gold, #e8c46b); }
+@media (prefers-reduced-motion: reduce) {
+  .job-chip, .job-chip i { transition: none; }
+  .job-chip.is-picked { animation: none; }
+  .job-chip:hover { transform: none; }
+}
