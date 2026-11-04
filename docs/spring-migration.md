@@ -50,3 +50,5 @@
 - 2026-11-01 (Codex) 검토 완료 즉시 공개: `catalog_review_save` 최신 정의 `sql/058` → Spring 관리자 발행 API에서 검토 revision 확인·공용 아이템 upsert·정규화/공개 이력·비공개 감사 이력을 한 트랜잭션으로 이전합니다. `p_publish=false` 초안/구 화면 호환·권한·재시도 멱등성·실패 전체 롤백을 유지합니다. 위 057의 별도 공개 승인 설명은 이 사용자 결정으로 대체합니다. [진술·실측]
 
 - 2026-11-01 (Codex) 검토 목록 삭제/복구: `catalog_review_set_deleted`(`sql/058`) → 관리자 API에서 소프트 삭제·revision·비공개 감사 이력으로 이전, 공개 도감은 삭제하지 않습니다. [실측]
+
+- 2026-11-04 (Codex) 아이템 상세 수정 `catalog_item_edit_detail/save`(`sql/059`) → Spring 관리자 조회/수정 API. Google 운영자 검증·행 버전 충돌(409)·공개 도감/정규화/이력/검토 버전 무효화 한 트랜잭션·UUID/관계 보존·비공개 검토 초안 보존을 유지합니다. 호출 `js/catalog-item-editor.js`, 공개 설명 렌더 `js/catalog-equipment.js`. [실측]

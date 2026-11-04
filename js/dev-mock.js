@@ -437,6 +437,22 @@ const RPCS = {
     return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
   },
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
+  catalog_item_edit_detail({p_id}) {
+    assertMockReviewer();const item=rowsOf("catalog_items").find(x=>x.id===p_id);if(!item)throw new Error("아이템을 찾을 수 없습니다");
+    return {version:JSON.stringify(item),draft:{name:item.name,description:item.description||"",effect_description:item.effect_description||"",base_options:structuredClone(item.base_options||{}),requirements:structuredClone(item.requirements||{}),review_note:""}};
+  },
+  catalog_item_edit_save({p_id,p_version,p_draft}) {
+    assertMockReviewer();const item=rowsOf("catalog_items").find(x=>x.id===p_id);if(!item)throw new Error("아이템을 찾을 수 없습니다");
+    if(JSON.stringify(item)!==p_version)throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
+    const old=structuredClone(item.base_options||{});
+    Object.assign(item,{name:p_draft.name,description:p_draft.description,effect_description:p_draft.effect_description,base_options:structuredClone(p_draft.base_options),requirements:structuredClone(p_draft.requirements),required_level:p_draft.requirements.level??null,gender_restriction:p_draft.requirements.GENDER??null,updated_at:iso()});
+    const stats=rowsOf("catalog_item_stats");tables().catalog_item_stats=stats.filter(x=>x.item_id!==p_id).concat(Object.entries(item.base_options).map(([stat_key,base_value])=>{
+      const previous=stats.find(x=>x.item_id===p_id&&x.stat_key===stat_key);return {item_id:p_id,stat_key,base_value,minimum_value:old[stat_key]===base_value?previous?.minimum_value??null:null,maximum_value:old[stat_key]===base_value?previous?.maximum_value??null:null};
+    }));
+    tables().catalog_item_requirements=rowsOf("catalog_item_requirements").filter(x=>x.item_id!==p_id).concat(Object.entries(item.requirements).filter(([k,v])=>typeof v==="number"&&k!=="level").map(([requirement_key,required_value])=>({item_id:p_id,requirement_key,required_value})));
+    if(item.requirements["REQ JOB"]){tables().catalog_item_jobs=rowsOf("catalog_item_jobs").filter(x=>x.item_id!==p_id).concat(item.requirements["REQ JOB"].split(/[\s/,·]+/).filter(Boolean).map(job_name=>({item_id:p_id,job_name})));}
+    save();return RPCS.catalog_item_detail({p_id});
+  },
   catalog_item_detail({p_id}={}) {
     const item=rowsOf("catalog_items").find(i=>i.id===p_id);
     if(!item)return null;

@@ -35,3 +35,14 @@ assert(!duplicateDetails.includes('<details'),'추가 정보가 전부 중복이
 const uniqueDetails=equipmentCard({item:{name:'장비',category:'장비'},attributes:[{attribute_name:'GENDER',value_text:'공용'},{attribute_name:'특수 효과',value_text:'설명 <효과>'}]});
 assert(uniqueDetails.includes('<details'));assert(uniqueDetails.includes('특수 효과'));assert(uniqueDetails.includes('설명 &lt;효과&gt;'));assert(!uniqueDetails.includes('<dt>GENDER</dt>'));
 console.log('중복 추가정보 숨김·별도 속성 보존/이스케이프 통과');
+
+const descriptionCard=equipmentCard({item:{name:'검증 장비',category:'장비',description:'직접 보완한 설명\n다음 줄 <script>',effect_description:'공개 효과'}});
+assert(descriptionCard.includes('직접 보완한 설명\n다음 줄 &lt;script&gt;'));
+assert(descriptionCard.includes('공개 효과'));assert(!descriptionCard.includes('<script>'));
+assert(!equipmentCard({item:{name:'빈 설명',category:'장비',description:'  '}}).includes('equipment-description'));
+console.log('장비 공개 설명/효과 표시·줄바꿈·이스케이프·빈 영역 숨김 통과');
+
+const {itemEditForm}=await import('../js/catalog-item-editor.js');
+const editForm=itemEditForm({name:'<장비>',description:'</textarea><script>bad</script>',base_options:{attack:0},requirements:{fame:0}});
+assert(!editForm.includes('<script>'));assert(editForm.includes('&lt;/textarea&gt;'));assert(editForm.includes('value="0"'));assert(!editForm.includes('name="review_note"'));
+console.log('상세 수정폼 HTML 이스케이프·0 보존·비공개 메모 입력 제외 통과');

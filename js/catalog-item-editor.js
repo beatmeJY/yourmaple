@@ -1,0 +1,43 @@
+import { escapeHtml } from "./format.js";
+import { itemOptionFields, readItemOptions } from "./item-options.js";
+import { reviewRpc, reviewError } from "./catalog-review.js";
+import { clearCatalogCache } from "./catalog-api.js";
+const esc = value => escapeHtml(String(value ?? ""));
+const conditions = [["level","레벨"],["str","필요 STR"],["dex","필요 DEX"],["int","필요 INT"],["luk","필요 LUK"],["fame","인기도"]];
+const input = (name,label,value,type="number") => `<label><span>${esc(label)}</span><input aria-label="${esc(label)}" name="${esc(name)}" type="${type}" ${type==="number"?'step="1"':''} value="${esc(value)}"></label>`;
+export function itemEditForm(draft) {
+ return `<form data-item-edit-form>${input("name","아이템 이름",draft.name,"text")}<label><span>선택 · 보완한 설명</span><textarea aria-label="선택 · 보완한 설명" name="description" rows="4" maxlength="20000">${esc(draft.description)}</textarea></label><label><span>효과 설명</span><textarea aria-label="효과 설명" name="effect_description" rows="3" maxlength="20000">${esc(draft.effect_description)}</textarea></label><section><h3>기본 옵션</h3><p class="hint">빈칸은 미제공입니다. 0과 구분해 주세요.</p><div class="catalog-edit-grid">${itemOptionFields.map(f=>input(`stat:${f.key}`,f.label,draft.base_options?.[f.key])).join("")}</div></section><section><h3>착용 조건</h3><div class="catalog-edit-grid">${conditions.map(([k,label])=>input(`req:${k}`,label,draft.requirements?.[k])).join("")}</div>${input("req:REQ JOB","착용 직업",draft.requirements?.["REQ JOB"],"text")}${input("req:GENDER","성별 제한",draft.requirements?.GENDER,"text")}</section><p class="hint">저장하면 공개 도감에 바로 반영됩니다. 기본값을 바꾼 옵션의 기존 가능 범위는 제거됩니다.</p><p data-edit-status role="status"></p><div data-close-warning hidden><p>저장하지 않은 변경을 버리고 닫을까요?</p><button type="button" class="mo-ghost" data-discard-edit>변경을 버리고 닫기</button></div><footer><button type="button" class="mo-ghost" data-close-edit>취소</button><button type="submit" class="primary-button">수정 저장 · 공개 반영</button></footer></form>`;
+}
+function readDraft(form) {
+ const f=new FormData(form),values={};itemOptionFields.forEach(({key})=>values[key]=f.get(`stat:${key}`));
+ const options=readItemOptions(values);if(options.error)throw new Error(options.error);
+ const name=f.get("name").trim();if(!name||name.length>200)throw new Error("아이템 이름은 1~200자로 입력해 주세요.");
+ const requirements={};for(const [key,label] of conditions){const raw=f.get(`req:${key}`).trim();if(!raw)continue;const n=Number(raw);if(!Number.isSafeInteger(n)||n<0||n>2147483647)throw new Error(`${label}은 0 이상의 정수로 입력해 주세요.`);requirements[key]=n;}
+ for(const key of ["REQ JOB","GENDER"]){const raw=f.get(`req:${key}`).trim();if(raw)requirements[key]=raw;}
+ return {name,description:f.get("description"),effect_description:f.get("effect_description"),base_options:options.value,requirements,review_note:""};
+}
+export function mountItemEditor(button, root, id, onSaved) {
+ button.setAttribute("aria-haspopup","dialog");let dialog;
+ button.addEventListener("click",async()=>{
+  if(dialog?.isConnected)return;
+  dialog=document.createElement("dialog");dialog.className="catalog-edit-dialog ym-glass";dialog.setAttribute("aria-labelledby","catalog-edit-title");
+  dialog.innerHTML='<header><h2 id="catalog-edit-title">아이템 수정</h2><button type="button" class="mo-ghost" data-close-edit aria-label="수정창 닫기">닫기</button></header><div data-edit-body><p class="hint">수정할 정보를 불러오는 중입니다.</p></div>';
+  root.append(dialog);dialog.showModal();const active=dialog;let dirty=false,saving=false;
+  const close=()=>{if(saving)return;if(dirty){active.querySelector('[data-close-warning]').hidden=false;return;}active.close();};
+  active.addEventListener("close",()=>{active.remove();if(button.isConnected)button.focus();},{once:true});
+  active.addEventListener("cancel",e=>{e.preventDefault();close();});
+  active.addEventListener("click",e=>{if(e.target.closest('[data-discard-edit]')){dirty=false;close();}else if(e.target.closest('[data-close-edit]'))close();});
+  active.addEventListener("input",()=>{dirty=true;const warning=active.querySelector('[data-close-warning]');if(warning)warning.hidden=true;});
+  const result=await reviewRpc("catalog_item_edit_detail",{p_id:id});if(!active.isConnected||!active.open)return;
+  const body=active.querySelector('[data-edit-body]');if(result.error||!result.data?.draft){body.innerHTML=`<p class="hint" role="alert">${esc(result.error?reviewError(result.error):"아이템을 찾을 수 없습니다.")}</p>`;return;}
+  body.innerHTML=itemEditForm(result.data.draft);
+  active.addEventListener("submit",async e=>{
+   e.preventDefault();if(saving)return;let draft;const status=active.querySelector('[data-edit-status]');
+   try{draft=readDraft(active.querySelector('form'));}catch(error){status.textContent=error.message;return;}
+   saving=true;status.textContent="공개 도감에 반영하고 있습니다.";active.querySelectorAll('button,input,textarea').forEach(node=>node.disabled=true);
+   const saved=await reviewRpc("catalog_item_edit_save",{p_id:id,p_version:result.data.version,p_draft:draft});saving=false;if(!active.isConnected)return;
+   if(saved.error){active.querySelectorAll('button,input,textarea').forEach(node=>node.disabled=false);status.textContent=reviewError(saved.error);return;}
+   clearCatalogCache();dirty=false;active.close();if(root.isConnected)await onSaved();
+  });
+ });
+}

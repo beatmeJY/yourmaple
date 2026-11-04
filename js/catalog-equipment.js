@@ -55,6 +55,7 @@ export function equipmentCard({ item, stats = [], requirements = [], jobs = [], 
     <dl class="equipment-requirements" aria-label="착용 조건">${conditions.map(([label, value]) => `<div class="${value == null || value === "" ? "is-empty" : ""}"><dt>${text(label)}</dt><dd>${value == null || value === "" ? `—<span class="sr-only">미제공</span>` : text(value)}</dd></div>`).join("")}</dl>
     <section class="equipment-options"><div class="equipment-options-head"><h2>기본 옵션</h2><span>기본값</span><span>가능 범위</span></div>
     <dl class="equipment-stats">${hasSpeed ? row("공격속도", item.attack_speed_label ?? item.attack_speed) : ""}${statRows || (hasSpeed ? "" : `<p class="hint">제공된 수치 옵션이 없습니다.</p>`)}</dl><p class="equipment-options-note">범위는 얻을 때 붙을 수 있는 옵션이에요. —는 범위 미제공이고, 거래되는 물건마다 다를 수 있어요.</p></section>
+    ${item.description?.trim() || item.effect_description?.trim() ? `<section class="equipment-description"><h2>아이템 설명</h2>${item.description?.trim()?`<p>${text(item.description)}</p>`:""}${item.effect_description?.trim()&&item.effect_description!==item.description?`<p>${text(item.effect_description)}</p>`:""}</section>`:""}
     <footer><span>상점 판매가</span><strong>${price == null ? "미제공" : `${text(formatCount(price))} 메소`}</strong></footer>
     ${extraAttributes.length ? `<details class="equipment-extra"><summary>추가 정보<span aria-hidden="true">›</span></summary><dl class="catalog-facts">${extraAttributes.map(attribute => `<div><dt>${text(attribute.attribute_name)}</dt><dd>${text(attribute.value_text)}</dd></div>`).join("")}</dl></details>` : ""}
   </article>`;
