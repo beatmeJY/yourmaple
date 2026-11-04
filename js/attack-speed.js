@@ -85,12 +85,18 @@ export function mountSpeedPicker(container) {
       : pickNumber(current, numberButton.dataset.speedNumber === "" ? null : Number(numberButton.dataset.speedNumber));
     const value = formatSpeed(next);
     if (value === field.value) return;
-    field.value = value;
     const focusKey = gradeButton ? `[data-speed-grade="${gradeButton.dataset.speedGrade}"]` : `[data-speed-number="${numberButton.dataset.speedNumber}"]`;
-    for (const node of [...picker.children]) if (node !== field) node.remove();
-    picker.insertAdjacentHTML("beforeend", speedPickerBody(next));
+    setSpeedValue(picker, value, { animateNumbers: Boolean(gradeButton) });
     picker.querySelector(focusKey)?.focus();
-    picker.querySelector(".speed-numbers")?.classList.toggle("is-new", Boolean(gradeButton));
     field.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+// 밖에서 값을 바꿀 때(예: 검토 보관함 "이쪽 수치 사용") 버튼 표시도 같이 바꾼다. input 이벤트는 부른 쪽이 정한다.
+export function setSpeedValue(picker, value, { animateNumbers = false } = {}) {
+  const field = picker.querySelector("input[type=hidden]");
+  field.value = String(value ?? "").trim();
+  for (const node of [...picker.children]) if (node !== field) node.remove();
+  picker.insertAdjacentHTML("beforeend", speedPickerBody(parseSpeed(field.value)));
+  picker.querySelector(".speed-numbers")?.classList.toggle("is-new", animateNumbers);
 }

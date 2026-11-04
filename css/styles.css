@@ -16322,3 +16322,8 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .job-chip.is-picked { animation: none; }
   .job-chip:hover { transform: none; }
 }
+
+/* 검토 보관함 공격속도 고르기(2026-11-04): 아이템 수정창과 같은 버튼(.speed-picker)을 쓴다 */
+.review-speed { display: grid; gap: 4px; margin: 6px 0 12px; }
+.review-speed > span { font-size: 13px; color: var(--muted); }
+.review-speed .hint { margin: 0; }
