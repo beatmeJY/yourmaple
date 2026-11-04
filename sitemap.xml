@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://yourmaple.kr/</loc></url>
+  <url><loc>https://yourmaple.kr/dojo/</loc></url>
+  <url><loc>https://yourmaple.kr/maker/</loc></url>
+  <url><loc>https://yourmaple.kr/chaos-scroll/</loc></url>
+  <url><loc>https://yourmaple.kr/level-up/</loc></url>
+  <url><loc>https://yourmaple.kr/monster-park/</loc></url>
+  <url><loc>https://yourmaple.kr/monsters/</loc></url>
+  <url><loc>https://yourmaple.kr/items/</loc></url>
   <url><loc>https://yourmaple.kr/privacy.html</loc></url>
   <url><loc>https://yourmaple.kr/terms.html</loc></url>
 </urlset>

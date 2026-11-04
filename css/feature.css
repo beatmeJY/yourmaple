@@ -1,0 +1,54 @@
+/* 기능 소개 페이지(/dojo/ 등) 전용. public.css 위에 얹는다. 앱 스타일·스크립트에 의존하지 않는다. */
+.feature-hero { display: grid; grid-template-columns: minmax(0, 1fr) 240px; align-items: center; gap: 32px; }
+.feature-hero .hero { padding-bottom: 40px; }
+.feature-art { position: relative; display: flex; align-items: center; justify-content: center; gap: 16px; min-height: 220px; border-radius: 28px; background: radial-gradient(circle at 50% 45%, rgba(237, 205, 138, .22), transparent 62%), var(--panel); border: 1px solid var(--line); animation: arrive .7s .1s ease-out both; }
+.feature-art img { width: auto; max-width: 42%; height: auto; max-height: 120px; image-rendering: pixelated; filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .45)); animation: float 3.6s ease-in-out infinite; }
+.feature-art img:nth-child(2) { animation-delay: -1.8s; }
+.feature-art img:only-child { width: 140px; max-width: 60%; max-height: 140px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.cta, .ghost-cta { display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; font-size: 15px; font-weight: 800; text-decoration: none; transition: transform .25s cubic-bezier(.34, 1.56, .64, 1), box-shadow .25s, background .25s; }
+.cta { color: #1a1206; background: linear-gradient(135deg, #f6dca0, var(--gold)); box-shadow: 0 8px 24px rgba(237, 205, 138, .25); }
+.cta:hover { color: #1a1206; transform: translateY(-2px); box-shadow: 0 12px 30px rgba(237, 205, 138, .35); }
+.ghost-cta { color: var(--text); border: 1px solid var(--line); background: rgba(255, 255, 255, .03); }
+.ghost-cta:hover { color: var(--gold); transform: translateY(-2px); border-color: var(--gold); }
+.feature-page section .cta { margin-top: 8px; }
+.feature-page main > section { max-width: 860px; }
+.feature-cards { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.feature-card { margin: 0; padding: 20px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); animation: arrive .55s calc(var(--i, 0) * 80ms + .15s) ease-out both; transition: transform .25s, border-color .25s; }
+.feature-card:hover { transform: translateY(-3px); border-color: rgba(237, 205, 138, .55); }
+.feature-card h3 { margin: 0 0 6px; font-size: 17px; color: var(--text); }
+.feature-card p { margin: 0; font-size: 15px; line-height: 1.7; }
+.steps { padding-left: 0; list-style: none; counter-reset: step; }
+.steps li { counter-increment: step; display: flex; gap: 14px; align-items: baseline; }
+.steps li::before { content: counter(step); flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(237, 205, 138, .16); color: var(--gold); font-size: 13px; font-weight: 800; }
+.hint { font-size: 13px; }
+.faq details { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); margin-bottom: 10px; }
+.faq summary { cursor: pointer; padding: 14px 18px; font-weight: 700; color: var(--text); }
+.faq summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 14px; }
+.faq details p { margin: 0; padding: 0 18px 16px; }
+.feature-nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 30px; }
+.feature-nav a { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; text-decoration: none; color: var(--muted); }
+.feature-nav a:hover { color: var(--gold); border-color: var(--gold); }
+.feature-nav a[aria-current="page"] { color: var(--text); border-color: var(--gold); background: rgba(237, 205, 138, .12); }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@media (max-width: 760px) {
+  .feature-hero { grid-template-columns: 1fr; gap: 0; }
+  .feature-hero .hero { padding-bottom: 24px; }
+  .feature-art { min-height: 150px; margin-bottom: 34px; }
+  .feature-cards { grid-template-columns: 1fr; }
+  .cta, .ghost-cta { flex: 1 1 auto; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feature-art, .feature-art img, .feature-card { animation: none; }
+  .cta, .ghost-cta, .feature-card { transition: none; }
+  .cta:hover, .ghost-cta:hover, .feature-card:hover { transform: none; }
+}
+/* 사진처럼 부드러운 그림은 픽셀 그대로 키우지 않는다 */
+.feature-art.is-smooth img { image-rendering: auto; }
+.cta-row[hidden], .ended-notice[hidden] { display: none; }
+.is-ended .cta-row { display: none; }
+/* 기간이 끝난 이벤트 안내(몬스터파크) */
+.ended-notice { margin-top: 26px; padding: 18px 22px; border-left: 3px solid var(--gold); border-radius: 0 14px 14px 0; background: var(--panel); animation: arrive .5s ease-out both; }
+.ended-notice strong { color: var(--gold); }
+.ended-notice p { margin: 4px 0 12px; font-size: 15px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .ended-notice { animation: none; } }

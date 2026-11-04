@@ -30,6 +30,7 @@
   - 개발 중인 화면·탭 숨기기: `routes.js`의 route에 `dev: true`(메이커 탭은 `TABS`의 `dev: true`)를 붙이면 운영 주소에서는 메뉴·검색·홈 타일에서 빠지고 주소로 열어도 홈으로 간다. 주소에 `?dev`(또는 `#/화면?dev`)를 붙이면 그 탭을 닫을 때까지 보이고 `?dev=0`이면 끈다. 로컬(127.0.0.1·localhost)에서는 늘 보인다(`js/dev-mode.js`). 2026-10-11 강화 계산·리버스 제작을 숨김 [실측]
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
 - 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
+- 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML(`css/public.css`+`css/feature.css`, 앱 스크립트 없음). 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`pages.yml` 복사 목록·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
 - 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
 
 ## 4. 코드 규칙
@@ -65,6 +66,16 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-04 (Claude) 기능 소개 페이지 3개 추가(사용자 우선순위): `/monster-park/`(구역별 한 판 경험치·하루 2회·1레벨 제한 등 docs 값, 사용자 선택 1번: 2026-11-30 지나면 종료 안내·바로 쓰기 숨김, 브라우저는 서울 날짜로 즉시·생성기는 실행일 기준), `/monsters/`·`/items/`(도감 소개만, 개별 페이지 없음, 수집처 미기재). 큰 그림은 `img/feature/`에 280px 사본(약 1MB → 55~93KB). sitemap 10개 주소. 로컬 7쪽 모바일 375 넘침 없음·그림 200·구조화 데이터 파싱·종료 스크립트(12-01 00:30 서울 → 안내 보임·버튼 숨김, 11-30 23:59는 그대로)·생성기 12-01 흉내 실행 시 원본 종료본, 앱 바닥글 링크 7개 줄바꿈·넘침/콘솔 오류 없음 [실측]. 미커밋·미배포
+
+- 2026-11-04 (Claude) 기능 소개 페이지 4개(사용자 요청, 검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`(제목·설명·canonical·OG·WebApplication 구조화 데이터, 이런 걸 계산해요 카드·계산 기준·사용법·자주 묻는 질문·바로 쓰기 버튼 → `/#/화면`), `tools/build_feature_pages.py`·`css/feature.css`, sitemap 7개 주소·pages.yml 복사·index.html 기본 화면과 앱 바닥글에 기능 안내 링크. 로컬 PC 800·모바일 375 4쪽 넘침 없음·그림 200·구조화 데이터 JSON 파싱·sitemap xmllint 통과·콘솔 오류 없음 [실측]. 무릉 검은띠 그림은 회색 바탕이라 뺌. 미커밋·미배포
+
+- 2026-11-04 (Claude) 사용자 Search Console 사이트맵 제출 완료: 도메인 속성이라 전체 주소 `https://yourmaple.kr/sitemap.xml`로 제출해야 하고, 발견된 페이지 3개 [진술]. 공개 sitemap.xml은 200·application/xml·올바른 XML [실측]. 다음: 기능별 소개 페이지(색인용) 진행 여부 사용자 결정 대기
+
+- 2026-11-04 (Claude) 사용자 Google 브랜딩 인증 제출 [진술]. 결과 대기(보통 영업일 2~3일). 승인되면 시크릿 창 Google 로그인 화면에 Your Maple 표시 확인, 거절되면 사유 보고 홈/정책 문구 조정
+
+- 2026-11-04 (Claude) 정책 링크 보강 1a22a9e 배포(Pages 성공·공개 v=1a22a9e, 공개 원본 HTML에 h1 Your Maple·privacy/terms 링크, 공개 홈 바닥글·로그인 카드 안내 링크·넘침/콘솔 오류 없음) [실측]
 
 - 2026-11-04 (Claude) 정책 링크 보강(사용자 요청, Google 브랜딩 심사 대비): `index.html` #app 안에 앱 뜨기 전 기본 소개(Your Maple·설명·개인정보 처리방침·이용약관·문의, JavaScript 없이도 보임, main.js가 바로 바꿔 그림), 앱 틀 공통 바닥글 `.site-foot`(모든 화면 본문 아래, 로그인 여부 무관, `.content` 세로 flex로 짧은 화면은 맨 아래). ?mock·guest PC·모바일 375 홈·메모·무릉·메이커·거래·도감·사냥 바닥글 1개·넘침/콘솔 오류 없음, 원본 HTML에 h1·링크 3개, stamp_version 복사본 실행 정상 [실측]
 

@@ -343,6 +343,8 @@ Secret key 는 Secret 에도 넣지 않습니다.
 5. DNS 반영 후 Search Console에서 확인합니다. 바로 확인되지 않으면 전파를 기다린 뒤 재시도합니다. 인증 후에도 TXT를 유지합니다. 필요하면 `dig TXT yourmaple.kr +short`로 값이 보이는지 확인합니다.
 6. 이 변경을 **배포한 뒤**, 사이트맵 메뉴에서 `https://yourmaple.kr/sitemap.xml`을 제출합니다. 홈·`privacy.html`·`terms.html`의 URL 검사에서 실제 페이지 확인 후 필요한 URL의 색인을 요청합니다.
 
+기능 소개 페이지 `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`도 사이트맵에 있습니다. 몬스터파크 페이지는 이벤트가 끝나면(2026-11-30 다음 날) 생성기를 다시 실행해 배포하면 원본 HTML도 종료 안내로 바뀝니다. 문구는 `python3 tools/build_feature_pages.py .`로 다시 만들고, 사이트맵을 바꾼 뒤에는 Search Console에서 다시 제출하지 않아도 Google이 다시 읽습니다(도메인 속성에서는 사이트맵을 `https://yourmaple.kr/sitemap.xml` 전체 주소로 제출).
+
 `robots.txt`는 크롤링을 허용하고 사이트맵 위치를 안내합니다. 접근 제어나 개인정보 보호 수단이 아닙니다. 사이트맵에는 공개된 정규 URL 세 개만 넣고 `#/homework` 같은 해시 화면, OAuth 콜백·코드·토큰 URL이나 개인 기록은 넣지 않습니다. 현재 해시 SPA의 개별 기능 검색 노출을 보장하지 않습니다. Search Console 등록·사이트맵 제출도 색인이나 검색 순위를 보장하지 않습니다.
 
 배포 설정은 새 정적 파일도 `_site`에 복사합니다. 코드 작성과 Google 계정의 소유권 확인은 별개이며, 이번 변경만으로 Search Console에 자동 등록되지 않습니다.

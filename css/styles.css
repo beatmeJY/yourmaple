@@ -16347,3 +16347,4 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .boot-intro nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 6px; font-size: 13px; }
 .boot-intro a { color: var(--gold, #e8c46b); }
 @media (prefers-reduced-motion: reduce) { .site-foot a { transition: none; } }
+.site-foot .site-foot-guides { flex-basis: 100%; font-size: 12px; }

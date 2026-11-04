@@ -109,6 +109,15 @@ export function renderShell() {
             <a href="./terms.html">이용약관</a>
             <a href="mailto:yourmaplekr@gmail.com">문의</a>
           </nav>
+          <nav class="site-foot-guides" aria-label="기능 안내">
+            <a href="./dojo/">무릉도장 계산기</a>
+            <a href="./maker/">메이커 계산기</a>
+            <a href="./chaos-scroll/">혼돈의 주문서</a>
+            <a href="./level-up/">레벨업 계산기</a>
+            <a href="./monster-park/">몬스터파크</a>
+            <a href="./monsters/">몬스터 도감</a>
+            <a href="./items/">아이템 도감</a>
+          </nav>
           <p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p>
         </footer>
       </div>
