@@ -15,6 +15,7 @@ const types = {
   "Two-Handed Axe": "두손도끼", "One-Handed Blunt Weapon": "한손둔기",
   "Two-Handed Blunt": "두손둔기", "Two-Handed Blunt Weapon": "두손둔기",
 };
+export const equipmentTypeName = type => types[type] ?? type ?? "";
 export const isEquipment = item => ["장비", "방어구", "무기", "Equip"].includes(item.category);
 
 export function equipmentCard({ item, stats = [], requirements = [], jobs = [], attributes = [] }) {

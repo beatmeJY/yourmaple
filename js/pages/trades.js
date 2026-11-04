@@ -1,5 +1,9 @@
-import { catalogError, loadCatalog } from "../catalog.js";
-import { itemOptionFields, itemSnapshot, optionSummary, readItemOptions, tradeItemKey } from "../item-options.js";
+import { catalogError } from "../catalog.js";
+import { catalogRpc } from "../catalog-api.js";
+import { equipmentTypeName, isEquipment } from "../catalog-equipment.js";
+import { catalogImage, mountCatalogImageFallback } from "../catalog-image.js";
+import { itemOptionFields, itemSnapshot, readItemOptions, tradeItemKey } from "../item-options.js";
+import { groupTotals, groupTrades, optionChips, tradeGroupKey } from "../trade-groups.js";
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
 import { escapeHtml, formatCount, readCount } from "../format.js";
@@ -45,13 +49,14 @@ function signedMoney(value) {
 
 export async function render(root) {
   root.innerHTML = `
-    <div class="trade-page">
-      <header class="page-header">
-        <p class="trade-kicker">장부</p>
-        <div class="trade-hero-row">
+    <div class="trade-page tr2">
+      <header class="page-header tr2-head">
+        <div>
+          <p class="trade-kicker">TRADE LEDGER</p>
           <h1>거래 장부</h1>
-          <button class="primary-button" type="button" data-add>거래 추가</button>
+          <p class="tr2-sub">산 가격·판 가격을 적으면 손익을 계산해요. 장비는 옵션이 같으면 수량으로 합치고, 다르면 따로 기록해요.</p>
         </div>
+        <button class="primary-button" type="button" data-add>＋ 거래 추가</button>
       </header>
       <div data-summary></div>
       <div class="trade-layout">
@@ -73,11 +78,23 @@ export async function render(root) {
         <div data-list></div>
       </section>
       <aside class="trade-side">
-        <form class="editor trade-editor ym-glass" id="trade-form">
+        <form class="editor trade-editor ym-glass" id="trade-form" autocomplete="off">
           <h2 data-form-title>거래 추가</h2>
-          <label class="field span-all"><span>공용 아이템</span><select name="catalog_item"><option value="">직접 입력 · 도감 연결 없음</option></select><small class="trade-catalog-status" data-catalog-status>공용 아이템을 불러오는 중입니다.</small></label>
-          <label class="field span-all"><span>아이템명</span><input name="name" required autocomplete="off" /></label>
-          <details class="trade-item-options"><summary>실제 아이템 옵션</summary><p class="hint">실제로 산 아이템의 옵션을 입력하세요. 같은 이름도 옵션이 다르면 별도로 기록합니다.</p><div class="trade-options-grid">${itemOptionFields.map(({ key, label }) => `<label class="field"><span>${escapeHtml(label)}</span><input name="option_${key}" inputmode="numeric" autocomplete="off" /></label>`).join("")}</div></details>
+          <div class="tr2-picker span-all">
+            <label class="field"><span>아이템</span>
+              <span class="tr2-search ym-search-wrap"><i class="ym-search-icon" aria-hidden="true"></i><input name="name" required autocomplete="off" spellcheck="false" placeholder="이름으로 찾기 · 도감에 없으면 그대로 적기" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="trade-item-results" /></span>
+            </label>
+            <input type="hidden" name="catalog_item" />
+            <div class="tr2-results" id="trade-item-results" data-item-results role="listbox" aria-label="도감 아이템" hidden></div>
+            <div class="tr2-picked" data-item-picked hidden></div>
+            <small class="trade-catalog-status" data-catalog-status>도감에서 고르면 그림과 기본 옵션이 붙어요.</small>
+          </div>
+          <section class="tr2-options span-all" data-options hidden>
+            <header><strong>실제 아이템 옵션</strong><small data-options-hint>산 아이템에 붙은 옵션을 적어요. 옵션이 같으면 수량으로 합치고, 다르면 따로 기록해요.</small></header>
+            <div class="trade-options-grid">${itemOptionFields.map(({ key, label }) => `<label class="field tr2-option" data-option-field="${key}"><span>${escapeHtml(label)}<em data-option-range="${key}"></em></span><input name="option_${key}" inputmode="numeric" autocomplete="off" placeholder="—" /></label>`).join("")}</div>
+            <button type="button" class="text-button tr2-more" data-options-more aria-expanded="false">＋ 다른 옵션도 적기</button>
+          </section>
+          <button type="button" class="text-button tr2-options-open span-all" data-options-open hidden>＋ 장비라면 옵션 적기</button>
           <div class="trade-form-sides span-all">
             <fieldset class="trade-form-side is-buy">
               <legend>매수</legend>
@@ -103,14 +120,21 @@ export async function render(root) {
       </div>
     </div>
   `;
+  mountCatalogImageFallback(root);
 
   const list = root.querySelector("[data-list]");
   const summary = root.querySelector("[data-summary]");
   const form = root.querySelector("#trade-form");
   const title = root.querySelector("[data-form-title]");
   let rows = [];
-  let catalogItems = [];
   let currentItemSnapshot = {};
+  // 도감에서 고른 아이템(그림·분류·옵션 범위 표시용). 거래 저장 값은 catalog_item·item_snapshot·옵션 칸이 정한다.
+  let picked = null;
+  // 목록 그림: 도감 ID → { image_url, category, subcategory, required_level }
+  const itemInfo = new Map();
+  // 펼친 묶음(같은 아이템 거래가 여러 건)
+  const openGroups = new Set();
+  let showAllOptions = false;
   let view = "all";
   let loadId = 0;
   let selectedId = "";
@@ -236,7 +260,31 @@ export async function render(root) {
     return `<input class="amount-input${quiet ? " is-quiet" : ""}" data-trade-id="${row.id}" data-trade-field="${field}" inputmode="numeric" value="${escapeHtml(shown)}" aria-label="${escapeHtml(`${row.name} ${label}`)}" />`;
   }
 
-  function card(row) {
+  // 아이템 그림 칸: 도감 그림이 있으면 그림, 없으면 이름 첫 글자.
+  function itemArt(row, size = 44) {
+    const info = row.item_id ? itemInfo.get(row.item_id) : null;
+    const image = info?.image_url ? catalogImage(info.image_url, "tr2-art-img", size) : "";
+    return `<span class="tr2-art${image ? "" : " is-glyph"}" aria-hidden="true">${image || escapeHtml([...tradeName(row.name)][0] ?? "?")}</span>`;
+  }
+
+  function itemTags(row) {
+    const info = row.item_id ? itemInfo.get(row.item_id) : null;
+    const category = info?.category ?? row.item_snapshot?.category;
+    const tags = [
+      category && (isEquipment({ category }) ? equipmentTypeName(info?.subcategory) || "장비" : category),
+      info?.required_level ? `Lv.${info.required_level}` : "",
+      row.item_id ? "" : "직접 입력",
+    ].filter(Boolean);
+    return tags.map((tag) => `<span class="tr2-tag">${escapeHtml(tag)}</span>`).join("");
+  }
+
+  function chipHtml(chips, equipment) {
+    if (!chips.length) return equipment ? `<span class="tr2-chip is-empty">옵션 미기록</span>` : "";
+    return chips.map((chip) => `<span class="tr2-chip${chip.unique ? " is-unique" : ""}"${chip.unique ? ` title="이 묶음에서 거래마다 다른 옵션"` : ""}>${escapeHtml(chip.label)} <b>${chip.value === undefined ? "—" : escapeHtml(formatCount(chip.value))}</b></span>`).join("");
+  }
+
+  // 거래 한 건(=옵션이 같은 물건 묶음). 가격·개수는 그 자리에서 고친다.
+  function lotCard(row, chips, { equipment, inGroup, index }) {
     const profit = profitOf(row);
     const remaining = remainingOf(row);
     const sold = row.sell_price != null && row.sell_qty > 0;
@@ -247,11 +295,16 @@ export async function render(root) {
     const soldCost = row.buy_price * row.sell_qty;
     const profitRate = profit == null || soldCost === 0 ? null : profit / soldCost * 100;
     const rateText = profitRate == null ? "" : `${profitRate > 0 ? "+" : ""}${profitRate.toFixed(1)}%`;
+    const chipsText = chipHtml(chips, equipment);
     return `
-      <article class="trade-card${selectedId === row.id ? " is-selected" : ""}" data-select-trade="${escapeHtml(row.id)}">
+      <article class="trade-card tr2-lot${selectedId === row.id ? " is-selected" : ""}" data-select-trade="${escapeHtml(row.id)}" style="--i:${Math.min(index, 10)}">
         <div class="trade-card-id">
-          <h3><button class="text-button" type="button" data-select-name="${escapeHtml(row.id)}" aria-pressed="${selectedId === row.id}">${escapeHtml(row.name)}</button></h3>
-          <p class="trade-option-copy">${escapeHtml(optionSummary(row.item_options) || "옵션 미기록")}</p>
+          ${inGroup ? "" : itemArt(row)}
+          <div class="tr2-lot-title">
+            <h3><button class="text-button" type="button" data-select-name="${escapeHtml(row.id)}" aria-pressed="${selectedId === row.id}">${escapeHtml(inGroup ? `${index + 1}번 · ${remaining > 0 ? `보유 ${formatCount(remaining)}개` : "판매 완료"}` : row.name)}</button></h3>
+            ${inGroup ? "" : `<p class="tr2-tags">${itemTags(row)}<span class="tr2-tag is-${remaining > 0 ? "hold" : "done"}">${remaining > 0 ? `보유 ${formatCount(remaining)}개` : "판매 완료"}</span></p>`}
+            ${chipsText ? `<p class="trade-option-copy tr2-chips">${chipsText}</p>` : ""}
+          </div>
           ${profit == null || profit === 0 ? "" : `<span class="trade-profit-sticker ${tone}">${profit > 0 ? "흑자" : "적자"}</span>`}
         </div>
         <section class="trade-lane is-buy">
@@ -279,6 +332,36 @@ export async function render(root) {
     `;
   }
 
+  // 같은 아이템 거래 묶음. 한 건이면 그 거래만, 여러 건이면 머리 줄을 눌러 펼치고 거래마다 다른 옵션을 금색으로 보여 준다.
+  function groupCard(group, groupIndex) {
+    const first = group.lots[0];
+    const equipment = isEquipment({ category: (first.item_id ? itemInfo.get(first.item_id)?.category : null) ?? first.item_snapshot?.category })
+      || group.lots.some((row) => Object.keys(row.item_options ?? {}).length);
+    const chips = optionChips(group.lots);
+    if (group.lots.length === 1) return `<div class="tr2-group is-single" style="--i:${Math.min(groupIndex, 10)}">${lotCard(first, chips[0], { equipment, inGroup: false, index: 0 })}</div>`;
+    const open = openGroups.has(group.key);
+    const totals = groupTotals(group.lots);
+    const uniqueCount = new Set(chips.flat().filter((chip) => chip.unique).map((chip) => chip.key)).size;
+    return `
+      <section class="tr2-group${open ? " is-open" : ""}" data-group="${escapeHtml(group.key)}" style="--i:${Math.min(groupIndex, 10)}">
+        <button type="button" class="tr2-group-head" data-toggle-group="${escapeHtml(group.key)}" aria-expanded="${open}">
+          ${itemArt(first, 48)}
+          <span class="tr2-group-copy">
+            <strong>${escapeHtml(first.name)}</strong>
+            <span class="tr2-tags">${itemTags(first)}<span class="tr2-tag is-count">거래 ${formatCount(group.lots.length)}건${uniqueCount ? ` · 옵션 ${formatCount(group.lots.length)}종` : ""}</span></span>
+            <small>${open ? "거래마다 다른 옵션을 금색으로 표시했어요." : "눌러서 거래마다 다른 옵션을 비교해요."}</small>
+          </span>
+          <span class="tr2-group-stats">
+            <span><small>보유</small><b>${escapeHtml(formatCount(totals.remaining))}개</b></span>
+            <span><small>실현 손익</small><b class="${moneyClass(totals.realized)}">${escapeHtml(signedMoney(totals.realized))}</b></span>
+          </span>
+          <i class="tr2-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="tr2-lots" ${open ? "" : "hidden"}>${group.lots.map((row, index) => lotCard(row, chips[index], { equipment, inGroup: true, index })).join("")}</div>
+      </section>
+    `;
+  }
+
   function tradeDate(value) {
     const date = new Date(value);
     if (!value || Number.isNaN(date.getTime())) return "—";
@@ -294,29 +377,18 @@ export async function render(root) {
     const visible = visibleRows();
     paintSummary(searchedRows());
     if (!rows.length) {
-      list.innerHTML = `<p class="empty">등록한 거래가 없습니다. 거래 추가로 산 가격과 개수를 먼저 적어 보세요.</p>`;
+      list.innerHTML = `<div class="tr2-empty"><span aria-hidden="true">📒</span><strong>아직 기록한 거래가 없어요</strong><p>오른쪽에서 아이템을 고르고 산 가격과 개수를 적어 보세요.</p></div>`;
       return;
     }
     if (!visible.length) {
       list.innerHTML = `<p class="empty">이 조건에 맞는 거래가 없습니다.</p>`;
       return;
     }
-    const groups = [];
-    for (const row of sortedTrades(visible)) {
-      const status = statusOf(row);
-      const last = groups[groups.length - 1];
-      if (!last || last.status !== status) groups.push({ status, rows: [row] });
-      else last.rows.push(row);
-    }
-    list.innerHTML = groups
-      .map((group) => {
-        const head =
-          view === "all"
-            ? `<header class="trade-group-head"><h2>${escapeHtml(group.status)}</h2><span class="count-pill">${formatCount(group.rows.length)}</span></header>`
-            : "";
-        return `<section class="trade-group">${head}<div class="trade-cards">${group.rows.map(card).join("")}</div></section>`;
-      })
-      .join("");
+    // 선택한 거래가 든 묶음은 펼쳐 둔다.
+    const selected = rows.find((row) => row.id === selectedId);
+    if (selected) openGroups.add(tradeGroupKey(selected));
+    const groups = groupTrades(sortedTrades(visible));
+    list.innerHTML = `<div class="trade-cards tr2-groups">${groups.map(groupCard).join("")}</div>`;
   }
 
   function tradeInputs(id) {
@@ -490,6 +562,12 @@ export async function render(root) {
     form.dataset.editingId = "";
     form.reset();
     currentItemSnapshot = {};
+    picked = null;
+    optionsForced = false;
+    showAllOptions = false;
+    closeResults();
+    paintPicked();
+    paintOptions();
     selectedId = "";
     title.textContent = "거래 추가";
     paintSelection();
@@ -515,10 +593,15 @@ export async function render(root) {
     form.elements.catalog_item.value = row.item_id || "";
     currentItemSnapshot = { ...(row.item_snapshot ?? {}) };
     for (const { key } of itemOptionFields) form.elements[`option_${key}`].value = row.item_options?.[key] ?? "";
-    if (row.item_id && !catalogItems.some((item) => item.id === row.item_id)) {
-      const option = document.createElement("option"); option.value = row.item_id; option.textContent = `${row.item_snapshot?.name || row.name} (거래 당시 기록)`;
-      form.elements.catalog_item.append(option); form.elements.catalog_item.value = row.item_id;
-    }
+    const info = row.item_id ? itemInfo.get(row.item_id) : null;
+    picked = row.item_id ? { id: row.item_id, name: row.item_snapshot?.name || row.name, category: row.item_snapshot?.category, base_options: row.item_snapshot?.base_options ?? {}, ranges: {}, ...info } : null;
+    optionsForced = false;
+    showAllOptions = false;
+    closeResults();
+    paintPicked();
+    paintOptions();
+    // 그림·옵션 범위만 더 불러온다(적어 둔 실제 옵션은 덮어쓰지 않는다).
+    if (row.item_id) loadPickedDetail(row.item_id, { fill: false });
   }
 
   function readTradeItem() {
@@ -527,16 +610,162 @@ export async function render(root) {
     return { value: { item_id: form.elements.catalog_item.value || null, item_snapshot: { ...currentItemSnapshot }, item_options: parsed.value } };
   }
 
-  async function loadItems() {
-    const result = await loadCatalog("catalog_items");
-    if (!root.isConnected) return;
-    const status = root.querySelector("[data-catalog-status]");
-    if (result.error) { status.textContent = catalogError(result.error); return; }
-    catalogItems = result.data;
-    for (const item of catalogItems) {
-      const option = document.createElement("option"); option.value = item.id; option.textContent = `${item.name} · ${item.category}`; form.elements.catalog_item.append(option);
+  // ── 아이템 고르기: 이름으로 도감 검색(서버 함수, 글자 순서 검색), 고르면 그림·기본 옵션·옵션 범위 ──
+  const resultsBox = root.querySelector("[data-item-results]");
+  const pickedBox = root.querySelector("[data-item-picked]");
+  const optionsBox = root.querySelector("[data-options]");
+  const optionsOpen = root.querySelector("[data-options-open]");
+  const optionsMore = root.querySelector("[data-options-more]");
+  const catalogStatus = root.querySelector("[data-catalog-status]");
+  let optionsForced = false;
+  let searchTimer = 0;
+  let searchId = 0;
+  let pickId = 0;
+
+  const pickedIsEquipment = () => Boolean(picked && isEquipment({ category: picked.category }));
+
+  function closeResults() {
+    window.clearTimeout(searchTimer);
+    searchId += 1;
+    resultsBox.hidden = true;
+    resultsBox.innerHTML = "";
+    form.elements.name.setAttribute("aria-expanded", "false");
+    form.elements.name.removeAttribute("aria-activedescendant");
+  }
+
+  function resultTags(row) {
+    const equipment = isEquipment({ category: row.category });
+    return [equipment ? equipmentTypeName(row.subcategory) || "장비" : row.category, row.required_level ? `Lv.${row.required_level}` : ""].filter(Boolean).join(" · ");
+  }
+
+  async function runSearch(query) {
+    const request = ++searchId;
+    if (!query) { closeResults(); return; }
+    const out = await catalogRpc("catalog_search_items", { p_query: query, p_page: 0 });
+    if (request !== searchId || !root.isConnected || form.elements.name.value.trim() !== query) return;
+    const direct = `<button type="button" class="tr2-result is-direct" data-pick-direct role="option" id="trade-item-direct"><span class="tr2-art is-glyph" aria-hidden="true">✎</span><span><strong>‘${escapeHtml(query)}’ 그대로 쓰기</strong><small>도감 연결 없이 이름만 기록</small></span></button>`;
+    if (out.error) {
+      resultsBox.innerHTML = `<p class="tr2-results-note">${escapeHtml(catalogError(out.error))}</p>${direct}`;
+    } else {
+      const found = (out.data?.rows ?? []).slice(0, 8);
+      resultsBox.innerHTML = found.map((row, index) => `<button type="button" class="tr2-result" data-pick-item="${escapeHtml(row.id)}" role="option" id="trade-item-${index}" style="--i:${index}">
+          <span class="tr2-art${row.image_url ? "" : " is-glyph"}" aria-hidden="true">${catalogImage(row.image_url, "tr2-art-img", 32) || escapeHtml([...row.name][0] ?? "?")}</span>
+          <span><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(resultTags(row))}</small></span>
+        </button>`).join("") + (found.length ? "" : `<p class="tr2-results-note">도감에 없는 이름이에요.</p>`) + direct;
+      for (const row of found) if (!itemInfo.has(row.id)) itemInfo.set(row.id, { image_url: row.image_url, category: row.category, subcategory: row.subcategory, required_level: row.required_level });
     }
-    status.textContent = catalogItems.length ? "선택하면 기본 옵션을 채워요. 실제 옵션은 직접 조정할 수 있어요." : "도감은 준비 중입니다. 직접 입력해 거래를 기록할 수 있어요.";
+    resultsBox.hidden = false;
+    form.elements.name.setAttribute("aria-expanded", "true");
+  }
+
+  function moveActive(step) {
+    const options = [...resultsBox.querySelectorAll("[role=option]")];
+    if (!options.length) return;
+    const current = options.findIndex((option) => option.classList.contains("is-active"));
+    const next = (current + step + options.length) % options.length;
+    options.forEach((option, index) => option.classList.toggle("is-active", index === next));
+    form.elements.name.setAttribute("aria-activedescendant", options[next].id);
+    options[next].scrollIntoView({ block: "nearest" });
+  }
+
+  function paintPicked() {
+    const equipment = pickedIsEquipment();
+    pickedBox.hidden = !picked;
+    pickedBox.innerHTML = picked
+      ? `<span class="tr2-art${picked.image_url ? "" : " is-glyph"}" aria-hidden="true">${catalogImage(picked.image_url, "tr2-art-img", 44) || escapeHtml([...picked.name][0] ?? "?")}</span>
+        <span class="tr2-picked-copy"><strong>${escapeHtml(picked.name)}</strong><small>${escapeHtml(resultTags(picked) || "도감 아이템")} · 도감 연결됨</small></span>
+        <button type="button" class="text-button" data-unpick>연결 해제</button>`
+      : "";
+    catalogStatus.textContent = !picked
+      ? "도감에서 고르면 그림과 기본 옵션이 붙어요. 없으면 이름만 적어도 돼요."
+      : equipment ? "장비예요. 실제로 산 물건의 옵션으로 고쳐 주세요." : "장비가 아니라 옵션 없이 수량만 기록해요.";
+  }
+
+  function paintOptions() {
+    const values = new Set(itemOptionFields.map(({ key }) => key).filter((key) => form.elements[`option_${key}`].value.trim() !== ""));
+    const equipment = pickedIsEquipment();
+    const show = equipment || values.size > 0 || optionsForced;
+    optionsBox.hidden = !show;
+    optionsOpen.hidden = show || Boolean(picked);
+    // 이 장비에 있는 옵션(기본값·범위)과 적어 둔 옵션만 먼저 보여 준다. 없으면 전부.
+    const relevant = new Set([...Object.keys(picked?.base_options ?? {}), ...Object.keys(picked?.ranges ?? {}), ...values]);
+    const all = showAllOptions || relevant.size === 0;
+    for (const field of optionsBox.querySelectorAll("[data-option-field]")) {
+      const key = field.dataset.optionField;
+      field.hidden = !(all || relevant.has(key));
+      const range = picked?.ranges?.[key];
+      field.querySelector("[data-option-range]").textContent = range ? `${formatCount(range[0])}~${formatCount(range[1])}` : "";
+    }
+    optionsMore.hidden = all || relevant.size >= itemOptionFields.length;
+    optionsMore.setAttribute("aria-expanded", String(all));
+  }
+
+  async function loadPickedDetail(id, { fill }) {
+    const request = ++pickId;
+    const out = await catalogRpc("catalog_item_detail", { p_id: id });
+    if (request !== pickId || !root.isConnected || form.elements.catalog_item.value !== id) return null;
+    const item = out.data?.item;
+    if (out.error || !item) {
+      if (fill) notify(out.error ? catalogError(out.error) : "아이템 정보를 찾지 못했어요.", "error");
+      return null;
+    }
+    const ranges = Object.fromEntries((out.data.stats ?? []).filter((row) => row.minimum_value != null && row.maximum_value != null).map((row) => [row.stat_key, [row.minimum_value, row.maximum_value]]));
+    const info = { image_url: item.image_url, category: item.category, subcategory: item.subcategory, required_level: item.required_level };
+    itemInfo.set(id, info);
+    picked = { ...picked, id, name: picked?.name || item.name, base_options: fill ? item.base_options ?? {} : picked?.base_options ?? item.base_options ?? {}, ranges, ...info };
+    paintPicked();
+    paintOptions();
+    return item;
+  }
+
+  async function pickItem(id) {
+    closeResults();
+    const info = itemInfo.get(id) ?? {};
+    form.elements.catalog_item.value = id;
+    picked = { id, name: resultsName.get(id) ?? form.elements.name.value.trim(), base_options: {}, ranges: {}, ...info };
+    paintPicked();
+    const item = await loadPickedDetail(id, { fill: true });
+    if (!item) {
+      form.elements.catalog_item.value = "";
+      picked = null;
+      paintPicked();
+      paintOptions();
+      return;
+    }
+    currentItemSnapshot = itemSnapshot(item);
+    form.elements.name.value = item.name;
+    picked = { ...picked, name: item.name };
+    const equipment = isEquipment(item);
+    // 장비면 도감 기본 옵션을 채우고(실제 값은 사용자가 고친다), 장비가 아니면 옵션을 비운다.
+    for (const { key } of itemOptionFields) form.elements[`option_${key}`].value = equipment ? item.base_options?.[key] ?? "" : "";
+    optionsForced = false;
+    showAllOptions = false;
+    paintPicked();
+    paintOptions();
+    sfx("tick");
+    if (equipment) {
+      optionsBox.classList.remove("is-arrive");
+      void optionsBox.offsetWidth;
+      optionsBox.classList.add("is-arrive");
+    }
+    form.elements.buy_price.focus();
+  }
+
+  // 검색 결과의 이름(고른 직후 detail 응답 전까지 보여 줄 값)
+  const resultsName = new Map();
+
+  // 목록 그림: 화면에 보이는 도감 아이템만 한 번에 읽는다(도감 SQL이 없거나 실패해도 거래는 그대로 보인다).
+  async function loadItemInfo() {
+    const ids = [...new Set(rows.map((row) => row.item_id).filter((id) => id && !itemInfo.has(id)))];
+    if (!ids.length) return;
+    const supabase = await getSupabase();
+    let changed = false;
+    for (let index = 0; index < ids.length; index += 100) {
+      const { data, error } = await supabase.from("catalog_items").select("id,image_url,category,subcategory,required_level").in("id", ids.slice(index, index + 100));
+      if (error || !root.isConnected) return;
+      for (const row of data ?? []) { itemInfo.set(row.id, row); changed = true; }
+    }
+    if (changed && root.isConnected) { paintList(); paintSelection(); }
   }
 
   function readForm(mode = "all") {
@@ -597,28 +826,53 @@ export async function render(root) {
     if (current !== loadId || !list.isConnected) return;
     paintList();
     paintSelection();
+    loadItemInfo();
   }
 
   root.addEventListener("input", (event) => {
-    if (event.target === form.elements.name && form.elements.name.value.trim() !== currentItemSnapshot.name) { form.elements.catalog_item.value = ""; currentItemSnapshot = {}; }
+    if (event.target === form.elements.name) {
+      // 고른 도감 아이템과 이름이 달라지면 연결을 끊는다(직접 입력). 그리고 잠깐 멈추면 도감을 찾는다.
+      if (form.elements.name.value.trim() !== currentItemSnapshot.name && form.elements.catalog_item.value) {
+        form.elements.catalog_item.value = "";
+        currentItemSnapshot = {};
+        picked = null;
+        pickId += 1;
+        paintPicked();
+        paintOptions();
+      }
+      window.clearTimeout(searchTimer);
+      const query = form.elements.name.value.trim();
+      searchTimer = window.setTimeout(() => runSearch(query), 180);
+    }
+    if (event.target.closest("[data-option-field]")) paintOptions();
     if (event.target.closest("[data-trade-field]")) applyAmountCommas(event.target);
     if (event.target.closest("[data-search]")) paintList();
   });
 
   root.addEventListener("change", (event) => {
-    if (event.target === form.elements.catalog_item) {
-      const item = catalogItems.find((item) => item.id === event.target.value);
-      currentItemSnapshot = item ? itemSnapshot(item) : {};
-      if (item) form.elements.name.value = item.name;
-      for (const { key } of itemOptionFields) form.elements[`option_${key}`].value = item?.base_options?.[key] ?? "";
-      return;
-    }
     if (!event.target.matches("[data-sort]")) return;
     sort = event.target.value;
     paintList();
   });
 
   root.addEventListener("keydown", (event) => {
+    if (event.target === form.elements.name && !event.isComposing) {
+      const open = !resultsBox.hidden;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        if (!open) return;
+        event.preventDefault();
+        moveActive(event.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+      if (event.key === "Escape" && open) { event.preventDefault(); closeResults(); return; }
+      if (event.key === "Enter" && open) {
+        // 목록을 고르는 중이면 그 항목, 아니면 첫 도감 결과를 고른다(폼 저장은 하지 않는다).
+        event.preventDefault();
+        const target = resultsBox.querySelector(".is-active") ?? resultsBox.querySelector("[data-pick-item]") ?? resultsBox.querySelector("[data-pick-direct]");
+        target?.click();
+        return;
+      }
+    }
     const input = event.target.closest?.("[data-trade-field]");
     if (!input || event.key !== "Enter" || event.isComposing) return;
     event.preventDefault();
@@ -631,6 +885,39 @@ export async function render(root) {
   });
 
   root.addEventListener("click", async (event) => {
+    if (!event.target.closest(".tr2-picker")) closeResults();
+    const pickButton = event.target.closest("[data-pick-item]");
+    if (pickButton) {
+      resultsName.set(pickButton.dataset.pickItem, pickButton.querySelector("strong")?.textContent ?? "");
+      await pickItem(pickButton.dataset.pickItem);
+      return;
+    }
+    if (event.target.closest("[data-pick-direct]")) { closeResults(); form.elements.buy_price.focus(); return; }
+    if (event.target.closest("[data-unpick]")) {
+      form.elements.catalog_item.value = "";
+      currentItemSnapshot = {};
+      picked = null;
+      pickId += 1;
+      paintPicked();
+      paintOptions();
+      form.elements.name.focus();
+      return;
+    }
+    if (event.target.closest("[data-options-open]")) { optionsForced = true; showAllOptions = true; paintOptions(); optionsBox.querySelector("input:not([hidden])")?.focus(); return; }
+    if (event.target.closest("[data-options-more]")) { showAllOptions = true; paintOptions(); return; }
+    const groupToggle = event.target.closest("[data-toggle-group]");
+    if (groupToggle) {
+      const key = groupToggle.dataset.toggleGroup;
+      if (openGroups.has(key)) openGroups.delete(key); else openGroups.add(key);
+      sfx("tick");
+      const section = groupToggle.closest("[data-group]");
+      const open = openGroups.has(key);
+      section.classList.toggle("is-open", open);
+      groupToggle.setAttribute("aria-expanded", String(open));
+      section.querySelector(".tr2-lots").hidden = !open;
+      groupToggle.querySelector(".tr2-group-copy small").textContent = open ? "거래마다 다른 옵션을 금색으로 표시했어요." : "눌러서 거래마다 다른 옵션을 비교해요.";
+      return;
+    }
     if (event.target.closest("[data-undo-save]")) { await undoSave(); return; }
     const viewButton = event.target.closest("[data-view]");
     if (viewButton) {
@@ -750,5 +1037,7 @@ export async function render(root) {
     await saveForm();
   });
 
-  await Promise.all([loadRows(), loadItems()]);
+  paintPicked();
+  paintOptions();
+  await loadRows();
 }

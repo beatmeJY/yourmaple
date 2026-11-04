@@ -778,7 +778,8 @@ export async function render(root, mode = "gem") {
     quickPriceLayer.querySelector("[data-quick-price-content]").innerHTML = quickPriceHtml(item);
   }
 
-  function openQuickPrice(itemId) {
+  // focusTier: 고른 등급(예: 리버스·옵션 부여의 상급 슬롯이면 "high") 칸에 바로 커서를 둔다. 없으면 첫 칸(원석).
+  function openQuickPrice(itemId, focusTier = "") {
     const item = makerItemById(itemId);
     if (!item) return;
     window.clearTimeout(quickPriceCloseTimer);
@@ -787,7 +788,12 @@ export async function render(root, mode = "gem") {
     quickPriceLayer.classList.remove("is-closing");
     refreshQuickPrice();
     window.requestAnimationFrame(() => quickPriceLayer.classList.add("is-open"));
-    quickPriceLayer.querySelector("[data-price-input]")?.focus({ preventScroll: true });
+    const input = (focusTier && quickPriceLayer.querySelector(`[data-price-input="${itemId}:${focusTier}"]`))
+      || quickPriceLayer.querySelector("[data-price-input]");
+    if (!input) return;
+    input.closest(".maker-quick-price-row")?.classList.add("is-focus-target");
+    input.focus({ preventScroll: true });
+    if (input.value) input.select();
   }
 
   function closeQuickPrice() {
@@ -1413,7 +1419,7 @@ export async function render(root, mode = "gem") {
       enchantCalculator.querySelector("[data-enchant-gem-picker]").hidden = true;
       updateEnchantCalculator();
       if (sourceIndex != null) notify(`${makerItemById(itemId)?.name ?? "보석"} 위치를 ${targetIndex + 1}번 슬롯으로 옮겼습니다.`, "info");
-      openQuickPrice(itemId);
+      openQuickPrice(itemId, enchantSelections[targetIndex]?.tier);
       return;
     }
     const enchantClear = event.target.closest("[data-enchant-clear]");
@@ -1430,7 +1436,7 @@ export async function render(root, mode = "gem") {
     const enchantAddPrice = event.target.closest("[data-enchant-add-price]");
     if (enchantAddPrice) {
       const selection = enchantSelections[Number(enchantAddPrice.dataset.enchantAddPrice)];
-      if (selection?.itemId) openQuickPrice(selection.itemId);
+      if (selection?.itemId) openQuickPrice(selection.itemId, selection.tier);
       return;
     }
     if (event.target.closest("[data-reverse-picker-close]")) {
@@ -1456,13 +1462,13 @@ export async function render(root, mode = "gem") {
       reverseCalculator.querySelector("[data-reverse-gem-picker]").hidden = true;
       updateReverseCalculator();
       if (sourceIndex != null) notify(`${makerItemById(itemId)?.name ?? "보석"} 위치를 ${targetIndex + 1}번 슬롯으로 옮겼습니다.`, "info");
-      openQuickPrice(itemId);
+      openQuickPrice(itemId, "high");
       return;
     }
     const reverseAddPrice = event.target.closest("[data-reverse-add-price]");
     if (reverseAddPrice) {
       const itemId = reverseHighSelections[Number(reverseAddPrice.dataset.reverseAddPrice)];
-      if (itemId) openQuickPrice(itemId);
+      if (itemId) openQuickPrice(itemId, "high");
       return;
     }
     const saveButton = event.target.closest("[data-save-price]");
