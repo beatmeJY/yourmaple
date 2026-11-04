@@ -390,9 +390,9 @@ const reviewAllowed = () => loggedIn() && sessionStorage.getItem("ym-mock-review
 function mockReviewRows() {
   const db = tables();
   if (!db.catalog_review_items) {
-    const draft = {name:"연습용 아이템",description:"보완할 설명입니다.",effect_description:"HP를 50 회복합니다.",base_options:{attack:5,remaining_upgrades:7},requirements:{level:10,fame:0},review_note:""};
+    const draft = {attack_speed_label:"보통",name:"연습용 아이템",description:"보완할 설명입니다.",effect_description:"HP를 50 회복합니다.",base_options:{attack:5,remaining_upgrades:7},requirements:{level:10,fame:0},review_note:""};
     db.catalog_review_items = [
-      {source_id:"1000001",category:"장비",review_kind:"different",image_url:null,status:"draft",revision:1,comparison:{differences:[{field:"공격력",api:5,reference:7}],unknown:[]},proposals:{api:{description:"",base_options:{attack:5},requirements:{level:10}},comparison:{description:"",base_options:{attack:7},requirements:{level:10}}},draft:{...draft,description:"",effect_description:""}},
+      {source_id:"1000001",category:"장비",review_kind:"different",image_url:null,status:"draft",revision:1,comparison:{differences:[{field:"공격력",api:5,reference:7}],unknown:[]},proposals:{api:{attack_speed_label:"보통",description:"",base_options:{attack:5},requirements:{level:10}},comparison:{attack_speed_label:"빠름",description:"",base_options:{attack:7},requirements:{level:10}}},draft:{...draft,description:"",effect_description:""}},
       {source_id:"2000001",category:"소비",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 설명 검토 필요"]},proposals:{api:{description:"HP를 50 회복합니다.",base_options:{},requirements:{}},comparison:{description:"HP를 100 회복합니다.",base_options:{},requirements:{}}},draft:{...draft,name:"연습용 포션",base_options:{},requirements:{}}},
       {source_id:"4000001",category:"기타",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 미제공"]},proposals:{},draft:{...draft,name:"연습용 재료",description:"",effect_description:"",base_options:{},requirements:{}}},
     ];
@@ -425,7 +425,7 @@ const RPCS = {
     row.draft=structuredClone(p_draft);row.status=p_status;row.revision++;row.updated_at=iso();
     if (p_publish) {
       const items=rowsOf("catalog_items"),existing=items.find(x=>x.source_id===p_id);
-      const published={...existing,id:existing?.id||crypto.randomUUID(),source:"collected",source_id:p_id,name:p_draft.name,category:row.category,image_url:row.image_url,base_options:structuredClone(p_draft.base_options),requirements:structuredClone(p_draft.requirements),description:p_draft.description,effect_description:p_draft.effect_description,required_level:p_draft.requirements.level??null};
+      const published={...existing,attack_speed_label:p_draft.attack_speed_label??existing?.attack_speed_label??null,id:existing?.id||crypto.randomUUID(),source:"collected",source_id:p_id,name:p_draft.name,category:row.category,image_url:row.image_url,base_options:structuredClone(p_draft.base_options),requirements:structuredClone(p_draft.requirements),description:p_draft.description,effect_description:p_draft.effect_description,required_level:p_draft.requirements.level??null};
       if(existing)Object.assign(existing,published);else items.push(published);
       row.published_item_id=published.id;row.published_revision=row.revision;
     }
@@ -451,14 +451,14 @@ const RPCS = {
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
   catalog_item_edit_detail({p_id}) {
     assertMockReviewer();const item=rowsOf("catalog_items").find(x=>x.id===p_id);if(!item)throw new Error("아이템을 찾을 수 없습니다");
-    return {version:JSON.stringify(item),ranges_supported:true,ranges:structuredClone(item.source_data?.option_ranges||Object.fromEntries(rowsOf("catalog_item_stats").filter(x=>x.item_id===p_id&&x.minimum_value!=null&&x.maximum_value!=null).map(x=>[x.stat_key,{min:x.minimum_value,max:x.maximum_value}]))),draft:{name:item.name,description:item.description||"",effect_description:item.effect_description||"",base_options:structuredClone(item.base_options||{}),requirements:structuredClone(item.requirements||{}),review_note:""}};
+    return {version:JSON.stringify(item),speed_supported:true,percent_supported:true,level_up_supported:true,ranges_supported:true,ranges:structuredClone(item.source_data?.option_ranges||Object.fromEntries(rowsOf("catalog_item_stats").filter(x=>x.item_id===p_id&&x.minimum_value!=null&&x.maximum_value!=null).map(x=>[x.stat_key,{min:x.minimum_value,max:x.maximum_value}]))),draft:{attack_speed_label:item.attack_speed_label||"",level_up_count:item.level_up_count??null,name:item.name,description:item.description||"",effect_description:item.effect_description||"",base_options:structuredClone(item.base_options||{}),requirements:structuredClone(item.requirements||{}),review_note:""}};
   },
   catalog_item_edit_save({p_id,p_version,p_draft,p_ranges}) {
     assertMockReviewer();const item=rowsOf("catalog_items").find(x=>x.id===p_id);if(!item)throw new Error("아이템을 찾을 수 없습니다");
     if(JSON.stringify(item)!==p_version)throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
     const old=structuredClone(item.base_options||{});
     if(p_ranges!=null)item.source_data={...item.source_data,option_ranges:structuredClone(p_ranges)};
-    Object.assign(item,{name:p_draft.name,description:p_draft.description,effect_description:p_draft.effect_description,base_options:structuredClone(p_draft.base_options),requirements:structuredClone(p_draft.requirements),required_level:p_draft.requirements.level??null,gender_restriction:p_draft.requirements.GENDER??null,updated_at:iso()});
+    Object.assign(item,{attack_speed_label:p_draft.attack_speed_label??item.attack_speed_label??null,level_up_count:Object.hasOwn(p_draft,"level_up_count")?p_draft.level_up_count:item.level_up_count??null,name:p_draft.name,description:p_draft.description,effect_description:p_draft.effect_description,base_options:structuredClone(p_draft.base_options),requirements:structuredClone(p_draft.requirements),required_level:p_draft.requirements.level??null,gender_restriction:p_draft.requirements.GENDER??null,updated_at:iso()});
     const stats=rowsOf("catalog_item_stats");tables().catalog_item_stats=stats.filter(x=>x.item_id!==p_id).concat(Object.entries(item.base_options).map(([stat_key,base_value])=>{
       const previous=stats.find(x=>x.item_id===p_id&&x.stat_key===stat_key);return {item_id:p_id,stat_key,base_value,minimum_value:p_ranges!=null?p_ranges[stat_key]?.min??null:old[stat_key]===base_value?previous?.minimum_value??null:null,maximum_value:p_ranges!=null?p_ranges[stat_key]?.max??null:old[stat_key]===base_value?previous?.maximum_value??null:null};
     }));

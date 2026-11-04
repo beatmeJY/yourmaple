@@ -46,3 +46,9 @@ const {itemEditForm}=await import('../js/catalog-item-editor.js');
 const editForm=itemEditForm({name:'<장비>',description:'</textarea><script>bad</script>',base_options:{attack:0},requirements:{fame:0}});
 assert(!editForm.includes('<script>'));assert(editForm.includes('&lt;/textarea&gt;'));assert(editForm.includes('value="0"'));assert(!editForm.includes('name="review_note"'));
 console.log('상세 수정폼 HTML 이스케이프·0 보존·비공개 메모 입력 제외 통과');
+
+const growthCard=equipmentCard({item:{name:'성장장비',category:'장비',level_up_count:3,attack_speed_label:'빠름'},stats:[{stat_key:'hp',base_value:100},{stat_key:'hp_percent',base_value:5,minimum_value:3,maximum_value:7},{stat_key:'mp_percent',base_value:10}]});
+assert(growthCard.includes('레벨업 가능 횟수'));assert(growthCard.includes('3회'));assert(growthCard.includes('+100'));assert(growthCard.includes('+5%'));assert(growthCard.includes('3% ~ 7%'));assert(growthCard.includes('+10%'));assert(growthCard.includes('빠름'));assert(!growthCard.includes('빠름 ('));
+assert(equipmentCard({item:{name:'성장불가',category:'장비',level_up_count:0}}).includes('0회'));
+assert(!equipmentCard({item:{name:'미확인',category:'장비'}}).includes('레벨업 가능 횟수'));
+console.log('장비 성장0/미제공 구분·HP 고정/퍼센트 분리·퍼센트 범위·등급공속 숫자추정없음 통과');

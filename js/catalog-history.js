@@ -14,6 +14,7 @@ function value(v, field) {
 }
 // 수집 경로는 화면에 보여주지 않습니다.
 Object.assign(labels, { mp:"MP",physical_attack:"물리 공격력",magic_attack:"마법 공격력",physical_defense:"물리 방어력",magic_defense:"마법 방어력",movement_speed:"이동속도",knockback_damage:"넉백 기준 피해량",meso_value:"메소",accuracy_reference_level:"명중 기준 레벨" });
+labels.level_up_count="레벨업 가능 횟수";
 const hiddenFields = new Set(["source_url","source","source_hash","response_sha256"]);
 function fields(changes) {
   const result = [];

@@ -54,3 +54,5 @@
 - 2026-11-04 (Codex) 아이템 상세 수정 `catalog_item_edit_detail/save`(`sql/059`) → Spring 관리자 조회/수정 API. Google 운영자 검증·행 버전 충돌(409)·공개 도감/정규화/이력/검토 버전 무효화 한 트랜잭션·UUID/관계 보존·비공개 검토 초안 보존을 유지합니다. 호출 `js/catalog-item-editor.js`, 공개 설명 렌더 `js/catalog-equipment.js`. [실측]
 
 - 2026-11-04 (Codex) 상세 옵션 범위 최신 정의 `sql/060`의 `catalog_item_edit_detail/save`: 범위 전체 전달·최소/기본/최대 검증·빈 범위 제거·0 보존·범위만 수정도 이력 기록. Spring 이전 시 p_ranges 미전달 구 화면 호환과 범위 지원 버전 확인도 유지합니다. [실측]
+
+- 2026-11-04 (Codex) 장비 성장/증가율/공속: 최신 상세 수정 RPC는 SQL062(061 포함), 검토 공개는 SQL062의 catalog_review_save, private valid_draft/effects_with_speed·공격속도 정규화 트리거도 이전 대상입니다. 성장 횟수 NULL/0·고정/퍼센트 분리·숫자 없는 공속은 등급만·구 화면 데이터 손실 방지·검토 보완/공개 교정 이력을 유지합니다. 이력 함수 최신 SQL061은 새 성장 컬럼을 포함합니다. [실측]

@@ -8,6 +8,8 @@ export const itemOptionFields = [
   {"key": "luk", "label": "LUK"},
   {"key": "hp", "label": "HP"},
   {"key": "mp", "label": "MP"},
+  {"key": "hp_percent", "label": "HP 증가율 (%)", "unit": "%"},
+  {"key": "mp_percent", "label": "MP 증가율 (%)", "unit": "%"},
   {"key": "defense", "label": "물리 방어"},
   {"key": "magic_defense", "label": "마법 방어"},
   {"key": "accuracy", "label": "명중"},
