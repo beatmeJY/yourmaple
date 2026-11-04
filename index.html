@@ -37,7 +37,20 @@
     <link rel="stylesheet" href="./css/catalog-review.css" />
   </head>
   <body>
-    <div id="app"></div>
+    <!-- 앱이 뜨기 전 기본 화면. JavaScript 없이 읽는 검색·심사 도구도 서비스 이름·설명·정책 링크를 볼 수 있게 둔다(main.js 가 바로 바꿔 그린다). -->
+    <div id="app">
+      <section class="boot-intro">
+        <img src="./apple-touch-icon.png" width="64" height="64" alt="" />
+        <h1>Your Maple</h1>
+        <p>메이플스토리 캐릭터와 숙제를 관리하고, 무릉도장·메이커 계산과 거래 기록을 한곳에서 확인하는 이용자 도구입니다.</p>
+        <noscript><p>Your Maple은 JavaScript를 켜야 사용할 수 있어요.</p></noscript>
+        <nav aria-label="정책">
+          <a href="./privacy.html">개인정보 처리방침</a>
+          <a href="./terms.html">이용약관</a>
+          <a href="mailto:yourmaplekr@gmail.com">문의</a>
+        </nav>
+      </section>
+    </div>
     <script type="module" src="./js/main.js"></script>
   </body>
 </html>

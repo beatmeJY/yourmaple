@@ -66,6 +66,12 @@
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
 
+- 2026-11-04 (Claude) 정책 링크 보강(사용자 요청, Google 브랜딩 심사 대비): `index.html` #app 안에 앱 뜨기 전 기본 소개(Your Maple·설명·개인정보 처리방침·이용약관·문의, JavaScript 없이도 보임, main.js가 바로 바꿔 그림), 앱 틀 공통 바닥글 `.site-foot`(모든 화면 본문 아래, 로그인 여부 무관, `.content` 세로 flex로 짧은 화면은 맨 아래). ?mock·guest PC·모바일 375 홈·메모·무릉·메이커·거래·도감·사냥 바닥글 1개·넘침/콘솔 오류 없음, 원본 HTML에 h1·링크 3개, stamp_version 복사본 실행 정상 [실측]
+
+- 2026-11-04 (Claude) 사용자 결정으로 Google 로그인을 예전 방식(signInWithOAuth 같은 탭 이동)으로 되돌림: GitHub Variable GOOGLE_CLIENT_ID 삭제 후 Pages 수동 재배포(cde889a, 성공). 공개 config에 Client ID 없음·공식 버튼/GSI 스크립트 미로딩·예전 Google·Discord 버튼 보임·콘솔 오류 없음 [실측]. 공식 버튼 코드는 남겨 둠(Variable 다시 넣으면 켜짐). Google 화면 브랜딩은 사용자가 Google 콘솔 브랜딩 인증 진행 예정 [진술]
+
+- 2026-11-04 (Claude) 검토 보관함 공속 버튼 cde889a 배포(첫 push GitHub 500 → 재시도 성공, Pages 성공·공개 v=cde889a). 사용자가 Google 콘솔·GOOGLE_CLIENT_ID 설정 [진술] → 공개 config에 Client ID 반영, 공개 홈·로그인 화면 공식 Google 버튼(폭 370=Discord)·예전 버튼 숨김·origin 오류 없음 [실측]. 로그인 화면 이동 때 GSI "initialize() 여러 번" 경고 1건(화면마다 새 nonce로 다시 초기화, 마지막 것만 쓰여 동작 영향 없음 [추정]). 실제 Google 로그인 왕복은 사용자 확인 필요
+
 - 2026-11-04 (Claude) 검토 보관함 공격속도도 버튼으로(사용자 요청): 아이템 수정창과 같은 `js/attack-speed.js` 고르기, "이쪽 수치 사용"은 `setSpeedValue`로 버튼 표시까지 바꿈. ?mock=reviewer 처음 보통·B 사용 빠름·숫자 5 → 5 (빠름)·A 사용 보통·매우 느림 9 → 초안 저장 값 9 (매우 느림), PC 1024·모바일 375 넘침/콘솔 오류 없음, 아이템 수정창 회귀(4 (빠름)·미저장 경고) 확인 [실측]. 미커밋·미배포
 
 - 2026-11-04 (Claude) 수정창 공속·착용 직업 버튼과 거래 합치기 기준 변경 4fc23d6 배포(Pages 성공·공개 v=4fc23d6, 공개 수정창 JS에 새 고르기 코드·job-picker.js 200, 공개 아이템 도감 3567개 목록·콘솔 오류 없음) [실측]. 수정창은 개발자 로그인 화면이라 공개 사이트 동작은 미확인. Codex 미커밋 기록 줄은 커밋에서 뺌

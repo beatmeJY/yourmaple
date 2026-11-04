@@ -102,6 +102,15 @@ export function renderShell() {
           </div>
         </header>
         <main id="main" class="main"></main>
+        <footer class="site-foot">
+          <span class="site-foot-brand">Your Maple</span>
+          <nav aria-label="정책">
+            <a href="./privacy.html">개인정보 처리방침</a>
+            <a href="./terms.html">이용약관</a>
+            <a href="mailto:yourmaplekr@gmail.com">문의</a>
+          </nav>
+          <p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p>
+        </footer>
       </div>
       <div class="link-panel" data-link-panel>
         <div class="link-panel-backdrop" data-link-panel-close></div>
