@@ -46,3 +46,7 @@
 - 검사: `supabase/functions/purge-account-deletions/purge.check.mjs`, `js/search-match.check.mjs`, 비공개 `catalog-tools/tools/source-scrub-db.check.mjs`(049~055 실데이터 검증)를 스프링 테스트로 옮긴다.
 - 정책 문서: 처리 위탁·국외 이전 표에 스프링 서버 호스팅 업체를 추가하고(`privacy.html` 03절), 삭제 주체가 바뀌면 05절 문구를 맞춘다.
 - 화면 호출 주소: `rpc(...)`·`from(...)` 직접 호출을 스프링 API로 바꾸는 곳은 `js/account.js`, `js/pages/trades.js`, `js/monster-import.js`, `js/catalog-api.js`.
+
+- 2026-11-01 (Codex) 검토 완료 즉시 공개: `catalog_review_save` 최신 정의 `sql/058` → Spring 관리자 발행 API에서 검토 revision 확인·공용 아이템 upsert·정규화/공개 이력·비공개 감사 이력을 한 트랜잭션으로 이전합니다. `p_publish=false` 초안/구 화면 호환·권한·재시도 멱등성·실패 전체 롤백을 유지합니다. 위 057의 별도 공개 승인 설명은 이 사용자 결정으로 대체합니다. [진술·실측]
+
+- 2026-11-01 (Codex) 검토 목록 삭제/복구: `catalog_review_set_deleted`(`sql/058`) → 관리자 API에서 소프트 삭제·revision·비공개 감사 이력으로 이전, 공개 도감은 삭제하지 않습니다. [실측]

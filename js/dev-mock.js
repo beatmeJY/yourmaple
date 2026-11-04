@@ -380,9 +380,9 @@ function mockReviewRows() {
   if (!db.catalog_review_items) {
     const draft = {name:"연습용 아이템",description:"보완할 설명입니다.",effect_description:"HP를 50 회복합니다.",base_options:{attack:5,remaining_upgrades:7},requirements:{level:10,fame:0},review_note:""};
     db.catalog_review_items = [
-      {source_id:"1000001",category:"장비",review_kind:"different",image_url:null,status:"draft",revision:1,comparison:{differences:[{field:"공격력",api:5,reference:7}],unknown:[]},proposals:{api:{description:"자료 A의 설명입니다.",base_options:{attack:5},requirements:{level:10}},comparison:{description:"자료 B의 설명입니다.",base_options:{attack:7},requirements:{level:10}}},draft:{...draft}},
-      {source_id:"2000001",category:"소비",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 설명 검토 필요"]},proposals:{api:{description:"HP를 50 회복합니다.",base_options:{},requirements:{}},comparison:{description:"HP를 100 회복합니다.",base_options:{},requirements:{}}},draft:{...draft,name:"연습용 포션"}},
-      {source_id:"4000001",category:"기타",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 미제공"]},proposals:{},draft:{...draft,name:"연습용 재료"}},
+      {source_id:"1000001",category:"장비",review_kind:"different",image_url:null,status:"draft",revision:1,comparison:{differences:[{field:"공격력",api:5,reference:7}],unknown:[]},proposals:{api:{description:"",base_options:{attack:5},requirements:{level:10}},comparison:{description:"",base_options:{attack:7},requirements:{level:10}}},draft:{...draft,description:"",effect_description:""}},
+      {source_id:"2000001",category:"소비",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 설명 검토 필요"]},proposals:{api:{description:"HP를 50 회복합니다.",base_options:{},requirements:{}},comparison:{description:"HP를 100 회복합니다.",base_options:{},requirements:{}}},draft:{...draft,name:"연습용 포션",base_options:{},requirements:{}}},
+      {source_id:"4000001",category:"기타",review_kind:"unverified",image_url:null,status:"draft",revision:1,comparison:{differences:[],unknown:["효과 미제공"]},proposals:{},draft:{...draft,name:"연습용 재료",description:"",effect_description:"",base_options:{},requirements:{}}},
     ];
     save();
   }
@@ -393,14 +393,31 @@ function assertMockReviewer() { if (!reviewAllowed()) throw Object.assign(new Er
 const RPCS = {
   can_review_catalog() { return reviewAllowed(); },
   catalog_review_list({p_query="",p_kind="",p_status="",p_page=0}={}) {
-    assertMockReviewer();const all=mockReviewRows();const rows=all.filter(x=>(!p_query||x.draft.name.includes(p_query)||x.source_id===p_query)&&(!p_kind||x.review_kind===p_kind)&&(!p_status||x.status===p_status));
-    return {total:rows.length,counts:{all:all.length,ready:all.filter(x=>x.status==="ready").length},rows:rows.slice(p_page*24,p_page*24+24).map(x=>({...x,name:x.draft.name}))};
+    assertMockReviewer();const all=mockReviewRows();const rows=all.filter(x=>(!p_query||x.draft.name.includes(p_query)||x.source_id===p_query)&&(!p_kind||x.review_kind===p_kind)&&(p_status==="deleted"?!!x.deleted_at:!x.deleted_at&&(!p_status||x.status===p_status)));
+    return {total:rows.length,counts:{all:all.filter(x=>!x.deleted_at).length,deleted:all.filter(x=>x.deleted_at).length,published:all.filter(x=>!x.deleted_at&&x.published_item_id).length,ready:all.filter(x=>!x.deleted_at&&x.status==="ready").length},rows:rows.slice(p_page*24,p_page*24+24).map(x=>({...x,name:x.draft.name}))};
   },
-  catalog_review_detail({p_id}) { assertMockReviewer();return structuredClone(mockReviewRows().find(x=>x.source_id===p_id)||null); },
-  catalog_review_save({p_id,p_revision,p_draft,p_status}) {
+  catalog_review_set_deleted({p_id,p_revision,p_deleted}) {
     assertMockReviewer();const row=mockReviewRows().find(x=>x.source_id===p_id);if(!row)throw new Error("검토 항목이 없습니다");
     if(row.revision!==p_revision)throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
-    row.draft=structuredClone(p_draft);row.status=p_status;row.revision++;row.updated_at=iso();save();return structuredClone(row);
+    if(!!row.deleted_at===p_deleted)return structuredClone(row);
+    if(row.published_revision===row.revision)row.published_revision=row.revision+1;
+    row.deleted_at=p_deleted?iso():null;row.revision++;row.updated_at=iso();save();return structuredClone(row);
+  },
+  catalog_review_detail({p_id}) { assertMockReviewer();return structuredClone(mockReviewRows().find(x=>x.source_id===p_id)||null); },
+  catalog_review_save({p_id,p_revision,p_draft,p_status,p_publish=false}) {
+    assertMockReviewer();const row=mockReviewRows().find(x=>x.source_id===p_id);if(!row)throw new Error("검토 항목이 없습니다");
+    if(row.deleted_at)throw new Error("삭제한 검토 항목입니다. 먼저 복구해 주세요");
+    if(row.revision!==p_revision)throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
+    if (p_publish && p_status!=="ready") throw new Error("공개 상태를 확인해 주세요");
+    if (JSON.stringify(row.draft)===JSON.stringify(p_draft) && row.status===p_status && (!p_publish || row.published_revision===row.revision)) return structuredClone(row);
+    row.draft=structuredClone(p_draft);row.status=p_status;row.revision++;row.updated_at=iso();
+    if (p_publish) {
+      const items=rowsOf("catalog_items"),existing=items.find(x=>x.source_id===p_id);
+      const published={...existing,id:existing?.id||crypto.randomUUID(),source:"collected",source_id:p_id,name:p_draft.name,category:row.category,image_url:row.image_url,base_options:structuredClone(p_draft.base_options),requirements:structuredClone(p_draft.requirements),description:p_draft.description,effect_description:p_draft.effect_description,required_level:p_draft.requirements.level??null};
+      if(existing)Object.assign(existing,published);else items.push(published);
+      row.published_item_id=published.id;row.published_revision=row.revision;
+    }
+    save();return structuredClone(row);
   },
   catalog_search_items({p_query="",p_page=0}={}) {
     // sql/054 와 같은 규칙: 이름 그대로 → 글자 순서만 맞음 → 분류·외부 ID, 같은 순위는 짧은 이름 먼저

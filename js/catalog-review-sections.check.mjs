@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import {reviewSections} from "./catalog-review-sections.js";
+const item = (a={},b={},draft={},unknown=[]) => ({proposals:{api:a,comparison:b},draft,comparison:{unknown}});
+let r=reviewSections(item());assert(r.skipDescription&&r.skipStats&&!r.openDescription&&!r.openStats);
+r=reviewSections(item({description:" \n"},{description:"\t"}));assert(r.skipDescription);
+r=reviewSections(item({description:"설명"},{}));assert(!r.skipDescription);
+r=reviewSections(item({}, {effect_description:"효과"}));assert(!r.skipDescription);
+r=reviewSections(item({base_options:{attack:0}},{}));assert(!r.skipStats);
+r=reviewSections(item({}, {base_options:{attack:7}}));assert(!r.skipStats);
+r=reviewSections(item({}, {}, {description:"직접 쓴 설명",base_options:{attack:3}}));assert(r.skipDescription&&r.skipStats&&r.openDescription&&r.openStats);
+r=reviewSections(item({}, {}, {}, ["양쪽 효과 설명이 없어 옵션 비교 불가","공격력 API 미제공","API 상세 정보 미제공"]));assert.deepEqual(r.unknown,["공격력 API 미제공","API 상세 정보 미제공"]);
+r=reviewSections(item({description:"설명"},{}, {}, ["양쪽 효과 설명이 없어 옵션 비교 불가"]));assert.equal(r.unknown.length,1);
+console.log("검토 항목 생략 검사 9개 통과");
