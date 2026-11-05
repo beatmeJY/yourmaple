@@ -5,7 +5,6 @@ import { burstAt, sfx } from "../effects.js";
 import {
   BANDS,
   BELTS,
-  DAILY_CAP,
   GOAL_SCORE,
   SAVE_FLOORS,
   SAVE_SECONDS,
@@ -13,8 +12,6 @@ import {
   bandBosses,
   bandPoints,
   beltById,
-  calendarDays,
-  playSeconds,
   chainPoints,
   chainText,
   compareRoutes,
@@ -198,8 +195,8 @@ export async function render(root) {
           </div>
           <div class="dj-stats">
             <div class="dj-stat"><span>검은색 허리띠까지</span><strong data-stat-need>-</strong></div>
-            <div class="dj-stat"><span>하루 ${formatCount(DAILY_CAP)}점 제한</span><strong data-stat-days>-</strong></div>
-            <div class="dj-stat is-gold"><span data-stat-play-label>추천 루트 플레이</span><strong data-stat-play>-</strong></div>
+            <div class="dj-stat is-gold"><span data-stat-play-label>총 시간 · 0 → ${formatCount(GOAL_SCORE)}점</span><strong data-stat-play>-</strong></div>
+            <div class="dj-stat is-gold"><span data-stat-hour-label>시간당 예상 메소</span><strong data-stat-hour>-</strong></div>
           </div>
         </div>
         <div class="dj-gauge" data-gauge>
@@ -427,19 +424,10 @@ export async function render(root) {
   function paintCharacters() {
     const select = form.elements.character_id;
     const current = form.dataset.openCharacter || select.value;
-    const groups = accounts
-      .map((account) => {
-        const members = characters.filter((character) => character.account_id === account.id).sort(compareCharacter);
-        if (!members.length) return "";
-        return `<optgroup label="${escapeHtml(account.name)}">${members.map(characterOption).join("")}</optgroup>`;
-      })
-      .filter(Boolean);
-    const known = new Set(accounts.map((account) => account.id));
-    const loose = characters.filter((character) => !known.has(character.account_id)).sort(compareCharacter);
-    if (loose.length) groups.push(`<optgroup label="계정 없음">${loose.map(characterOption).join("")}</optgroup>`);
+    const options = [...characters].sort(compareCharacter).map(characterOption);
     // 로그인했으면 맨 아래에 "이름만으로 새 캐릭터"(캐릭터가 없을 때 적던 기록을 바로 저장할 수 있게)
     const quick = isLoggedIn() ? [`<option value="${QUICK_OPTION}">＋ 새 캐릭터 (이름만)</option>`] : [];
-    select.innerHTML = [`<option value="">캐릭터 선택</option>`, ...groups, ...quick].join("");
+    select.innerHTML = [`<option value="">캐릭터 선택</option>`, ...options, ...quick].join("");
     if (current && characters.some((character) => character.id === current)) select.value = current;
     paintCharChips();
   }
@@ -456,13 +444,13 @@ export async function render(root) {
     const party = form.elements.party.value || "solo";
     // 기록이 있는 캐릭터와 지금 고른 캐릭터만 칩으로. 나머지는 "＋ 새 캐릭터"에서 고른다.
     const shown = characters.filter((character) => character.id === current || recordRows.some((row) => row.character_id === character.id));
-    box.innerHTML = charGroupsHtml(shown, current, party) || `<span class="dj-charbar-note">아직 기록한 캐릭터가 없어요. ＋ 새 캐릭터에서 골라 시작해요.</span>`;
+    box.innerHTML = characterChipsHtml(shown, current, party) || `<span class="dj-charbar-note">아직 기록한 캐릭터가 없어요. ＋ 새 캐릭터에서 골라 시작해요.</span>`;
     box.insertAdjacentHTML("beforeend", `<button type="button" class="dj-char is-new" data-char-new aria-expanded="${!quickBox.hidden}">＋ 새 캐릭터</button>`);
     if (!quickBox.hidden) paintQuickList();
   }
 
-  // 캐릭터 칩 묶음(계정별). 칩 줄과 "새 캐릭터" 칸이 같이 쓴다.
-  function charGroupsHtml(list, current, party) {
+  // 계정 구분 없이 캐릭터만 보여준다. 칩 줄과 "새 캐릭터" 칸이 같이 쓴다.
+  function characterChipsHtml(list, current, party) {
     const chip = (character) => {
       const on = character.id === current;
       const sheet = sheetFor(character.id, party) ?? sheetFor(character.id, party === "team" ? "solo" : "team");
@@ -473,16 +461,7 @@ export async function render(root) {
         <span class="dj-char-copy"><strong>${escapeHtml(character.name)}</strong><small>${escapeHtml(meta)}</small></span>
       </button>`;
     };
-    const known = new Set(accounts.map((account) => account.id));
-    const groups = accounts
-      .map((account) => ({ name: account.name, members: list.filter((character) => character.account_id === account.id).sort(compareCharacter) }))
-      .filter((group) => group.members.length);
-    const loose = list.filter((character) => !known.has(character.account_id)).sort(compareCharacter);
-    if (loose.length) groups.push({ name: "계정 없음", members: loose });
-    const many = groups.length > 1;
-    return groups
-      .map((group) => `<span class="dj-char-group">${many ? `<small class="dj-char-account">${escapeHtml(group.name)}</small>` : ""}${group.members.map(chip).join("")}</span>`)
-      .join("");
+    return [...list].sort(compareCharacter).map(chip).join("");
   }
 
   // "＋ 새 캐릭터" 칸: 아직 무릉 기록이 없는 등록 캐릭터. 고르면 그 캐릭터로 새 기록을 시작한다.
@@ -492,7 +471,7 @@ export async function render(root) {
     const current = form.dataset.openCharacter || form.elements.character_id.value;
     const fresh = characters.filter((character) => character.id !== current && !recordRows.some((row) => row.character_id === character.id));
     box.innerHTML = fresh.length
-      ? `<span class="dj-quick-char-title">등록된 캐릭터에서 고르기</span><div class="dj-charbar-list">${charGroupsHtml(fresh, current, form.elements.party.value || "solo")}</div><span class="dj-quick-char-title">또는 새로 등록</span>`
+      ? `<span class="dj-quick-char-title">등록된 캐릭터에서 고르기</span><div class="dj-charbar-list">${characterChipsHtml(fresh, current, form.elements.party.value || "solo")}</div><span class="dj-quick-char-title">또는 새로 등록</span>`
       : "";
   }
 
@@ -1158,10 +1137,12 @@ export async function render(root) {
       if (node) node.textContent = text;
     };
     set("[data-stat-need]", need ? `${formatCount(need)}점` : "달성");
-    set("[data-stat-days]", need ? `최소 ${formatCount(calendarDays(need))}일` : "-");
     const route = shownEntry?.route;
-    set("[data-stat-play-label]", shownEntry?.mode === "actual" ? "실제 1위 루트 남은 플레이" : "추천 루트 남은 플레이");
-    set("[data-stat-play]", route && need ? formatDuration(playSeconds({ points: route.points, seconds: shownEntry.seconds }, need)) : need ? "-" : "달성");
+    const basis = shownEntry?.mode === "actual" ? "실제 1위" : "참고 1위";
+    set("[data-stat-play-label]", `총 시간 · 0 → ${formatCount(GOAL_SCORE)}점 (${basis})`);
+    set("[data-stat-play]", beltText(route, shownEntry?.seconds, 0));
+    set("[data-stat-hour-label]", `시간당 예상 메소 · ${basis}`);
+    set("[data-stat-hour]", hourText(route, shownEntry?.seconds));
     const fill = root.querySelector("[data-gauge-fill]");
     const width = `${Math.min(100, (score / GOAL_SCORE) * 100)}%`;
     // 처음 그릴 때는 0에서 차오르게 한 프레임 늦게 넣는다.
@@ -1447,6 +1428,8 @@ export async function render(root) {
     const quote = quoteBlackBelt(priceMap(), shownEntry?.route, shownEntry?.seconds);
     sum.textContent = quote.total == null ? `시세 ${formatCount(BELTS.length - quote.missing.length)}/${formatCount(BELTS.length)} 입력` : `${formatCount(quote.total)} 메소`;
     hour.textContent = quote.hour != null ? `${formatCount(quote.hour)} 메소` : "-";
+    const summaryHour = root.querySelector("[data-stat-hour]");
+    if (summaryHour) summaryHour.textContent = hourText(shownEntry?.route, shownEntry?.seconds);
   }
 
   // 처음 열 때 고를 캐릭터: 실제 1위 루트가 빠른 기록 순(예전 캐릭터별 기록 카드 순서)
