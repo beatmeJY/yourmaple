@@ -959,7 +959,11 @@ export async function render(root) {
         <span class="dj-card-rate"><b data-live="pm">${seconds != null ? `분당 ${escapeHtml(formatPerMinute(route.points, seconds))}` : "분당 -"}</b><small>초당 <span data-live="ps">${escapeHtml(seconds != null ? formatPointsPerSecond(route.points, seconds) : "-")}</span> · 점수당 <span data-live="spp">${escapeHtml(seconds != null ? formatSecondsPerPoint(route.points, seconds) : "-")}</span></small></span>
       </div>
       <div class="dj-best-edit-foot">
-        <span><small data-live="basis">${escapeHtml(basis)}</small> · 검은 허리띠까지 <b data-live="belt">${escapeHtml(beltText(route, seconds, score))}</b></span>
+        <div class="dj-belt-times">
+          <small data-live="basis">${escapeHtml(basis)}</small>
+          <span class="dj-belt-total">검은 허리띠 총 시간 <b data-live="belt-total">${escapeHtml(beltText(route, seconds, 0))}</b><small>0 → ${escapeHtml(formatCount(GOAL_SCORE))}점</small></span>
+          <span class="dj-belt-remaining">현재 ${escapeHtml(formatCount(score))}점에서 남은 시간 <b data-live="belt">${escapeHtml(beltText(route, seconds, score))}</b></span>
+        </div>
         <span>시간당 <b data-live="hour">${escapeHtml(hourText(route, seconds))}</b> 메소</span>
         <span class="dj-best-edit-btns">
           <button type="button" class="dj-best-redo" data-pick-chain="${escapeHtml(key)}">${has ? "다시 재기" : "이 루트 재기"} ↓</button>
@@ -1017,6 +1021,7 @@ export async function render(root) {
       set("pm", available ? `분당 ${formatPerMinute(route.points, displaySeconds)}` : "분당 -");
       set("ps", available ? formatPointsPerSecond(route.points, displaySeconds) : "-");
       set("spp", available ? formatSecondsPerPoint(route.points, displaySeconds) : "-");
+      set("belt-total", available ? beltText(route, displaySeconds, 0) : "-");
       set("belt", available ? beltText(route, displaySeconds, score.error ? 0 : score.score) : "-");
       set("hour", available ? hourText(route, displaySeconds) : "-");
       set("pm-short", has ? formatPerMinute(route.points, seconds).replace("점", "") : route?.runs ? formatPerMinute(route.points, route.seconds).replace("점", "") : "-");
@@ -1155,7 +1160,7 @@ export async function render(root) {
     set("[data-stat-need]", need ? `${formatCount(need)}점` : "달성");
     set("[data-stat-days]", need ? `최소 ${formatCount(calendarDays(need))}일` : "-");
     const route = shownEntry?.route;
-    set("[data-stat-play-label]", shownEntry?.mode === "actual" ? "실제 1위 루트 플레이" : "추천 루트 플레이");
+    set("[data-stat-play-label]", shownEntry?.mode === "actual" ? "실제 1위 루트 남은 플레이" : "추천 루트 남은 플레이");
     set("[data-stat-play]", route && need ? formatDuration(playSeconds({ points: route.points, seconds: shownEntry.seconds }, need)) : need ? "-" : "달성");
     const fill = root.querySelector("[data-gauge-fill]");
     const width = `${Math.min(100, (score / GOAL_SCORE) * 100)}%`;

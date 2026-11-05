@@ -15381,6 +15381,12 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .dj-best-edit-label { color: var(--dj-red); font-size: 13px; font-weight: 800; }
 .dj-best-edit-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; color: #5a4128; font-size: 12px; }
 .dj-best-edit-foot b { color: var(--dj-ink); }
+.dj-belt-times { display: grid; gap: 5px; flex: 1 1 240px; min-width: 0; }
+.dj-belt-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--dj-ink); font-size: 14px; font-weight: 700; }
+.dj-belt-total b { font-size: 19px; font-variant-numeric: tabular-nums; }
+.dj-belt-total small { font-size: 11px; font-weight: 400; }
+.dj-belt-remaining { font-size: 12px; }
+
 .dj-best-edit-btns { display: flex; gap: 6px; margin-left: auto; }
 .dj-best-redo { height: 28px; padding: 0 12px; border: 1px solid rgba(122, 29, 18, 0.4); border-radius: var(--radius-pill); background: #fffaf0; color: var(--dj-red); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; transition: background-color 0.2s, transform 0.25s var(--spring); }
 .dj-best-redo:hover { background: rgba(122, 29, 18, 0.08); }
