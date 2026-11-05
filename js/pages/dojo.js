@@ -13,6 +13,7 @@ import {
   bandPoints,
   beltById,
   chainPoints,
+  routeShape,
   chainText,
   compareRoutes,
   compareSaves,
@@ -576,7 +577,7 @@ export async function render(root) {
     if (current.error) return null;
     const row = compareSaves(current.times, current.party).rows.find((item) => chainKey(item.saves) === key);
     if (!row) return null;
-    return row.best ?? { points: chainPoints(current.party, row.saves) };
+    return row.best ?? routeShape(current.party, row.saves);
   }
 
   function hourText(route, seconds) {
@@ -960,9 +961,8 @@ export async function render(root) {
       box.innerHTML = "";
       return;
     }
-    const byRef = ranked.filter((item) => item.row.best);
     const rows = showAllRoutes
-      ? [...byRef, ...ranked.filter((item) => !item.row.best)].map((item) => {
+      ? ranked.map((item) => {
           const key = chainKey(item.row.saves);
           const label = chainText(item.row.saves);
           const seconds = item.actual ?? item.row.best?.seconds ?? null;
@@ -1030,7 +1030,8 @@ export async function render(root) {
   // 회차마다 한 줄: 그 회차가 다시 시작하는 라운드부터 27라운드까지 칸을 켠다(시안의 1회차·2회차).
   function runRows(route) {
     const last = BANDS.at(-1).end;
-    const runs = route?.runs?.length ? route.runs : [{ start: 1, end: last }];
+    // 구간 초 없이 실제 기록만 있는 루트는 저장 조합으로 회차 모양만 그린다(laps).
+    const runs = route?.runs?.length ? route.runs : route?.laps?.length ? route.laps : [{ start: 1, end: last }];
     return `<div class="dj-runs-grid" data-tip-host>${runs
       .map((run, runIndex) => {
         const cells = Array.from({ length: last }, (_, index) => {
@@ -1070,7 +1071,7 @@ export async function render(root) {
     if (refNote) refNote.hidden = tab !== "recommend";
     if (sub) sub.textContent = tab === "actual" ? "직접 잰 루트가 먼저, 분당 점수가 높은 순" : "구간 초로 계산한 참고 시간 기준, 분당 점수가 높은 순";
     if (!hasRoute) {
-      box.innerHTML = `<p class="dj-best-empty">구간 초를 모두 입력하면 1위 루트가 여기에 적힙니다.</p>`;
+      box.innerHTML = `<p class="dj-best-empty">구간 초를 모두 입력하거나 루트 실제 시간을 적으면 1위 루트가 여기에 적힙니다.</p>`;
       return;
     }
     const name = route.saves?.length ? chainText(route.saves) : "저장 안 함";
@@ -1099,8 +1100,9 @@ export async function render(root) {
     const box = root.querySelector("[data-route-list]");
     if (!box) return;
     // 추천 동선 기준이면 실제 시간이 있어도 참고 시간으로 줄 세운다.
+    // 실제 기록 기준이면 구간 초가 없어 참고 시간이 없는 루트도 실제 시간이 있으면 올린다.
     const all = ranked
-      .filter((item) => item.row.best)
+      .filter((item) => item.row.best || (mode === "actual" && item.actual != null))
       .map((item) => {
         const actual = mode === "actual" ? item.actual : null;
         const seconds = actual ?? item.row.best.seconds;
@@ -1122,7 +1124,7 @@ export async function render(root) {
       const index = filled.length + offset;
       return `<div class="dj-route is-empty" aria-hidden="true" style="--i:${index}">
           <span class="dj-route-rank">${String(all.length + offset + 1).padStart(2, "0")}</span>
-          <span class="dj-route-copy"><strong>—</strong><span>구간 초를 입력하면 채워집니다</span></span>
+          <span class="dj-route-copy"><strong>—</strong><span>구간 초나 실제 시간을 적으면 채워집니다</span></span>
           <span class="dj-route-rate"><b>분당 -</b><span class="dj-route-bar"></span></span>
         </div>`;
     });
@@ -1243,29 +1245,30 @@ export async function render(root) {
     paintPlaque(current.score);
     paintBeltSum();
 
+    // 실제 시간이 있는 루트(구간 초가 없어도) → 참고 시간만 있는 루트 → 둘 다 없는 루트 순.
     const ranked = compared.rows
-      .map((row) => ({
-        row,
-        points: row.best ? row.best.points : chainPoints(party, row.saves),
-        actual: draftRuns.get(chainKey(row.saves)) ?? null,
-      }))
+      .map((row) => {
+        const route = row.best ?? routeShape(party, row.saves);
+        return { row, route, points: route.points, actual: draftRuns.get(chainKey(row.saves)) ?? null };
+      })
       .sort((left, right) => {
-        if (!left.row.best && !right.row.best) return left.row.saves.length - right.row.saves.length;
-        if (!left.row.best) return 1;
-        if (!right.row.best) return -1;
-        if ((left.actual == null) !== (right.actual == null)) return left.actual == null ? 1 : -1;
-        if (left.actual != null) {
+        const tier = (item) => (item.actual != null ? 0 : item.row.best ? 1 : 2);
+        if (tier(left) !== tier(right)) return tier(left) - tier(right);
+        if (tier(left) === 0) {
           return compareRoutes(
-            { points: left.row.best.points, seconds: left.actual, start: left.row.best.start },
-            { points: right.row.best.points, seconds: right.actual, start: right.row.best.start },
+            { points: left.route.points, seconds: left.actual, start: left.route.start },
+            { points: right.route.points, seconds: right.actual, start: right.route.start },
           );
         }
-        return compareRoutes(left.row.best, right.row.best);
+        if (tier(left) === 1) return compareRoutes(left.row.best, right.row.best);
+        return left.row.saves.length - right.row.saves.length;
       });
     // 순위표 기준: 실제 기록(잰 루트 먼저) 또는 추천 동선(참고 시간 순). 실제 기록이 없으면 추천 동선만.
     const mode = shown?.mode ?? "recommend";
     const withBest = ranked.filter((item) => item.row.best);
-    const order = mode === "recommend" ? [...withBest].sort((left, right) => compareRoutes(left.row.best, right.row.best)) : withBest;
+    const order = mode === "recommend"
+      ? [...withBest].sort((left, right) => compareRoutes(left.row.best, right.row.best))
+      : ranked.filter((item) => item.row.best || item.actual != null);
     defaultKey = order[0] ? chainKey(order[0].row.saves) : null;
     if (viewKey === defaultKey) viewKey = null;
     if (viewKey != null && !order.some((item) => chainKey(item.row.saves) === viewKey)) viewKey = null;
@@ -1273,7 +1276,7 @@ export async function render(root) {
     const topIndex = order.findIndex((item) => chainKey(item.row.saves) === topKey);
     const top = order[topIndex];
     const topActual = mode === "actual" ? top?.actual ?? null : null;
-    paintBest(top ? { mode: topActual != null ? "actual" : "recommend", route: top.row.best, seconds: topActual ?? top.row.best.seconds, score: current.score } : null,
+    paintBest(top ? { mode: topActual != null ? "actual" : "recommend", route: top.route, seconds: topActual ?? top.row.best.seconds, score: current.score } : null,
       { hasActual, hasRecommend, rank: topIndex + 1, picked: viewKey != null, view: mode });
     paintRouteList(order, topKey, mode);
     paintAllRoutes(ranked);
@@ -1287,7 +1290,7 @@ export async function render(root) {
       points: picked?.points ?? chainPoints(party, savesOf(clockTarget)),
       ref: picked?.row.best ? picked.row.best.seconds : null,
       actual: picked?.actual ?? null,
-      rank: picked?.row.best ? order.indexOf(picked) + 1 : 0,
+      rank: picked && order.includes(picked) ? order.indexOf(picked) + 1 : 0,
       listMode: mode,
     };
     plan.innerHTML = `<div class="dj-measure-body">${deskHtml(pick)}</div>`;

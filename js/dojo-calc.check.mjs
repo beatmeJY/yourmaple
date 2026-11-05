@@ -62,3 +62,19 @@ console.log("무릉 층별 보스 검증 통과");
   assert.equal(route([5, 10]).seconds, 720 + 660 + 580 + 10 * 2 + 10 * 2);
   console.log("무릉 쉼터 시간 검증 통과");
 }
+
+// 구간 초가 없어도 실제 기록만 있는 루트를 순위에 올린다(2026-11-05)
+{
+  const { routeShape, measuredRoutes, chainPoints, chainKey } = await import("./dojo-calc.js");
+  const shape = routeShape(false, [10]);
+  assert.equal(shape.points, chainPoints(false, [10]));
+  assert.equal(shape.laps.length, 2);
+  assert.equal(shape.laps[0].start, 1);
+  assert(shape.laps[1].start > 10);
+  assert.equal(shape.seconds, undefined);
+  const runs = new Map([[chainKey([10]), 600], [chainKey([]), 900]]);
+  const measured = measuredRoutes(new Map(), false, runs);
+  assert.equal(measured.rows.length, 2);
+  assert.equal(measured.compared.best, null);
+  assert(measured.best.route.laps);
+}

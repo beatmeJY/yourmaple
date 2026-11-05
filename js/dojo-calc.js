@@ -136,6 +136,17 @@ function chainRoute(times, party, saves) {
   };
 }
 
+// 구간 초가 없어도 저장 조합만으로 알 수 있는 모양(점수·회차 시작 라운드). 참고 시간(seconds·runs)은 없다.
+// 실제 기록만 있는 루트를 순위표에 올릴 때 쓴다(2026-11-05 사용자 요청).
+export function routeShape(party, saves) {
+  const laps = [{ start: 1, end: MAX_FLOOR }];
+  for (const saveFloor of saves ?? []) {
+    const start = bandStartAfter(saveFloor);
+    if (start != null) laps.push({ start, end: MAX_FLOOR });
+  }
+  return { saves: saves ?? [], saveFloor: saves?.at(-1) ?? null, start: laps[1]?.start ?? 1, end: MAX_FLOOR, points: chainPoints(party, saves), laps };
+}
+
 export function compareSaves(times, party) {
   const map = times instanceof Map ? times : parseFloors(times);
   const rows = saveChains().map((saves) => ({
@@ -342,7 +353,7 @@ export function measuredRoutes(times, party, runs) {
   const rows = compared.rows
     .filter((row) => map.has(chainKey(row.saves)))
     .map((row) => ({
-      route: row.best ?? { points: chainPoints(party, row.saves), saves: row.saves, start: row.start, end: MAX_FLOOR },
+      route: row.best ?? routeShape(party, row.saves),
       seconds: map.get(chainKey(row.saves)),
     }))
     .sort((left, right) =>
