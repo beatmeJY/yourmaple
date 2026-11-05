@@ -70,9 +70,11 @@ export function renderShell() {
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-panel">
         <div class="brand">
-          <img class="brand-logo" src="./apple-touch-icon.png" alt="" width="40" height="40" />
-          <strong>Your Maple</strong>
-          <span>메이플 도우미</span>
+          <a class="brand-home" href="#/dashboard" data-brand-home aria-label="Your Maple 홈으로">
+            <img class="brand-logo" src="./apple-touch-icon.png" alt="" width="40" height="40" />
+            <strong>Your Maple</strong>
+            <span>메이플 도우미</span>
+          </a>
           <button class="nav-toggle nav-close" type="button" data-close-nav aria-label="메뉴 닫기">${NAV_CHEVRON}</button>
         </div>
         <nav class="nav" id="nav" aria-label="주요 메뉴"></nav>

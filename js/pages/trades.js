@@ -11,6 +11,7 @@ import { matchesText } from "../filters.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 import { combineLots, isCompleteTrade, isPartialSell, tradeName } from "../trade-merge.js";
+import { exactLinks, linkedTrade, unlinkedNames } from "../trade-link.js";
 
 const columns = "id, name, buy_price, buy_qty, sell_price, sell_qty, created_at, updated_at, item_id, item_snapshot, item_options";
 
@@ -118,6 +119,7 @@ export async function render(root) {
         </form>
       </aside>
       </div>
+      <dialog class="tr2-link-dialog" data-link-dialog aria-labelledby="trade-link-title"></dialog>
     </div>
   `;
   mountCatalogImageFallback(root);
@@ -278,9 +280,13 @@ export async function render(root) {
     return tags.map((tag) => `<span class="tr2-tag">${escapeHtml(tag)}</span>`).join("");
   }
 
-  function chipHtml(chips, equipment) {
-    if (!chips.length) return equipment ? `<span class="tr2-chip is-empty">옵션 미기록</span>` : "";
-    return chips.map((chip) => `<span class="tr2-chip${chip.unique ? " is-unique" : ""}"${chip.unique ? ` title="이 묶음에서 거래마다 다른 옵션"` : ""}>${escapeHtml(chip.label)} <b>${chip.value === undefined ? "—" : escapeHtml(formatCount(chip.value))}</b></span>`).join("");
+  // 도감에 연결된 장비면 옵션 칩 끝에 "옵션 적기/고치기" 버튼을 둔다.
+  function chipHtml(chips, equipment, row) {
+    const edit = row?.item_id && equipment
+      ? `<button type="button" class="tr2-chip is-edit" data-option-open="${escapeHtml(row.id)}">${chips.length ? "✎ 옵션 고치기" : "＋ 옵션 적기"}</button>`
+      : "";
+    if (!chips.length) return edit || (equipment ? `<span class="tr2-chip is-empty">옵션 미기록</span>` : "");
+    return chips.map((chip) => `<span class="tr2-chip${chip.unique ? " is-unique" : ""}"${chip.unique ? ` title="이 묶음에서 거래마다 다른 옵션"` : ""}>${escapeHtml(chip.label)} <b>${chip.value === undefined ? "—" : escapeHtml(formatCount(chip.value))}</b></span>`).join("") + edit;
   }
 
   // 거래 한 건(=옵션이 같은 물건 묶음). 가격·개수는 그 자리에서 고친다.
@@ -295,14 +301,14 @@ export async function render(root) {
     const soldCost = row.buy_price * row.sell_qty;
     const profitRate = profit == null || soldCost === 0 ? null : profit / soldCost * 100;
     const rateText = profitRate == null ? "" : `${profitRate > 0 ? "+" : ""}${profitRate.toFixed(1)}%`;
-    const chipsText = chipHtml(chips, equipment);
+    const chipsText = chipHtml(chips, equipment, row);
     return `
       <article class="trade-card tr2-lot${selectedId === row.id ? " is-selected" : ""}" data-select-trade="${escapeHtml(row.id)}" style="--i:${Math.min(index, 10)}">
         <div class="trade-card-id">
           ${inGroup ? "" : itemArt(row)}
           <div class="tr2-lot-title">
             <h3><button class="text-button" type="button" data-select-name="${escapeHtml(row.id)}" aria-pressed="${selectedId === row.id}">${escapeHtml(inGroup ? `${index + 1}번 · ${remaining > 0 ? `보유 ${formatCount(remaining)}개` : "판매 완료"}` : row.name)}</button></h3>
-            ${inGroup ? "" : `<p class="tr2-tags">${itemTags(row)}<span class="tr2-tag is-${remaining > 0 ? "hold" : "done"}">${remaining > 0 ? `보유 ${formatCount(remaining)}개` : "판매 완료"}</span></p>`}
+            ${inGroup ? "" : `<p class="tr2-tags">${itemTags(row)}${row.item_id ? "" : linkButton(tradeGroupKey(row), 1)}<span class="tr2-tag is-${remaining > 0 ? "hold" : "done"}">${remaining > 0 ? `보유 ${formatCount(remaining)}개` : "판매 완료"}</span></p>`}
             ${chipsText ? `<p class="trade-option-copy tr2-chips">${chipsText}</p>` : ""}
           </div>
           ${profit == null || profit === 0 ? "" : `<span class="trade-profit-sticker ${tone}">${profit > 0 ? "흑자" : "적자"}</span>`}
@@ -357,6 +363,7 @@ export async function render(root) {
           </span>
           <i class="tr2-chevron" aria-hidden="true"></i>
         </button>
+        ${first.item_id ? "" : `<p class="tr2-group-link">${linkButton(group.key, group.lots.length)}<small>별명으로 적었으면 도감에서 찾아 이어 주세요.</small></p>`}
         <div class="tr2-lots" ${open ? "" : "hidden"}>${group.lots.map((row, index) => lotCard(row, chips[index], { equipment, inGroup: true, index })).join("")}</div>
       </section>
     `;
@@ -477,11 +484,13 @@ export async function render(root) {
     );
   }
 
-  async function persistTrade(id, value) {
+  // remember: 마지막 저장 취소에 남길지. restoreTimes: 도감 연결처럼 가격이 안 바뀌는 변경은 등록·수정 시각을 그대로 둔다.
+  // merge: false면 같은 거래가 있어도 합치지 않는다(화면을 열 때 하는 자동 연결 — 조회 중 자동 합산은 하지 않는다, docs/domain.md 2026-10-21).
+  async function persistTrade(id, value, { remember = true, restoreTimes = false, merge = true } = {}) {
     const supabase = await getSupabase();
     const stored = { ...value, name: tradeName(value.name) };
     const complete = isCompleteTrade(stored);
-    const sameLot = isPartialSell(stored)
+    const sameLot = !merge || isPartialSell(stored)
       ? null
       : rows.find(
           (row) =>
@@ -493,8 +502,8 @@ export async function render(root) {
     const before = [sameLot, id ? rows.find((row) => row.id === id) : null].filter(Boolean).map((row) => ({ ...row }));
     const target = sameLot ?? before[0];
     const after = { ...(target ?? {}), ...(sameLot ? combineLots([sameLot, stored]) : stored), id: target?.id ?? crypto.randomUUID() };
-    const { data, error } = await supabase.rpc("replace_my_trades_v2", { expected: before, replacement: [after] });
-    if (!error && data) {
+    const { data, error } = await supabase.rpc("replace_my_trades_v2", { expected: before, replacement: [after], ...(restoreTimes ? { restore_times: true } : {}) });
+    if (!error && data && remember) {
       lastSave = { ...data, name: stored.name };
       paintUndo();
     }
@@ -827,9 +836,308 @@ export async function render(root) {
     paintList();
     paintSelection();
     loadItemInfo();
+    autoLinkExact();
+  }
+
+  // ── 예전 거래 도감 연결(2026-11-05 사용자 요청) ──
+  // 이름이 도감과 완전히 같으면 화면을 열 때 자동으로 잇고, 별명·줄인 이름이면 창에서 찾아 잇는다. 장비면 실제 옵션 칸이 펼쳐진다.
+  const linkDialog = root.querySelector("[data-link-dialog]");
+  let link = null;
+  let linkSearchId = 0;
+  let linkPickId = 0;
+  let linkTimer = 0;
+  let autoLinkTried = false;
+  const linkResults = new Map();
+
+  function linkButton(key, count) {
+    return `<button type="button" class="tr2-link-open" data-link-open="${escapeHtml(key)}"><i aria-hidden="true">🔗</i>${count > 1 ? `도감 연결 · ${formatCount(count)}건 모두` : "도감 연결"}</button>`;
+  }
+
+  async function fetchRows() {
+    const supabase = await getSupabase();
+    const { data, error } = await supabase.from("trades").select(columns).order("updated_at", { ascending: false });
+    return error ? null : data ?? [];
+  }
+
+  // 거래를 한 건씩 저장한다(서버 함수가 한 번에 두 줄까지만 받는다). make(row)가 null이면 건너뛴다.
+  async function saveLinks(ids, make, { remember = false, restoreTimes = false, merge = true } = {}) {
+    changing = true;
+    paintUndo();
+    let done = 0;
+    let merged = 0;
+    try {
+      for (const id of ids) {
+        const row = rows.find((item) => item.id === id);
+        const value = row ? make(row) : null;
+        if (!value) continue;
+        const saved = await persistTrade(row.id, value, { remember, restoreTimes, merge });
+        if (saved.error) return { done, merged, failed: saved.error };
+        done += 1;
+        if (saved.merged) merged += 1;
+        const fresh = await fetchRows();
+        if (fresh) rows = fresh;
+      }
+      return { done, merged, failed: null };
+    } catch (error) {
+      return { done, merged, failed: error };
+    } finally {
+      // 여러 건을 한꺼번에 바꾸면 "마지막 저장 취소"로 일부만 되돌리게 되므로 취소를 끈다.
+      if (!remember && done) lastSave = null;
+      changing = false;
+      paintUndo();
+    }
+  }
+
+  async function autoLinkExact() {
+    if (autoLinkTried || changing) return;
+    autoLinkTried = true;
+    const names = unlinkedNames(rows);
+    if (!names.length) return;
+    const supabase = await getSupabase();
+    const items = [];
+    for (let index = 0; index < names.length; index += 100) {
+      const { data, error } = await supabase.from("catalog_items").select("id,name,category,subcategory,image_url,required_level,base_options,requirements").in("name", names.slice(index, index + 100));
+      if (error || !root.isConnected) return;
+      items.push(...(data ?? []));
+    }
+    if (changing || !root.isConnected) return;
+    const links = exactLinks(rows, items);
+    if (!links.length) return;
+    const byTrade = new Map(links.map(({ row, item }) => [row.id, item]));
+    for (const { item } of links) itemInfo.set(item.id, { image_url: item.image_url, category: item.category, subcategory: item.subcategory, required_level: item.required_level });
+    const result = await saveLinks([...byTrade.keys()], (row) => (row.item_id ? null : linkedTrade(row, byTrade.get(row.id))), { restoreTimes: true, merge: false });
+    if (!root.isConnected) return;
+    if (result.done) {
+      paintList();
+      paintSelection();
+      showStatus(`이름이 도감과 똑같은 예전 거래 ${formatCount(result.done)}건을 도감 아이템에 연결했어요.`, "info");
+    }
+    if (result.failed) showStatus(`예전 거래 일부를 도감에 연결하지 못했어요. ${saveError(result.failed)}`, "error");
+  }
+
+  const linkLots = () => (link ? rows.filter((row) => link.lotIds.includes(row.id)) : []);
+  const linkEl = (selector) => linkDialog.querySelector(selector);
+
+  function openLink(lots, mode) {
+    if (!lots.length || changing) return;
+    const first = lots[0];
+    const many = lots.length > 1;
+    link = { lotIds: lots.map((row) => row.id), name: tradeName(first.name), mode, item: null, ranges: {}, showAll: false };
+    const options = mode === "options";
+    linkDialog.innerHTML = `
+      <div class="tr2-link">
+        <header class="tr2-link-head">
+          <div>
+            <p class="trade-kicker">${options ? "ITEM OPTIONS" : "LINK ITEM"}</p>
+            <h2 id="trade-link-title">${options ? "실제 옵션 적기" : "도감 아이템 연결"}</h2>
+            <p>‘${escapeHtml(link.name)}’ ${many ? `거래 ${formatCount(lots.length)}건` : "거래"} · ${options ? "산 물건에 붙은 옵션을 적으면 옵션이 같은 거래끼리 합쳐요." : "별명이나 줄인 이름이어도 찾아서 이으면 그림·분류가 붙어요."}</p>
+          </div>
+          <button type="button" class="tr2-link-x" data-link-close aria-label="닫기">×</button>
+        </header>
+        <div class="tr2-link-search" data-link-search>
+          <span class="tr2-search ym-search-wrap"><i class="ym-search-icon" aria-hidden="true"></i><input data-link-query value="${escapeHtml(link.name)}" autocomplete="off" spellcheck="false" placeholder="도감 아이템 이름 · 띄어쓰기·줄임말도 찾아요" aria-label="도감 아이템 찾기" aria-controls="trade-link-results" /></span>
+          <div class="tr2-link-results" id="trade-link-results" data-link-results role="listbox" aria-label="도감 아이템"></div>
+        </div>
+        <div class="tr2-picked tr2-link-picked" data-link-picked hidden></div>
+        <label class="tr2-link-rename" data-link-rename-row hidden><input type="checkbox" data-link-rename checked /><span data-link-rename-text></span></label>
+        <section class="tr2-options tr2-link-options" data-link-options hidden>
+          <header><strong>실제 아이템 옵션</strong><small>산 물건에 붙은 옵션으로 고쳐 주세요. <span data-link-options-source></span></small></header>
+          <div class="trade-options-grid">${itemOptionFields.map(({ key, label }) => `<label class="field tr2-option" data-link-option="${key}"><span>${escapeHtml(label)}<em data-link-range="${key}"></em></span><input name="link_option_${key}" inputmode="numeric" autocomplete="off" placeholder="—" /></label>`).join("")}</div>
+          <button type="button" class="text-button tr2-more" data-link-more aria-expanded="false">＋ 다른 옵션도 적기</button>
+        </section>
+        <p class="tr2-link-note" data-link-note hidden></p>
+        <p class="tr2-link-error" data-link-error role="alert" hidden></p>
+        <div class="button-row tr2-link-actions">
+          <button class="primary-button" type="button" data-link-save disabled>${options ? "옵션 저장" : "연결 저장"}</button>
+          <button class="secondary-button" type="button" data-link-close>취소</button>
+        </div>
+      </div>`;
+    linkDialog.showModal();
+    sfx("tick");
+    if (first.item_id) {
+      linkPick(first.item_id);
+    } else {
+      const input = linkEl("[data-link-query]");
+      input.focus();
+      input.select();
+      runLinkSearch(link.name);
+    }
+  }
+
+  function showLinkError(text) {
+    const box = linkEl("[data-link-error]");
+    box.hidden = !text;
+    box.textContent = text ?? "";
+  }
+
+  async function runLinkSearch(query) {
+    const request = ++linkSearchId;
+    const box = linkEl("[data-link-results]");
+    if (!query) { box.innerHTML = `<p class="tr2-results-note">찾을 이름을 적어 주세요.</p>`; return; }
+    const out = await catalogRpc("catalog_search_items", { p_query: query, p_page: 0 });
+    if (request !== linkSearchId || !link || !linkDialog.open) return;
+    if (out.error) { box.innerHTML = `<p class="tr2-results-note">${escapeHtml(catalogError(out.error))}</p>`; return; }
+    const found = (out.data?.rows ?? []).slice(0, 8);
+    for (const row of found) {
+      linkResults.set(row.id, row);
+      if (!itemInfo.has(row.id)) itemInfo.set(row.id, { image_url: row.image_url, category: row.category, subcategory: row.subcategory, required_level: row.required_level });
+    }
+    box.innerHTML = found.length
+      ? found.map((row, index) => `<button type="button" class="tr2-result" data-link-pick="${escapeHtml(row.id)}" role="option" style="--i:${index}">
+          <span class="tr2-art${row.image_url ? "" : " is-glyph"}" aria-hidden="true">${catalogImage(row.image_url, "tr2-art-img", 32) || escapeHtml([...row.name][0] ?? "?")}</span>
+          <span><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(resultTags(row))}</small></span>
+        </button>`).join("")
+      : `<p class="tr2-results-note">‘${escapeHtml(query)}’와 맞는 도감 아이템이 없어요. 다른 이름이나 줄인 말로 찾아보세요.</p>`;
+  }
+
+  async function linkPick(id) {
+    const request = ++linkPickId;
+    showLinkError("");
+    const out = await catalogRpc("catalog_item_detail", { p_id: id });
+    if (request !== linkPickId || !link || !linkDialog.open) return;
+    const item = out.data?.item;
+    if (out.error || !item) {
+      showLinkError(out.error ? catalogError(out.error) : "아이템 정보를 찾지 못했어요.");
+      if (!link.item) { linkEl("[data-link-search]").hidden = false; runLinkSearch(linkEl("[data-link-query]").value.trim()); }
+      return;
+    }
+    itemInfo.set(id, { image_url: item.image_url, category: item.category, subcategory: item.subcategory, required_level: item.required_level });
+    link.item = item;
+    link.ranges = Object.fromEntries((out.data.stats ?? []).filter((row) => row.minimum_value != null && row.maximum_value != null).map((row) => [row.stat_key, [row.minimum_value, row.maximum_value]]));
+    link.showAll = false;
+    paintLink(true);
+  }
+
+  function paintLinkOptions() {
+    const item = link?.item;
+    const values = new Set(itemOptionFields.map(({ key }) => key).filter((key) => linkEl(`[name="link_option_${key}"]`).value.trim() !== ""));
+    const relevant = new Set([...Object.keys(item?.base_options ?? {}), ...Object.keys(link?.ranges ?? {}), ...values]);
+    const all = link?.showAll || relevant.size === 0;
+    for (const field of linkDialog.querySelectorAll("[data-link-option]")) {
+      const key = field.dataset.linkOption;
+      field.hidden = !(all || relevant.has(key));
+      const range = link?.ranges?.[key];
+      field.querySelector("[data-link-range]").textContent = range ? `${formatCount(range[0])}~${formatCount(range[1])}` : "";
+    }
+    const more = linkEl("[data-link-more]");
+    more.hidden = all || relevant.size >= itemOptionFields.length;
+    more.setAttribute("aria-expanded", String(all));
+  }
+
+  function paintLink(arrive = false) {
+    const lots = linkLots();
+    const item = link.item;
+    const equipment = Boolean(item && isEquipment(item));
+    const single = lots.length === 1;
+    linkEl("[data-link-search]").hidden = Boolean(item);
+    const picked = linkEl("[data-link-picked]");
+    picked.hidden = !item;
+    picked.innerHTML = item
+      ? `<span class="tr2-art${item.image_url ? "" : " is-glyph"}" aria-hidden="true">${catalogImage(item.image_url, "tr2-art-img", 44) || escapeHtml([...item.name][0] ?? "?")}</span>
+        <span class="tr2-picked-copy"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(resultTags(item) || "도감 아이템")} · ${lots.every((row) => row.item_id === item.id) ? "연결돼 있어요" : "이 아이템에 연결해요"}</small></span>
+        <button type="button" class="text-button" data-link-change>다른 아이템</button>`
+      : "";
+    const differs = Boolean(item) && lots.some((row) => tradeName(row.name) !== tradeName(item.name));
+    linkEl("[data-link-rename-row]").hidden = !differs;
+    if (differs) linkEl("[data-link-rename-text]").textContent = `거래 이름도 도감 이름 ‘${item.name}’(으)로 바꾸기`;
+    const optionsBox = linkEl("[data-link-options]");
+    optionsBox.hidden = !(equipment && single);
+    if (arrive && equipment && single) {
+      // 적어 둔 옵션이 있으면(같은 아이템이거나 아직 연결 전) 그 값을, 없으면 도감 기본값을 채운다.
+      const lot = lots[0];
+      const own = lot.item_options ?? {};
+      const source = Object.keys(own).length && (!lot.item_id || lot.item_id === item.id) ? own : item.base_options ?? {};
+      for (const { key } of itemOptionFields) linkEl(`[name="link_option_${key}"]`).value = source[key] ?? "";
+      linkEl("[data-link-options-source]").textContent = source === own ? "적어 둔 옵션을 불러왔어요." : "도감 기본값을 미리 채워 뒀어요.";
+      optionsBox.classList.remove("is-arrive");
+      void optionsBox.offsetWidth;
+      optionsBox.classList.add("is-arrive");
+    }
+    if (equipment && single) paintLinkOptions();
+    const note = linkEl("[data-link-note]");
+    note.hidden = !item || (equipment && single);
+    note.textContent = !item ? "" : equipment
+      ? `거래가 ${formatCount(lots.length)}건이라 옵션은 연결한 뒤 거래마다 ‘＋ 옵션 적기’로 따로 적어요.`
+      : "장비가 아니라 옵션 없이 수량만 기록해요.";
+    linkEl("[data-link-save]").disabled = !item;
+    if (arrive && item) (equipment && single ? optionsBox.querySelector(".tr2-option:not([hidden]) input") : linkEl("[data-link-save]"))?.focus();
+  }
+
+  async function saveLink() {
+    if (!link?.item || changing) return;
+    const lots = linkLots();
+    if (!lots.length) { linkDialog.close(); return; }
+    const item = link.item;
+    let options;
+    if (isEquipment(item) && lots.length === 1) {
+      const parsed = readItemOptions(Object.fromEntries(itemOptionFields.map(({ key }) => [key, linkEl(`[name="link_option_${key}"]`).value])));
+      if (parsed.error) { showLinkError(parsed.error); return; }
+      options = parsed.value;
+    }
+    const renameRow = linkEl("[data-link-rename-row]");
+    const rename = renameRow.hidden || linkEl("[data-link-rename]").checked;
+    const saveButton = linkEl("[data-link-save]");
+    saveButton.disabled = true;
+    showLinkError("");
+    const ids = lots.map((row) => row.id);
+    if (ids.includes(selectedId) || ids.includes(form.dataset.editingId)) closeForm();
+    const result = await saveLinks(ids, (row) => linkedTrade(row, item, { rename, options }), { remember: ids.length === 1 });
+    if (!root.isConnected) return;
+    if (result.failed) {
+      showLinkError(saveError(result.failed));
+      saveButton.disabled = false;
+      if (result.done) { paintList(); paintSelection(); }
+      return;
+    }
+    const { mode, name } = link;
+    linkDialog.close();
+    paintList();
+    paintSelection();
+    sfx("check");
+    // 연결된 거래 카드(묶음이면 묶음 머리)에서 반짝인다.
+    const target = list.querySelector(`[data-group="id:${CSS.escape(item.id)}"] .tr2-group-head`)
+      ?? [...list.querySelectorAll("[data-select-trade]")].find((node) => rows.find((row) => row.id === node.dataset.selectTrade)?.item_id === item.id);
+    if (target) burstAt(target, BURST_COLORS.success, 18, 0.8);
+    const merged = result.merged ? " 옵션까지 같은 거래가 있어 한 줄로 합쳤어요." : "";
+    showStatus(mode === "options" ? `${item.name} 옵션을 저장했어요.${merged}` : `‘${name}’ 거래 ${formatCount(result.done)}건을 ${item.name}에 연결했어요.${merged}`, "info");
+  }
+
+  linkDialog.addEventListener("close", () => {
+    window.clearTimeout(linkTimer);
+    linkSearchId += 1;
+    linkPickId += 1;
+    link = null;
+  });
+
+  function handleLinkClick(event) {
+    if (event.target === linkDialog || event.target.closest("[data-link-close]")) { linkDialog.close(); return; }
+    const pick = event.target.closest("[data-link-pick]");
+    if (pick) { sfx("tick"); linkPick(pick.dataset.linkPick); return; }
+    if (event.target.closest("[data-link-change]")) {
+      link.item = null;
+      link.ranges = {};
+      linkPickId += 1;
+      paintLink();
+      const input = linkEl("[data-link-query]");
+      input.focus();
+      input.select();
+      runLinkSearch(input.value.trim());
+      return;
+    }
+    if (event.target.closest("[data-link-more]")) { link.showAll = true; paintLinkOptions(); return; }
+    if (event.target.closest("[data-link-save]")) saveLink();
   }
 
   root.addEventListener("input", (event) => {
+    if (event.target.closest("[data-link-dialog]")) {
+      if (event.target.matches("[data-link-query]")) {
+        window.clearTimeout(linkTimer);
+        const query = event.target.value.trim();
+        linkTimer = window.setTimeout(() => runLinkSearch(query), 180);
+      }
+      if (event.target.closest("[data-link-option]")) paintLinkOptions();
+      return;
+    }
     if (event.target === form.elements.name) {
       // 고른 도감 아이템과 이름이 달라지면 연결을 끊는다(직접 입력). 그리고 잠깐 멈추면 도감을 찾는다.
       if (form.elements.name.value.trim() !== currentItemSnapshot.name && form.elements.catalog_item.value) {
@@ -856,6 +1164,12 @@ export async function render(root) {
   });
 
   root.addEventListener("keydown", (event) => {
+    if (event.target.closest?.("[data-link-dialog]") && event.key === "Enter" && !event.isComposing) {
+      // 찾기 칸에서 Enter면 첫 결과를 고르고, 옵션 칸에서 Enter면 저장한다.
+      if (event.target.matches("[data-link-query]")) { event.preventDefault(); linkEl("[data-link-results] [data-link-pick]")?.click(); return; }
+      if (event.target.closest("[data-link-option]")) { event.preventDefault(); saveLink(); return; }
+      return;
+    }
     if (event.target === form.elements.name && !event.isComposing) {
       const open = !resultsBox.hidden;
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -885,6 +1199,11 @@ export async function render(root) {
   });
 
   root.addEventListener("click", async (event) => {
+    if (event.target.closest("[data-link-dialog]")) { handleLinkClick(event); return; }
+    const linkOpen = event.target.closest("[data-link-open]");
+    if (linkOpen) { openLink(rows.filter((row) => tradeGroupKey(row) === linkOpen.dataset.linkOpen), "link"); return; }
+    const optionOpen = event.target.closest("[data-option-open]");
+    if (optionOpen) { const row = rows.find((item) => item.id === optionOpen.dataset.optionOpen); if (row) openLink([row], "options"); return; }
     if (!event.target.closest(".tr2-picker")) closeResults();
     const pickButton = event.target.closest("[data-pick-item]");
     if (pickButton) {

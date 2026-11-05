@@ -87,11 +87,16 @@ function subLink(route, activeId) {
 // 펼침형 분류 트리. 기본은 모두 펼침, 사용자가 접은 분류만 접는다(지금 화면의 분류는 늘 펼침).
 export function renderNav(nav, activeId) {
   const current = categoryOf(activeId);
-  const home = `<a class="nav-home${activeId === homeRoute.id ? " is-active" : ""}" href="#/${homeRoute.id}" data-route="${homeRoute.id}"${activeId === homeRoute.id ? ` aria-current="page"` : ""}><span class="nav-glyph" aria-hidden="true">${homeRoute.glyph}</span><span>${homeRoute.label}</span></a>`;
+  // 홈 메뉴 줄은 없애고 사이드바 로고가 홈 링크다(2026-11-05 사용자 요청). 지금 홈이면 로고에 현재 위치를 표시한다.
+  const brandHome = document.querySelector("[data-brand-home]");
+  if (brandHome) {
+    if (activeId === homeRoute.id) brandHome.setAttribute("aria-current", "page");
+    else brandHome.removeAttribute("aria-current");
+  }
   // 메뉴가 차례로 떠오르는 효과는 처음 한 번만. 페이지를 옮길 때마다 다시 재생되지 않게 한다.
   nav.classList.toggle("is-entering", !navRendered);
   navRendered = true;
-  nav.innerHTML = `${home}<div class="nav-groups">${categories.map((category, index) => {
+  nav.innerHTML = `<div class="nav-groups">${categories.map((category, index) => {
     const open = !collapsedCategories.has(category.id) || category.id === current?.id;
     const active = category.id === current?.id;
     const glyph = `<span class="nav-glyph${category.icon ? " is-icon" : category.glyph.length > 2 ? " is-long" : ""}" aria-hidden="true">${glyphInner(category)}</span>`;

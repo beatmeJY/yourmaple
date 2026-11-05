@@ -138,7 +138,9 @@ document.body.addEventListener("click", async (event) => {
     toggleNavCategory(navCategory);
     return;
   }
-  if (event.target.closest(".nav-sub, .nav-home, .nav-single")) sfx("tick");
+  if (event.target.closest(".nav-sub, .nav-home, .nav-single, [data-brand-home]")) sfx("tick");
+  // 이미 홈에서 로고를 누르면 주소가 그대로라 화면 이동이 없으니 모바일 메뉴만 닫는다.
+  if (event.target.closest("[data-brand-home]") && !isDesktopNav()) setNavOpen(false);
   if (event.target.closest("[data-sound-toggle]")) {
     const on = !isSoundOn();
     setSoundOn(on);
