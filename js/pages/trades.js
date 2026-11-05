@@ -280,13 +280,16 @@ export async function render(root) {
     return tags.map((tag) => `<span class="tr2-tag">${escapeHtml(tag)}</span>`).join("");
   }
 
+  // 공격력과 주 스탯 4개는 칩에 색을 입힌다(스탯은 직업 계열 색: STR 전사·DEX 궁수·INT 마법사·LUK 도적).
+  const STAT_TONE = new Set(["attack", "str", "dex", "int", "luk"]);
+
   // 도감에 연결된 장비면 옵션 칩 끝에 "옵션 적기/고치기" 버튼을 둔다.
   function chipHtml(chips, equipment, row) {
     const edit = row?.item_id && equipment
       ? `<button type="button" class="tr2-chip is-edit" data-option-open="${escapeHtml(row.id)}">${chips.length ? "✎ 옵션 고치기" : "＋ 옵션 적기"}</button>`
       : "";
     if (!chips.length) return edit || (equipment ? `<span class="tr2-chip is-empty">옵션 미기록</span>` : "");
-    return chips.map((chip) => `<span class="tr2-chip${chip.unique ? " is-unique" : ""}"${chip.unique ? ` title="이 묶음에서 거래마다 다른 옵션"` : ""}>${escapeHtml(chip.label)} <b>${chip.value === undefined ? "—" : escapeHtml(formatCount(chip.value))}</b></span>`).join("") + edit;
+    return chips.map((chip) => `<span class="tr2-chip${chip.unique ? " is-unique" : ""}"${STAT_TONE.has(chip.key) ? ` data-stat="${chip.key}"` : ""}${chip.unique ? ` title="이 묶음에서 거래마다 다른 옵션"` : ""}>${escapeHtml(chip.label)} <b>${chip.value === undefined ? "—" : escapeHtml(formatCount(chip.value))}</b></span>`).join("") + edit;
   }
 
   // 거래 한 건(=옵션이 같은 물건 묶음). 가격·개수는 그 자리에서 고친다.

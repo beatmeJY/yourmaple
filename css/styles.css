@@ -16168,6 +16168,16 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .tr2-chip.is-unique { border-color: color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 14%, transparent); color: color-mix(in srgb, var(--gold) 80%, white); box-shadow: 0 0 14px -6px var(--gold); }
 .tr2-chip.is-unique b { color: var(--gold); }
 .tr2-chip.is-empty { border-style: dashed; background: transparent; }
+/* 공격력·주 스탯 칩 색(2026-11-06 사용자 요청). 스탯은 직업 계열 다크 색(sql/008): STR 전사·DEX 궁수·INT 마법사·LUK 도적.
+   거래마다 다른 옵션(is-unique)은 같은 색에 테두리·빛을 더 세게 줘서 구분한다. */
+.tr2-chip[data-stat="attack"] { --stat: #fb923c; }
+.tr2-chip[data-stat="str"] { --stat: #f87171; }
+.tr2-chip[data-stat="dex"] { --stat: #4ade80; }
+.tr2-chip[data-stat="int"] { --stat: #38bdf8; }
+.tr2-chip[data-stat="luk"] { --stat: #d8b4fe; }
+.tr2-chip[data-stat] { border-color: color-mix(in srgb, var(--stat) 40%, transparent); background: color-mix(in srgb, var(--stat) 13%, transparent); color: color-mix(in srgb, var(--stat) 75%, white); box-shadow: none; }
+.tr2-chip[data-stat] b { color: var(--stat); }
+.tr2-chip[data-stat].is-unique { border-color: var(--stat); background: color-mix(in srgb, var(--stat) 22%, transparent); box-shadow: 0 0 14px -4px var(--stat); }
 
 /* 목록 */
 .tr2-groups { display: grid; gap: 12px; }
