@@ -774,13 +774,13 @@ export async function render(root) {
     paintPlan();
   }
 
-  // 측정대에서 잴 저장 조합을 바꾼다. 재는 중에는 잠근다. 반영 전 시간은 버린다(다른 루트에 적히지 않게).
+  // 쉼터를 고쳐도 시작 시각·잰 시간은 유지하고, 반영할 루트만 함께 바꾼다.
   function pickRoute(key) {
-    if (clock?.scope === "route") return false;
     if (key === clockTarget) return true;
     sfx("tick");
     clockTarget = key;
-    routePending = null;
+    if (clock?.scope === "route") clock.key = key;
+    if (routePending) routePending.key = key;
     paintPlan();
     return true;
   }
@@ -852,7 +852,7 @@ export async function render(root) {
   }
 
   // ① 층 트랙: 27라운드 칸 + 저장 지점(5·10·15·20·25라운드 뒤) 마름모 토글
-  function trackHtml(saves, locked) {
+  function trackHtml(saves) {
     const last = BANDS.at(-1).end;
     const parts = [];
     for (let round = 1; round <= last; round += 1) {
@@ -860,7 +860,7 @@ export async function render(root) {
       parts.push(`<i class="dj-track-cell${rerun ? " is-rerun" : ""}" style="--hue:${bandHue(round)}" data-track-round="${round}" aria-label="${escapeHtml(roundToFloorText(round))}"></i>`);
       if (SAVE_FLOORS.includes(round)) {
         const on = saves.includes(round);
-        parts.push(`<button type="button" class="dj-gate${on ? " is-on" : ""}" data-gate="${round}" aria-pressed="${on}" title="${saveFloorToFloor(round)}층(쉬는 층)에서 저장"${locked ? " disabled" : ""}><small>${saveFloorToFloor(round)}층</small><i aria-hidden="true"></i></button>`);
+        parts.push(`<button type="button" class="dj-gate${on ? " is-on" : ""}" data-gate="${round}" aria-pressed="${on}" title="${saveFloorToFloor(round)}층(쉬는 층)에서 저장"><small>${saveFloorToFloor(round)}층</small><i aria-hidden="true"></i></button>`);
       }
     }
     return `<div class="dj-track" data-tip-host>${parts.join("")}<div class="dj-track-tip" data-track-tip role="tooltip" hidden></div></div>`;
@@ -888,7 +888,7 @@ export async function render(root) {
     const quick = QUICK_PICKS.map((picks) => {
       const key = chainKey(picks);
       const on = key === pick.key;
-      return `<button type="button" class="dj-quick${on ? " is-on" : ""}" data-quick-pick="${escapeHtml(key)}" aria-pressed="${on}"${running ? " disabled" : ""}>${escapeHtml(chainText(picks))}</button>`;
+      return `<button type="button" class="dj-quick${on ? " is-on" : ""}" data-quick-pick="${escapeHtml(key)}" aria-pressed="${on}">${escapeHtml(chainText(picks))}</button>`;
     }).join("");
     const buttons = running
       ? `<button type="button" class="dj-watch-btn is-stop" data-clock-stop>■ 종료</button>`
@@ -897,8 +897,8 @@ export async function render(root) {
         : `<button type="button" class="dj-watch-btn is-start" data-clock-start${bandPending || clock ? " disabled" : ""}>▶ 시작</button>`;
     return `<div class="dj-desk">
       <div class="dj-step-block">
-        <div class="dj-step-head"><span class="dj-step-num">1</span><strong>저장할 쉬는 층 고르기</strong><small>${running ? "재는 동안은 바꿀 수 없어요" : "층을 눌러 켜고 꺼요"}</small></div>
-        ${trackHtml(saves, running)}
+        <div class="dj-step-head"><span class="dj-step-num">1</span><strong>저장할 쉬는 층 고르기</strong><small>${running || pending ? "쉼터를 바꿔도 잰 시간은 유지돼요" : "층을 눌러 켜고 꺼요"}</small></div>
+        ${trackHtml(saves)}
         <div class="dj-pick-line"><strong>${escapeHtml(chainText(saves))}</strong><span>한 바퀴 ${escapeHtml(formatCount(pick.points))}점 · ${saves.length + 1}회차 · 저장 ${saves.length}번</span>${rankLink}</div>
         <div class="dj-quicks">${quick}</div>
       </div>
@@ -1984,7 +1984,7 @@ export async function render(root) {
       resetRoutePending();
       return;
     }
-    // ① 층 트랙의 마름모: 그 쉬는 층 저장을 켜고 끈다(재는 중에는 잠김)
+    // ① 층 트랙의 마름모: 잰 시간을 유지하며 쉬는 층 저장을 켜고 끈다.
     const gate = event.target.closest("[data-gate]");
     if (gate && !gate.disabled) {
       const round = Number(gate.dataset.gate);
