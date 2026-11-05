@@ -942,23 +942,25 @@ export async function render(root) {
   }
 
   // 순위표 위 칸 아래: 보고 있는 루트의 실제 시간 칸(기록부를 합친 자리)
-  function editorHtml(route, score) {
+  function editorHtml(route, score, mode) {
     const key = chainKey(route.saves ?? []);
     const label = chainText(route.saves ?? []);
     const actual = draftRuns.get(key) ?? null;
     const ref = route.runs ? route.seconds : null;
     const delta = deltaText(actual, ref);
     const has = actual != null;
-    return `<div class="dj-best-edit${has ? " has-actual" : ""}" data-chain="${escapeHtml(key)}">
+    const seconds = mode === "actual" && has ? actual : ref;
+    const basis = mode === "actual" && has ? "실제 시간 기준" : "참고 시간 기준 예상";
+    return `<div class="dj-best-edit${has ? " has-actual" : ""}" data-chain="${escapeHtml(key)}" data-time-mode="${escapeHtml(mode)}">
       <div class="dj-best-edit-row">
         <span class="dj-best-edit-label">실제 시간</span>
         ${runInputs(key, label, actual)}
         <span class="dj-card-ref"><small>참고 ${escapeHtml(ref != null ? formatDuration(ref) : "-")}</small><b class="${delta.tone}" data-live="delta">${escapeHtml(has ? delta.text : "아직 안 잼")}</b></span>
-        <span class="dj-card-rate"><b data-live="pm">${has ? `분당 ${escapeHtml(formatPerMinute(route.points, actual))}` : "분당 -"}</b><small>초당 <span data-live="ps">${escapeHtml(has ? formatPointsPerSecond(route.points, actual) : "-")}</span> · 점수당 <span data-live="spp">${escapeHtml(has ? formatSecondsPerPoint(route.points, actual) : "-")}</span></small></span>
+        <span class="dj-card-rate"><b data-live="pm">${seconds != null ? `분당 ${escapeHtml(formatPerMinute(route.points, seconds))}` : "분당 -"}</b><small>초당 <span data-live="ps">${escapeHtml(seconds != null ? formatPointsPerSecond(route.points, seconds) : "-")}</span> · 점수당 <span data-live="spp">${escapeHtml(seconds != null ? formatSecondsPerPoint(route.points, seconds) : "-")}</span></small></span>
       </div>
       <div class="dj-best-edit-foot">
-        <span>검은 허리띠까지 <b data-live="belt">${escapeHtml(has ? beltText(route, actual, score) : "-")}</b></span>
-        <span>시간당 <b data-live="hour">${escapeHtml(has ? hourText(route, actual) : "-")}</b> 메소</span>
+        <span><small data-live="basis">${escapeHtml(basis)}</small> · 검은 허리띠까지 <b data-live="belt">${escapeHtml(beltText(route, seconds, score))}</b></span>
+        <span>시간당 <b data-live="hour">${escapeHtml(hourText(route, seconds))}</b> 메소</span>
         <span class="dj-best-edit-btns">
           <button type="button" class="dj-best-redo" data-pick-chain="${escapeHtml(key)}">${has ? "다시 재기" : "이 루트 재기"} ↓</button>
           ${has ? `<button type="button" class="dj-best-clear" data-run-clear="${escapeHtml(key)}" aria-label="${escapeHtml(label)} 실제 기록 지우기">기록 지우기</button>` : ""}
@@ -1008,11 +1010,15 @@ export async function render(root) {
         const node = row.querySelector(`[data-live='${name}']`);
         if (node) node.textContent = text;
       };
-      set("pm", has ? `분당 ${formatPerMinute(route.points, seconds)}` : "분당 -");
-      set("ps", has ? formatPointsPerSecond(route.points, seconds) : "-");
-      set("spp", has ? formatSecondsPerPoint(route.points, seconds) : "-");
-      set("belt", has ? beltText(route, seconds, score.error ? 0 : score.score) : "-");
-      set("hour", has ? hourText(route, seconds) : "-");
+      const estimate = row.dataset.timeMode === "recommend" || !has;
+      const displaySeconds = estimate ? ref : seconds;
+      const available = Boolean(route) && displaySeconds != null;
+      set("basis", estimate ? "참고 시간 기준 예상" : "실제 시간 기준");
+      set("pm", available ? `분당 ${formatPerMinute(route.points, displaySeconds)}` : "분당 -");
+      set("ps", available ? formatPointsPerSecond(route.points, displaySeconds) : "-");
+      set("spp", available ? formatSecondsPerPoint(route.points, displaySeconds) : "-");
+      set("belt", available ? beltText(route, displaySeconds, score.error ? 0 : score.score) : "-");
+      set("hour", available ? hourText(route, displaySeconds) : "-");
       set("pm-short", has ? formatPerMinute(route.points, seconds).replace("점", "") : route?.runs ? formatPerMinute(route.points, route.seconds).replace("점", "") : "-");
       const deltaNode = row.querySelector("[data-live='delta']");
       if (deltaNode) {
@@ -1096,7 +1102,7 @@ export async function render(root) {
         <span class="dj-best-meta">한 바퀴 ${escapeHtml(formatCount(route.points))}점 · ${escapeHtml(formatDuration(seconds))}</span>
         ${runRows(route)}
       </div>
-      ${editorHtml(route, score)}
+      ${editorHtml(route, score, mode)}
     `;
   }
 
