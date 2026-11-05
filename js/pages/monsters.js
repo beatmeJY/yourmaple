@@ -351,16 +351,16 @@ export function render(root) {
           const width = ratio == null ? 0 : max === min ? 100 : 18 + ((max - ratio) / (max - min)) * 82;
           const accuracy = neededAccuracy(row, myLevel);
           const el = firstElement(row);
+          // 작은 가로 카드(2026-11-06 사용자 요청): 그림(레벨 배지) | 이름 / 1 EXP당 HP 막대, 아래 줄 HP·EXP·명중, 속성.
           return `<button type="button" class="mo-card${row.id === selectedId ? " is-on" : ""}" data-pick-monster="${row.id}" aria-pressed="${row.id === selectedId}" style="--i:${Math.min(index, 16)}">
-            <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중">명중 ${num(accuracy)}</span>` : ""}</span>
-            <span class="mo-name"><strong>${escapeHtml(row.name)}</strong></span>
-            <span class="mo-stats"><span><small>HP</small><strong>${num(row.hp)}</strong></span><span><small>EXP</small><strong>${num(row.exp)}</strong></span></span>
-            <span class="mo-eff">
+            <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></span>
+            <span class="mo-name"><strong title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</strong></span>
+            <span class="mo-eff" title="1 HP당 EXP ${escapeHtml(formatExpPerHp(row.hp,row.exp))}">
               <span class="mo-eff-top"><span>1 EXP당 HP</span>${hpCell(ratio)}</span>
               <span class="mo-eff-bar"><i style="width:${width}%"></i></span>
-              <span class="mo-eff-top"><span>1 HP당 EXP</span><span>${escapeHtml(formatExpPerHp(row.hp,row.exp))}</span></span>
             </span>
-            <span class="mo-tags">${elementTags(row)}</span>
+            <span class="mo-stats"><span><small>HP</small><strong>${num(row.hp)}</strong></span><span><small>EXP</small><strong>${num(row.exp)}</strong></span>${accuracy != null ? `<span class="mo-acc" title="내 레벨 기준 필요 명중"><small>명중</small><strong>${num(accuracy)}</strong></span>` : ""}</span>
+            ${elementTags(row) ? `<span class="mo-tags">${elementTags(row)}</span>` : ""}
           </button>`;
         })
         .join("");

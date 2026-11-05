@@ -16452,3 +16452,48 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .transport-skew { margin: 6px 0 0; padding: 6px 10px; border-radius: 10px; font-size: 11px; line-height: 1.5; text-align: center; color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); animation: ym-fade-up .4s var(--spring, ease-out) both; }
 .transport-skew[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .transport-skew { animation: none; } }
+
+/* 도감 목록 작은 카드(2026-11-06 사용자 요청): 한 화면에 여러 개 보이게 가로형으로 줄이고 핵심만 남긴다. */
+/* 아이템: 그림 | 이름 / 종류·레벨 */
+.catalog-page .catalog-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+@media (min-width: 700px) { .catalog-page .catalog-grid { grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); } }
+.catalog-page .catalog-item { gap: 10px; padding: 10px 11px; border-radius: 16px; animation-delay: calc(var(--i, 0) * 25ms); }
+.catalog-page .catalog-item:hover { transform: translateY(-2px); }
+.catalog-page .catalog-item-art { width: 44px; height: 44px; border-radius: 12px; background: radial-gradient(circle at 50% 60%, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.28) 75%); font-size: 19px; }
+.catalog-page .catalog-item-art img { max-width: 36px; max-height: 36px; transition: transform 0.35s var(--spring); }
+.catalog-page .catalog-item:hover .catalog-item-art img { transform: scale(1.12) rotate(-4deg); }
+.catalog-item-copy { display: grid; gap: 5px; min-width: 0; }
+.catalog-page .catalog-item h2 { display: -webkit-box; overflow: hidden; margin: 0; font-size: 14px; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.catalog-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; }
+.catalog-item-meta .ym-chip { min-height: 0; height: auto; padding: 1px 7px; font-size: 11px; line-height: 1.5; }
+.catalog-item-lv { padding: 1px 7px; line-height: 1.5; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.catalog-item-lv.is-free, .catalog-item-lv.is-unknown { background: rgba(255, 255, 255, 0.06); color: var(--muted); font-weight: 700; }
+
+/* 몬스터: 그림(레벨 배지) | 이름 / 효율 막대, 아래 줄 HP·EXP·명중, 속성 */
+.mo-page .mo-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; }
+.mo-page .mo-card { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-content: start; column-gap: 9px; row-gap: 6px; padding: 8px 10px 9px 8px; border-radius: 15px; animation-delay: calc(0.03s + var(--i, 0) * 0.025s); }
+.mo-page .mo-card:hover { transform: translateY(-2px); }
+.mo-page .mo-card.is-on { box-shadow: 0 0 0 2px oklch(0.8 0.13 295 / 0.18), 0 10px 22px -12px oklch(0.75 0.15 295); }
+.mo-page .mo-card .mo-art { grid-row: 1 / span 2; align-self: start; width: 48px; height: 48px; border-radius: 12px; overflow: visible; }
+.mo-page .mo-card .mo-art b { font-size: 22px; }
+.mo-page .mo-card .mo-art .catalog-monster-image { width: 44px; height: 44px; object-fit: contain; transition: transform 0.35s var(--spring); }
+.mo-page .mo-card:hover .mo-art .catalog-monster-image { transform: scale(1.1); }
+.mo-page .mo-card .mo-lv { left: 50%; top: auto; bottom: -6px; transform: translateX(-50%); padding: 0 5px; border: 1px solid oklch(0.86 0.15 85 / 0.35); font-size: 10px; line-height: 1.45; white-space: nowrap; }
+.mo-page .mo-card .mo-name { align-self: center; padding: 0; }
+.mo-page .mo-card .mo-name strong { font-size: 13.5px; }
+.mo-page .mo-card .mo-eff { gap: 3px; padding: 0; }
+.mo-page .mo-card .mo-eff-top { font-size: 10.5px; }
+.mo-page .mo-card .mo-eff-bar { height: 4px; }
+.mo-page .mo-card .mo-stats { display: flex; flex-wrap: wrap; grid-column: 1 / -1; gap: 2px 10px; margin-top: 2px; padding: 0 2px; }
+.mo-page .mo-card .mo-stats > span { flex-direction: row; align-items: baseline; gap: 3px; }
+.mo-page .mo-card .mo-stats small { font-size: 10.5px; }
+.mo-page .mo-card .mo-stats strong { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.mo-page .mo-card .mo-acc { position: static; padding: 0; background: none; }
+.mo-page .mo-card .mo-acc small { color: oklch(0.8 0.1 160); }
+.mo-page .mo-card .mo-acc strong { color: oklch(0.88 0.12 160); }
+.mo-page .mo-card .mo-tags { grid-column: 1 / -1; min-height: 0; padding: 0; gap: 3px; }
+.mo-page .mo-card .mo-tag { height: 18px; padding: 0 6px; font-size: 10.5px; }
+@media (prefers-reduced-motion: reduce) {
+  .catalog-page .catalog-item-art img, .mo-page .mo-card .mo-art .catalog-monster-image { transition: none; }
+  .catalog-page .catalog-item:hover .catalog-item-art img, .mo-page .mo-card:hover .mo-art .catalog-monster-image { transform: none; }
+}

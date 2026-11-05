@@ -5,7 +5,7 @@ import { catalogRpc, clearCatalogCache, itemDropPage } from "../catalog-api.js";
 import { catalogImage, catalogMonsterImage, mountCatalogImageFallback } from "../catalog-image.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { itemOptionFields } from "../item-options.js";
-import { equipmentCard, isEquipment } from "../catalog-equipment.js";
+import { equipmentCard, equipmentTypeName, isEquipment } from "../catalog-equipment.js";
 import { mountHistoryDialog } from "../catalog-history.js";
 
 const labels = Object.fromEntries(itemOptionFields.map(f => [f.key, f.label]));
@@ -33,11 +33,23 @@ export async function render(root) {
     root.querySelector("[data-page]").textContent = `${page+1} / ${Math.max(1,Math.ceil(total/24))}`;
     root.querySelector("[data-prev]").disabled = page === 0;
     root.querySelector("[data-next]").disabled = (page+1)*24 >= total;
-    list.innerHTML = rows.length ? rows.map(item=>`<a class="catalog-item ym-glass" href="#/item-catalog?id=${encodeURIComponent(item.id)}"><div class="catalog-item-art">${catalogImage(item.image_url) || `<span aria-hidden="true">${text([...item.name][0])}</span>`}</div><div><small class="ym-chip">${text(item.subcategory || item.middle_category || item.category)}</small><h2>${text(item.name)}</h2><p>${item.required_level == null ? "착용 레벨 미제공" : `Lv.${text(item.required_level)}`}</p></div><span class="catalog-item-arrow" aria-hidden="true">↗</span></a>`).join("") : `<p class="empty">검색 결과가 없습니다.</p>`;
+    list.innerHTML = rows.length ? rows.map((item,index)=>`<a class="catalog-item ym-glass" href="#/item-catalog?id=${encodeURIComponent(item.id)}" style="--i:${Math.min(index,16)}"><div class="catalog-item-art">${catalogImage(item.image_url) || `<span aria-hidden="true">${text([...item.name][0])}</span>`}</div><div class="catalog-item-copy"><h2 title="${text(item.name)}">${text(item.name)}</h2><p class="catalog-item-meta"><small class="ym-chip">${text(itemKind(item))}</small>${levelBadge(item)}</p></div></a>`).join("") : `<p class="empty">검색 결과가 없습니다.</p>`;
   }
   root.querySelector("input").addEventListener("input",()=>{clearTimeout(timer);++loadId;page=0;root.querySelectorAll(".catalog-pager button").forEach(b=>b.disabled=true);timer=setTimeout(()=>{if(root.isConnected)void load();},300);});
   root.addEventListener("click",e=>{if(e.target.closest("[data-prev]"))page=Math.max(0,page-1);else if(e.target.closest("[data-next]"))page++;else if(e.target.closest("[data-catalog-refresh]")){clearCatalogCache();page=0;}else return;clearTimeout(timer);void load();});
   await load();
+}
+// 목록 카드(2026-11-06 작게): 종류는 장비면 한글 이름(아대·신발 등), 아니면 큰 분류(소비·설치·기타). 레벨은 장비거나 0보다 클 때만 배지로.
+const kindNames = { Etc: "기타", Cash: "캐시", Use: "소비", Setup: "설치" };
+function itemKind(item) {
+  if (isEquipment(item)) return equipmentTypeName(item.subcategory) || item.middle_category || item.category || "";
+  return kindNames[item.category] ?? item.category ?? "";
+}
+function levelBadge(item) {
+  const level = Number(item.required_level);
+  if (item.required_level == null || !Number.isFinite(level)) return isEquipment(item) ? `<span class="catalog-item-lv is-unknown">Lv 미제공</span>` : "";
+  if (level > 0) return `<span class="catalog-item-lv">Lv.${text(level)}</span>`;
+  return isEquipment(item) ? `<span class="catalog-item-lv is-free">Lv 제한 없음</span>` : "";
 }
 async function renderDetail(root,id) {
   root.innerHTML = `<section class="catalog-page item-detail-page"><div class="catalog-detail-actions"><a class="catalog-back-link" href="#/item-catalog">← 아이템 목록</a><span class="catalog-detail-actions-gap"></span></div><div data-item-detail><p class="empty">아이템 정보를 불러오는 중입니다.</p></div></section>`;
