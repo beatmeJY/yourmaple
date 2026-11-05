@@ -16192,6 +16192,30 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .tr2-lot-title { flex: 1; min-width: 0; }
 .tr2 .trade-card-id h3 { margin: 0; font-size: 15.5px; }
 .tr2-lots .trade-card-id h3 { font-size: 13.5px; color: #cfc8e2; }
+/* 좁은 목록(카드 1080px 이하): 옵션 칩이 제목 칸(첫 칸)에 갇혀 한두 개씩 쌓이고 가격 칸이 잘리던 것(2026-11-06).
+   제목·칩 줄은 카드 전체 폭으로 펴고, 흑자/적자 표시는 오른쪽 위에 띄운다. 매수·매도·수정은 그 아래 한 줄. */
+@container trade-board (max-width: 1080px) {
+  .trade-page.tr2 .trade-card { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .trade-page.tr2 .trade-card-id { position: relative; grid-column: 1 / -1; grid-row: 1; }
+  .trade-page.tr2 .trade-card-id .trade-profit-sticker { position: absolute; top: 0; right: 0; }
+  .trade-page.tr2 .trade-card-id:has(.trade-profit-sticker) h3 { padding-right: 40px; }
+  .trade-page.tr2 .trade-lane.is-buy { grid-column: 1; grid-row: 2; }
+  .trade-page.tr2 .trade-lane.is-sell { grid-column: 2; grid-row: 2; }
+  .trade-page.tr2 .trade-card .row-actions { grid-column: 3; grid-row: 2; align-self: center; }
+  .trade-page.tr2 .trade-lane.is-result { grid-column: 1 / -1; grid-row: 3; }
+  .trade-page.tr2 .trade-dates { grid-column: 1 / -1; grid-row: 4; }
+}
+/* 폰 폭: 매수·매도·결과를 세로로 쌓고, 수정·삭제는 맨 아래 날짜 줄 오른쪽으로 내린다. */
+@container trade-board (max-width: 560px) {
+  .trade-page.tr2 .trade-card { grid-template-columns: minmax(0, 1fr) auto; }
+  .trade-page.tr2 .trade-lane.is-buy { grid-column: 1 / -1; grid-row: 2; }
+  .trade-page.tr2 .trade-lane.is-sell { grid-column: 1 / -1; grid-row: 3; }
+  .trade-page.tr2 .trade-lane.is-result { grid-column: 1 / -1; grid-row: 4; }
+  .trade-page.tr2 .trade-dates { grid-column: 1; grid-row: 5; }
+  .trade-page.tr2 .trade-card .row-actions { display: flex; grid-column: 2; grid-row: 5; align-self: stretch; align-items: end; margin: 6px 0 0 -8px; padding: 6px 0 0 8px; border-top: 1px solid var(--line); }
+  .tr2 .tr2-chips { gap: 4px; }
+  .tr2 .tr2-chip { padding: 2px 8px; font-size: 11.5px; }
+}
 .tr2-empty { display: grid; justify-items: center; gap: 6px; padding: 40px 16px; border: 1px dashed rgba(255, 255, 255, 0.12); border-radius: 20px; text-align: center; }
 .tr2-empty span { font-size: 34px; }
 .tr2-empty strong { font-size: 16px; }
