@@ -1,4 +1,4 @@
-// 사용자 시간표: 한국 시각 기준. 서버 호출 없이 기기의 현재 시각에서 매번 계산한다.
+// 사용자 시간표: 한국 시각 기준. 현재 시각(위젯은 서버 시각에 맞춘 serverNow)을 받아 매번 계산한다.
 const MINUTE = 60_000;
 const SHIP_CYCLE = 10 * MINUTE;
 const HELIOS = [

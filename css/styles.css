@@ -16413,3 +16413,8 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .tr2-link-open, .tr2-chip.is-edit, .tr2-link-x { transition: none; }
   .tr2-link-open:hover, .tr2-chip.is-edit:hover, .tr2-link-x:hover { transform: none; }
 }
+
+/* 교통 위젯: 기기 시계가 서버와 30초 넘게 어긋났을 때 안내(2026-11-05) */
+.transport-skew { margin: 6px 0 0; padding: 6px 10px; border-radius: 10px; font-size: 11px; line-height: 1.5; text-align: center; color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); animation: ym-fade-up .4s var(--spring, ease-out) both; }
+.transport-skew[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .transport-skew { animation: none; } }

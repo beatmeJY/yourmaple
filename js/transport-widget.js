@@ -1,4 +1,5 @@
 import { transportState, transportTime, transportCountdown } from "./transport-calc.js";
+import { clockOffset, onServerClockChange, serverNow, syncServerClock } from "./server-clock.js";
 
 const elevatorIcon = `<img class="transport-icon" src="img/helios-icon.png" alt="" width="24" height="24" />`;
 const shipIcon = `<img class="transport-icon transport-ship-icon" src="img/ship-icon.png" alt="" width="24" height="24" />`;
@@ -34,7 +35,8 @@ function createTransportWidget() {
         <strong data-ship-state></strong><p><span data-ship-next></span> <b data-ship-remain></b></p>
         <div class="transport-times"><span>탑승 마감 <b data-ship-close></b></span><span>출발 <b data-ship-depart></b></span></div>
       </article>
-      <p class="transport-note">배는 출발 1분 전 마감 · 기기 시각 기준</p>
+      <p class="transport-note">배는 출발 1분 전 마감 · <span data-transit-source>기기 시각 기준</span></p>
+      <p class="transport-skew" data-transit-skew hidden></p>
     </section>
     <button class="transport-toggle" type="button" aria-controls="transport-panel" aria-expanded="false">
       <span class="transport-mini" data-mini-helios>${elevatorIcon}<span><b data-helios-mini></b><small><span data-helios-mini-next></span> <span data-helios-mini-remain></span></small></span></span><i></i><span class="transport-mini" data-mini-ship>${shipIcon}<span><b data-ship-mini></b><small><span data-ship-mini-next></span> <span data-ship-mini-remain></span></small></span></span>
@@ -48,7 +50,7 @@ function createTransportWidget() {
   function update() {
     clearTimeout(timer);
     if (!host.isConnected) return;
-    const now = Date.now();
+    const now = serverNow();
     const { helios, ship } = transportState(now);
     // 탑승할 수 있는 때는 "탑승 가능"(2026-10-28 사용자 요청, 이전 "탑승 중"·"대기 중")
     const shipLabel = { waiting: "출발함", boarding: "탑승 가능", closed: "탑승 마감" }[ship.phase];
@@ -79,7 +81,24 @@ function createTransportWidget() {
     host.dataset.shipPhase = ship.phase;
     host.dataset.heliosDirection = helios.direction;
     button.setAttribute("aria-label", `교통 시간표: 헬리오스탑 ${miniHelios}, 배 ${shipLabel}`);
+    paintSource();
     if (!document.hidden) timer = setTimeout(update, 1000 - (now % 1000));
+  }
+  // 서버 시각을 받았으면 그 기준이라고 알리고, 기기 시계가 30초 넘게 어긋났으면 얼마나인지 보여 준다.
+  const source = host.querySelector("[data-transit-source]");
+  const skew = host.querySelector("[data-transit-skew]");
+  function paintSource() {
+    const value = clockOffset();
+    const label = value == null ? "기기 시각 기준" : "서버 시각 기준";
+    if (source.textContent !== label) source.textContent = label;
+    const off = value != null && Math.abs(value) >= 30_000;
+    skew.hidden = !off;
+    if (off) {
+      const seconds = Math.round(Math.abs(value) / 1000);
+      const amount = seconds >= 60 ? `${Math.floor(seconds / 60)}분 ${seconds % 60}초` : `${seconds}초`;
+      const message = `이 기기 시계가 ${amount} ${value > 0 ? "늦어서" : "빨라서"} 서버 시각으로 맞췄어요.`;
+      if (skew.textContent !== message) skew.textContent = message;
+    }
   }
   function setOpen(open, focusBack = false) {
     panel.hidden = !open;
@@ -97,5 +116,7 @@ function createTransportWidget() {
   document.addEventListener("visibilitychange", update);
   window.addEventListener("pageshow", update);
   window.addEventListener("pagehide", () => clearTimeout(timer));
+  onServerClockChange(update);
+  void syncServerClock();
   return { host, update };
 }
