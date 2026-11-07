@@ -177,3 +177,22 @@ const requiredReverse = {time_piece: 1000000n, high_1: 1000n, high_2: 2000n, hig
 assert.equal(maker.reverseCraftCost(requiredReverse).attemptCost, 47715000n);
 for (const key of Object.keys(requiredReverse)) { const missing={...requiredReverse}; delete missing[key]; assert.equal(maker.reverseCraftCost(missing).complete,false); }
 assert.equal(maker.reverseCraftCost({...requiredReverse, orihalcon:100n}).attemptCost,47715500n);
+
+// 적정가 계산 과정(2026-11-07): 101회 총비용 ÷ 6 ÷ 101회 중 예상 개수, 판매 총액 = 총비용(반올림 차이만)
+{
+  const proof = maker.reverseFairProof(1_000_000n);
+  assert.equal(proof.totalCost, 101_000_000n);
+  assert.equal(proof.share, 16_833_333n);
+  const plusFive = proof.rows.find((row) => row.bonus === 5);
+  assert.equal(plusFive.expectedCount, 0.9999);
+  assert.equal(plusFive.fairPrice, 16_835_017n);
+  const base = proof.rows.find((row) => row.bonus === 0);
+  assert.equal(base.fairPrice, maker.reverseExpectedValue(null, {}, 1_000_000n).rows[0].fairPrice);
+  const destroy = proof.rows.find((row) => row.bonus == null);
+  assert.equal(destroy.expectedCount, 10.1);
+  assert.equal(destroy.revenue, 0n);
+  // 개당 적정가를 메소 단위로 반올림해 101회 × 확률(합 90.9개)만큼 곱하므로 차이는 최대 약 ±49메소다.
+  assert.ok(proof.roundingGap >= -50n && proof.roundingGap <= 50n);
+  assert.equal(proof.roundingGap, -15n);
+  assert.equal(maker.reverseFairProof(null), null);
+}

@@ -27,9 +27,11 @@ import {
   normalRefinePercent,
   reverseCraftCost,
   reverseExpectedValue,
+  reverseFairProof,
   enchantCraftCost,
   tierPrices,
 } from "../maker-calc.js";
+import { equipmentTypeName } from "../catalog-equipment.js";
 import { isLoggedIn, requireLogin, restoreFields, snapshotFields, takeDraft } from "../session.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -398,7 +400,12 @@ function reverseCalculatorHtml() {
         </section>
         <section class="reverse-panel reverse-value-panel" data-reverse-value-panel>
           <div class="reverse-panel-title"><span>02</span><div><strong>공격력별 적정 판매가</strong><small>제작비를 정옵~+5에 1/6씩 나눈 뒤 각 옵션의 예상 수량으로 나눠요. 파괴 10%도 비용에 들어가요.</small></div></div>
-          <label class="reverse-base-attack"><span>정옵 공격력</span><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" data-reverse-base-attack placeholder="예: 120" /><small>적으면 +1~+5 공격력이 채워져요.</small></label>
+          <div class="reverse-weapon-pick" data-reverse-weapons>
+            <div class="reverse-weapon-head"><strong>리버스 무기</strong><small data-reverse-weapon-note>도감에서 리버스 무기를 불러오는 중…</small></div>
+            <div class="reverse-weapon-grid" data-reverse-weapon-grid role="radiogroup" aria-label="리버스 무기 고르기"></div>
+            <div class="reverse-weapon-save" data-reverse-weapon-save hidden></div>
+          </div>
+          <label class="reverse-base-attack"><span data-reverse-base-label>정옵 공격력</span><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" data-reverse-base-attack placeholder="예: 120" /><small>적으면 +1~+5 공격력이 채워져요.</small></label>
           <div class="reverse-odds-strip" data-reverse-odds-panel role="img" aria-label="촉진제 제작 결과 확률: ${REVERSE_CATALYST_ODDS.map((row) => `${row.label} ${row.percent}%`).join(", ")}">
             ${REVERSE_CATALYST_ODDS.map((row, index) => `<i style="--w:${row.percent};--c:${row.bonus == null ? "rgba(255,255,255,.14)" : REVERSE_GRADE_COLORS[index]};--i:${index}" title="${escapeHtml(row.label)} ${row.percent}%"></i>`).join("")}
           </div>
@@ -409,13 +416,15 @@ function reverseCalculatorHtml() {
                   <details class="reverse-market-detail reverse-grade" style="--c:${REVERSE_GRADE_COLORS[index]};--i:${index}">
                     <summary>
                       <span class="reverse-grade-badge">${escapeHtml(row.label)}</span>
-                      <span class="reverse-grade-main"><strong data-reverse-attack-label="${row.bonus}">공격력 -</strong><em>${row.percent}% · 101회 중 ${(101 * row.percent / 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}개</em></span>
+                      <span class="reverse-grade-main"><strong data-reverse-attack-label="${row.bonus}">공격력 -</strong><em>${row.percent}% · 101회 중 ${countText(101 * row.percent / 100)}개</em></span>
                       <b class="reverse-grade-fair" data-reverse-fair-price="${row.bonus}">제작비 입력 대기</b>
                       <span class="reverse-grade-chev" aria-hidden="true">›</span>
                     </summary>
                     <div class="reverse-grade-body">
-                      <span class="reverse-value-input"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="40" autocomplete="off" spellcheck="false" data-reverse-output-price="${row.bonus}" aria-label="${escapeHtml(row.label)} 실거래가" placeholder="실거래가 · 선택" /><small data-reverse-output-reading="${row.bonus}">비교할 때만 적어요</small></span>
+                      <span class="reverse-value-input"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="40" autocomplete="off" spellcheck="false" data-reverse-output-price="${row.bonus}" aria-label="${escapeHtml(row.label)} 시장가" placeholder="시장가 · 선택" /><small data-reverse-output-reading="${row.bonus}">비교할 때만 적어요</small></span>
                       <span class="reverse-grade-diff" data-reverse-diff="${row.bonus}"></span>
+                      <button type="button" class="reverse-grade-history" data-reverse-history="${row.bonus}" hidden></button>
+                      <div class="reverse-proof-steps" data-reverse-proof="${row.bonus}"></div>
                     </div>
                   </details>
                 `,
@@ -423,7 +432,11 @@ function reverseCalculatorHtml() {
               .join("")}
             <div class="reverse-grade is-destroy"><span class="reverse-grade-badge">파괴</span><span class="reverse-grade-main"><strong>장비 없음</strong><em>10% · 101회 중 10.1회</em></span><b class="reverse-grade-fair">0메소</b></div>
           </div>
-          <p class="hint">계산식: 1회 제작비 ÷ 6 ÷ 옵션 확률. 이 가격으로 모두 팔면 예상 판매 총액과 제작비가 같아져요(메소 반올림 차이 제외). 시장 가격을 예측하는 값은 아니고, 실거래가는 비교용 선택 입력이에요.</p>
+          <details class="reverse-proof" data-reverse-proof-panel>
+            <summary><span class="reverse-proof-icon" aria-hidden="true">∑</span><span><strong>적정 판매가 계산 과정 펼쳐 보기</strong><small>제작비가 어떻게 나뉘어 각 공격력의 적정가가 되는지 숫자로 보여 줘요</small></span><span class="reverse-grade-chev" aria-hidden="true">›</span></summary>
+            <div class="reverse-proof-body" data-reverse-proof-body></div>
+          </details>
+          <p class="hint">계산식: 1회 제작비 ÷ 6 ÷ 옵션 확률. 이 가격으로 모두 팔면 예상 판매 총액과 제작비가 같아져요(메소 반올림 차이 제외). 시장 가격을 예측하는 값은 아니고, 시장가는 비교용 선택 입력이에요. 무기를 고르면 무기마다 시장가를 따로 저장할 수 있어요.</p>
           <div class="reverse-value-summary" data-reverse-value-summary></div>
           <div class="reverse-target-results" data-reverse-target-results></div>
         </section>
@@ -483,6 +496,83 @@ function enchantCalculatorHtml() {
   `;
 }
 
+// 리버스 무기: 완드·스태프는 마력이 주 수치라 마력 기준으로 채운다(촉진제 +1~+5가 마력에 붙는다고 봄 [추정]).
+const REVERSE_MAGIC_WEAPON_TYPES = new Set(["Wand", "Staff"]);
+
+function reverseWeaponStat(weapon) {
+  const options = weapon?.base_options ?? {};
+  const magic = REVERSE_MAGIC_WEAPON_TYPES.has(weapon?.subcategory);
+  const raw = magic ? options.magic_attack : options.attack;
+  return { magic, name: magic ? "마력" : "공격력", value: raw == null || !Number.isFinite(Number(raw)) ? null : BigInt(Math.trunc(Number(raw))) };
+}
+
+function reverseWeaponName(weapon) {
+  return String(weapon?.name ?? "").replace(/^리버스\s*/, "");
+}
+
+function countText(value) {
+  return value.toLocaleString("ko-KR", { maximumFractionDigits: 4 });
+}
+
+/** 적정가 계산 과정 전체(1회 제작비 내역 → 101회 → 1/6 몫 → 예상 개수 → 적정가 → 판매 총액 확인) */
+function reverseProofHtml(craftResult, proof, statName, baseAttack) {
+  if (!proof) return `<p class="reverse-proof-wait">재료 시세를 모두 적으면 숫자로 채워져요. 지금 비어 있는 재료: ${craftResult.rows.filter((row) => row.unitPrice == null).map((row) => escapeHtml(row.label)).join(" · ") || "-"}</p>`;
+  const materialLines = craftResult.rows
+    .map((row) => `<div><span>${escapeHtml(row.label)} <small>${formatCount(row.unitPrice ?? 0n)} × ${formatCount(row.count)}</small></span><b>${meso(row.cost)}</b></div>`)
+    .join("");
+  const optionRows = proof.rows
+    .map((row, index) => {
+      const destroy = row.bonus == null;
+      const name = destroy ? "장비 없음" : baseAttack == null ? escapeHtml(row.label) : `${statName} ${formatCount(baseAttack + BigInt(row.bonus))}`;
+      return `
+        <div class="reverse-proof-row${destroy ? " is-destroy" : ""}" role="listitem" style="--c:${destroy ? "rgba(255,255,255,.4)" : REVERSE_GRADE_COLORS[index]};--i:${index}">
+          <span class="reverse-proof-name"><b>${escapeHtml(row.label)}</b><small>${name}</small></span>
+          <span data-label="확률">${row.percent}%</span>
+          <span data-label="101회 중">${countText(row.expectedCount)}개</span>
+          <span data-label="비용 몫">${destroy ? "0" : meso(row.share)}</span>
+          <span data-label="적정가" class="is-fair">${destroy ? "0" : meso(row.fairPrice)}</span>
+          <span data-label="판매 총액">${destroy ? "0" : meso(row.revenue)}</span>
+        </div>`;
+    })
+    .join("");
+  const gap = proof.roundingGap;
+  const gapText = gap === 0n ? "딱 맞아요" : `반올림 차이 ${gap > 0n ? "+" : "−"}${formatCount(gap > 0n ? gap : -gap)}메소`;
+  return `
+    <ol class="reverse-proof-flow">
+      <li><span class="reverse-proof-no">1</span><div><strong>제작 1회 비용</strong>
+        <div class="reverse-proof-receipt">${materialLines}
+          <div><span>기본 제작비</span><b>${meso(REVERSE_BASE_FEE)}</b></div>
+          <div><span>상급 추가비 <small>${formatCount(REVERSE_HIGH_EXTRA_FEE)} × 3</small></span><b>${meso(craftResult.highExtraFee)}</b></div>
+          <div><span>촉진제</span><b>${meso(craftResult.catalystFee)}</b></div>
+          <div class="is-total"><span>1회 합계</span><b>${meso(proof.attemptCost)}</b></div>
+        </div></div></li>
+      <li><span class="reverse-proof-no">2</span><div><strong>101번 만든다고 생각해요</strong><p>${meso(proof.attemptCost)} × 101 = <b>${meso(proof.totalCost)}</b></p><small>101번 중 파괴가 10.1번, 나머지 90.9번은 정옵~+5 장비가 나와요.</small></div></li>
+      <li><span class="reverse-proof-no">3</span><div><strong>정옵~+5 여섯 결과가 비용을 똑같이 1/6씩 나눠 가져요</strong><p>${meso(proof.totalCost)} ÷ 6 = <b>${meso(proof.share)}</b> <small>(결과 하나의 비용 몫)</small></p><small>파괴는 팔 수 없어서 몫이 없고, 그만큼 비용은 다른 여섯 결과가 나눠 내요.</small></div></li>
+      <li><span class="reverse-proof-no">4</span><div><strong>몫을 101번 동안 나오는 개수로 나누면 개당 적정가</strong><p>비용 몫 ÷ (101 × 확률) = 적정가</p><small>+5처럼 드물게 나오는 결과는 같은 몫을 적은 개수로 나누니 개당 값이 커져요.</small></div></li>
+    </ol>
+    <div class="reverse-proof-table" role="list" aria-label="결과별 적정가 계산">
+      ${optionRows}
+      <div class="reverse-proof-total"><span>여섯 결과를 적정가로 모두 팔면</span><b>${meso(proof.totalRevenue)}</b><small>101회 총 제작비 ${meso(proof.totalCost)}와 ${gapText}</small></div>
+    </div>
+    <p class="reverse-proof-note">판매 총액 = 적정가 × 101회 중 개수. 적정가는 손해도 이득도 없는 기준선이에요. 시장가가 이보다 높으면 그 결과는 이득, 낮으면 손해예요.</p>
+  `;
+}
+
+function reverseRowProofHtml(proof, bonus) {
+  if (!proof) return `<p class="reverse-proof-wait">재료 시세를 모두 적으면 이 가격이 나온 과정을 보여 줘요.</p>`;
+  const row = proof.rows.find((item) => item.bonus === bonus);
+  if (!row) return "";
+  return `
+    <span class="reverse-proof-title">이 가격이 나온 과정</span>
+    <ol>
+      <li><span>101회 총 제작비</span><b>${meso(proof.attemptCost)} × 101 = ${meso(proof.totalCost)}</b></li>
+      <li><span>여섯 결과가 1/6씩 나눈 몫</span><b>÷ 6 = ${meso(proof.share)}</b></li>
+      <li><span>101회 중 ${escapeHtml(row.label)} 예상 개수</span><b>101 × ${row.percent}% = ${countText(row.expectedCount)}개</b></li>
+      <li class="is-result"><span>적정 판매가</span><b>${meso(proof.share)} ÷ ${countText(row.expectedCount)} ≈ ${meso(row.fairPrice)}</b></li>
+    </ol>
+  `;
+}
+
 function reverseTargetResultsHtml(targets) {
   const stageLabel = (row) => (row.bonus == null ? "파괴" : row.label);
   return `
@@ -501,7 +591,7 @@ function reverseTargetResultsHtml(targets) {
                 <div><span>잔여템 판매</span><b>−${meso(target.residualRevenue)}</b></div>
               </div>
               <div class="reverse-target-net"><span>순제작비</span><b>${target.netCost >= 0n ? meso(target.netCost) : `−${meso(-target.netCost)}`}</b></div>
-              <div class="reverse-target-market"><span>실거래가 ${meso(target.price)}</span><b>${profit >= 0n ? `+${meso(profit)} 이득` : `−${meso(-profit)} 손해`}</b></div>
+              <div class="reverse-target-market"><span>시장가 ${meso(target.price)}</span><b>${profit >= 0n ? `+${meso(profit)} 이득` : `−${meso(-profit)} 손해`}</b></div>
               <details>
                 <summary>잔여 결과 자세히 보기</summary>
                 <div class="reverse-leftover-list">
@@ -632,6 +722,14 @@ export async function render(root, mode = "gem") {
           <div data-quick-price-content></div>
         </section>
       </div>
+      <dialog class="belt-history-dialog" data-reverse-history-dialog>
+        <div class="belt-history-head">
+          <h2 data-reverse-history-title>시장가 기록</h2>
+          <button class="text-button" type="button" data-reverse-history-close aria-label="닫기">닫기</button>
+        </div>
+        <div data-reverse-history-body></div>
+        <p class="hint">새 시장가는 리버스 제작 화면의 입력칸에 적고 "시장가 저장"을 누르면 쌓여요.</p>
+      </dialog>
       <dialog class="belt-history-dialog" data-price-history-dialog>
         <div class="belt-history-head">
           <h2 data-price-history-title>시세 기록</h2>
@@ -661,6 +759,15 @@ export async function render(root, mode = "gem") {
   let refineTimer = 0;
   const reverseHighSelections = [null, null, null];
   let reverseActiveSlot = null;
+  // 리버스 무기별 시장가(sql/065): 도감 무기 목록과 내 기록(최신 순).
+  const reverseHistoryDialog = root.querySelector("[data-reverse-history-dialog]");
+  let reverseWeapons = [];
+  let reverseWeaponNote = "도감에서 리버스 무기를 불러오는 중…";
+  let reversePriceRows = [];
+  let reversePriceError = "";
+  let reverseWeaponId = "";
+  let reverseLoadId = 0;
+  let savingReverse = false;
   const enchantSelections = [
     { itemId: null, tier: "high" },
     { itemId: null, tier: "high" },
@@ -1176,6 +1283,259 @@ export async function render(root, mode = "gem") {
     }
   }
 
+  function pickedReverseWeapon() {
+    return reverseWeapons.find((weapon) => weapon.id === reverseWeaponId) ?? null;
+  }
+
+  function reverseHistory(itemId, bonus) {
+    return reversePriceRows.filter((row) => row.item_id === itemId && Number(row.bonus) === bonus);
+  }
+
+  function latestReverse(itemId, bonus) {
+    return reverseHistory(itemId, bonus)[0] ?? null;
+  }
+
+  // 고른 무기의 저장값과 다른(새로 적은) 시장가만 모은다. 칸을 비운 것은 저장하지 않는다.
+  function reverseChanges() {
+    const weapon = pickedReverseWeapon();
+    if (!weapon || !reverseCalculator) return [];
+    const changes = [];
+    for (const input of reverseCalculator.querySelectorAll("[data-reverse-output-price]")) {
+      const bonus = Number(input.dataset.reverseOutputPrice);
+      const parsed = readBig(input.value, "시장가", 0n);
+      if (parsed.error || parsed.value == null) continue;
+      const latest = latestReverse(weapon.id, bonus);
+      if (!latest || BigInt(latest.price) !== parsed.value) changes.push({ bonus, value: parsed.value });
+    }
+    return changes;
+  }
+
+  function paintReverseWeapons() {
+    if (!reverseCalculator) return;
+    const grid = reverseCalculator.querySelector("[data-reverse-weapon-grid]");
+    const savedCount = (itemId) => new Set(reversePriceRows.filter((row) => row.item_id === itemId).map((row) => Number(row.bonus))).size;
+    const card = (weapon, index) => {
+      const picked = (weapon?.id ?? "") === reverseWeaponId;
+      if (!weapon) {
+        return `<label class="reverse-weapon is-manual${picked ? " is-picked" : ""}" style="--i:0"><input type="radio" name="reverse-weapon" value="" data-reverse-weapon${picked ? " checked" : ""} /><span class="reverse-weapon-art" aria-hidden="true">✎</span><span class="reverse-weapon-text"><strong>직접 입력</strong><small>공격력·시장가를 직접</small></span></label>`;
+      }
+      const stat = reverseWeaponStat(weapon);
+      const saved = savedCount(weapon.id);
+      const name = reverseWeaponName(weapon);
+      return `<label class="reverse-weapon${picked ? " is-picked" : ""}" style="--i:${index + 1}" title="${escapeHtml(weapon.name)}"><input type="radio" name="reverse-weapon" value="${escapeHtml(weapon.id)}" data-reverse-weapon${picked ? " checked" : ""} /><span class="reverse-weapon-art">${weapon.image_url ? `<img src="${escapeHtml(weapon.image_url)}" alt="" loading="lazy" decoding="async" />` : `<i aria-hidden="true">⚔</i>`}</span><span class="reverse-weapon-text"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(equipmentTypeName(weapon.subcategory) || "무기")} · ${stat.name} ${stat.value == null ? "-" : formatCount(stat.value)}</small></span>${saved ? `<em class="reverse-weapon-saved" title="저장한 시장가 ${saved}/6">${saved}/6</em>` : ""}</label>`;
+    };
+    if (grid) grid.innerHTML = [card(null, 0), ...reverseWeapons.map(card)].join("");
+    const note = reverseCalculator.querySelector("[data-reverse-weapon-note]");
+    if (note) note.textContent = reverseWeaponNote;
+    paintReverseSave();
+  }
+
+  function paintReverseSave() {
+    if (!reverseCalculator) return;
+    const weapon = pickedReverseWeapon();
+    const bar = reverseCalculator.querySelector("[data-reverse-weapon-save]");
+    for (const input of reverseCalculator.querySelectorAll("[data-reverse-output-price]")) {
+      const bonus = Number(input.dataset.reverseOutputPrice);
+      const history = weapon ? reverseHistory(weapon.id, bonus) : [];
+      const latest = history[0] ?? null;
+      const parsed = readBig(input.value, "시장가", 0n);
+      const changed = Boolean(weapon && parsed.value != null && (!latest || BigInt(latest.price) !== parsed.value));
+      input.classList.toggle("is-changed", changed);
+      const reading = reverseCalculator.querySelector(`[data-reverse-output-reading="${bonus}"]`);
+      if (reading) {
+        const text = priceReading(input.value);
+        reading.textContent = latest && !changed && parsed.value != null
+          ? `저장됨 · ${formatWhen(latest.created_at)}`
+          : changed ? `${text || "메소"} · 저장 전` : text || (weapon ? "이 무기 시장가를 적어요" : "비교할 때만 적어요");
+      }
+      const historyButton = reverseCalculator.querySelector(`[data-reverse-history="${bonus}"]`);
+      if (historyButton) {
+        historyButton.hidden = !history.length;
+        historyButton.textContent = `기록 ${history.length}개`;
+      }
+    }
+    if (!bar) return;
+    if (!weapon) {
+      bar.hidden = true;
+      bar.innerHTML = "";
+      return;
+    }
+    const changes = reverseChanges();
+    const rows = reversePriceRows.filter((row) => row.item_id === weapon.id);
+    const saved = new Set(rows.map((row) => Number(row.bonus))).size;
+    const status = reversePriceError
+      ? `시장가 기록을 불러오지 못했어요: ${reversePriceError}`
+      : !isLoggedIn()
+        ? "적은 시장가는 로그인하면 무기별로 저장돼요"
+        : saved
+          ? `저장 ${saved}/6 · 마지막 ${formatWhen(rows[0].created_at)}`
+          : "아직 저장한 시장가가 없어요";
+    bar.hidden = false;
+    bar.classList.toggle("has-changes", changes.length > 0);
+    bar.innerHTML = `
+      <span class="reverse-weapon-save-art">${weapon.image_url ? `<img src="${escapeHtml(weapon.image_url)}" alt="" />` : "⚔"}</span>
+      <span class="reverse-weapon-save-text"><strong>${escapeHtml(weapon.name)} 시장가</strong><small${reversePriceError ? ' class="is-error"' : ""}>${escapeHtml(status)}</small></span>
+      <button type="button" class="reverse-weapon-save-button" data-reverse-save-prices${changes.length ? "" : " disabled"}>${changes.length ? `시장가 저장 · ${changes.length}개` : "바뀐 시장가 없음"}</button>
+    `;
+  }
+
+  // 무기를 고르면 정옵 공격력(완드·스태프는 마력)과 그 무기에 저장한 최신 시장가를 채운다.
+  function pickReverseWeapon(itemId) {
+    if (itemId === reverseWeaponId) return;
+    const pending = reverseChanges();
+    if (pending.length && !window.confirm(`저장하지 않은 ${reverseWeaponName(pickedReverseWeapon())} 시장가 ${pending.length}개가 있어요. 무기를 바꿀까요?`)) {
+      const back = reverseCalculator.querySelector(`[data-reverse-weapon][value="${CSS.escape(reverseWeaponId)}"]`);
+      if (back) back.checked = true;
+      return;
+    }
+    reverseWeaponId = itemId;
+    const weapon = pickedReverseWeapon();
+    const stat = reverseWeaponStat(weapon);
+    reverseCalculator.querySelector("[data-reverse-base-label]").textContent = `정옵 ${stat.name}`;
+    if (weapon) {
+      reverseCalculator.querySelector("[data-reverse-base-attack]").value = stat.value == null ? "" : stat.value.toString();
+      for (const input of reverseCalculator.querySelectorAll("[data-reverse-output-price]")) {
+        const latest = latestReverse(weapon.id, Number(input.dataset.reverseOutputPrice));
+        input.value = latest ? String(latest.price) : "";
+      }
+    }
+    for (const label of reverseCalculator.querySelectorAll("[data-reverse-weapon]")) {
+      label.closest(".reverse-weapon")?.classList.toggle("is-picked", label.value === reverseWeaponId);
+    }
+    updateReverseCalculator();
+  }
+
+  async function loadReverseWeapons() {
+    if (!reverseCalculator) return;
+    try {
+      const supabase = await getSupabase();
+      const { data, error } = await supabase
+        .from("catalog_items")
+        .select("id, name, subcategory, middle_category, base_options, image_url")
+        .ilike("name", "리버스%");
+      if (!root.isConnected) return;
+      if (error) throw error;
+      reverseWeapons = (data ?? [])
+        .filter((item) => /Weapon$/.test(item.middle_category ?? ""))
+        .sort((a, b) => (equipmentTypeName(a.subcategory) || "").localeCompare(equipmentTypeName(b.subcategory) || "", "ko") || a.name.localeCompare(b.name, "ko"));
+      reverseWeaponNote = reverseWeapons.length
+        ? `도감의 리버스 무기 ${reverseWeapons.length}종 · 고르면 정옵 공격력과 저장한 시장가가 채워져요`
+        : "도감에 리버스 무기가 없어요. 직접 입력으로 계산해요";
+    } catch (error) {
+      reverseWeapons = [];
+      reverseWeaponNote = `무기 목록을 불러오지 못했어요: ${translateDbError(error)}`;
+    }
+    paintReverseWeapons();
+  }
+
+  async function loadReversePrices() {
+    const current = ++reverseLoadId;
+    if (!isLoggedIn()) {
+      reversePriceRows = [];
+      reversePriceError = "";
+      paintReverseWeapons();
+      return;
+    }
+    const supabase = await getSupabase();
+    const { data, error } = await supabase
+      .from("maker_reverse_prices")
+      .select("id, item_id, bonus, price, created_at")
+      .order("created_at", { ascending: false });
+    if (current !== reverseLoadId || !root.isConnected) return;
+    reversePriceError = error ? translateDbError(error) : "";
+    reversePriceRows = error ? [] : data ?? [];
+    paintReverseWeapons();
+  }
+
+  async function saveReversePrices(button) {
+    const weapon = pickedReverseWeapon();
+    if (savingReverse || !weapon) return;
+    for (const input of reverseCalculator.querySelectorAll("[data-reverse-output-price]")) {
+      const parsed = readBig(input.value, `${input.closest(".reverse-grade")?.querySelector(".reverse-grade-badge")?.textContent ?? ""} 시장가`, 0n);
+      if (parsed.error) {
+        notify(parsed.error, "error");
+        input.focus();
+        return;
+      }
+    }
+    const changes = reverseChanges();
+    if (!changes.length) {
+      notify("바뀐 시장가가 없어요.", "info");
+      return;
+    }
+    if (!requireLogin("리버스 무기 시장가는 로그인한 계정에 저장돼요.", { fields: snapshotFields(root) })) return;
+    savingReverse = true;
+    if (button) button.disabled = true;
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from("maker_reverse_prices")
+        .insert(changes.map((change) => ({ item_id: weapon.id, bonus: change.bonus, price: change.value.toString() })));
+      if (!root.isConnected) return;
+      if (error) {
+        notify(translateDbError(error), "error");
+        return;
+      }
+      sfx("check");
+      if (button?.isConnected) burstAt(button, ["#ffe28a", "#c9a6ff", "#ffffff"], 18, 0.8);
+      notify(`${reverseWeaponName(weapon)} 시장가 ${changes.length}개를 저장했어요.`);
+      await loadReversePrices();
+    } finally {
+      savingReverse = false;
+      paintReverseSave();
+    }
+  }
+
+  function refreshReverseHistory() {
+    const weapon = pickedReverseWeapon();
+    const bonus = Number(reverseHistoryDialog.dataset.bonus);
+    const odd = REVERSE_CATALYST_ODDS.find((row) => row.bonus === bonus);
+    if (!weapon || !odd) return;
+    reverseHistoryDialog.querySelector("[data-reverse-history-title]").textContent = `${weapon.name} ${odd.label} 시장가 기록`;
+    const history = reverseHistory(weapon.id, bonus);
+    reverseHistoryDialog.querySelector("[data-reverse-history-body]").innerHTML = history.length
+      ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>시장가</th><th>이전과 차이</th><th>기록 시각</th><th></th></tr></thead><tbody>${history
+          .map((row, index) => {
+            const delta = priceDelta(row, history[index + 1]);
+            return `<tr><td class="num">${escapeHtml(formatCount(row.price))}</td><td class="num ${delta.className}">${escapeHtml(delta.text)}</td><td>${escapeHtml(formatWhen(row.created_at))}</td><td><button class="text-button is-danger" type="button" data-delete-reverse-price="${escapeHtml(row.id)}">삭제</button></td></tr>`;
+          })
+          .join("")}</tbody></table></div>`
+      : `<p class="hint">아직 기록이 없어요.</p>`;
+  }
+
+  function openReverseHistory(bonus) {
+    if (!pickedReverseWeapon()) return;
+    reverseHistoryDialog.dataset.bonus = String(bonus);
+    refreshReverseHistory();
+    if (!reverseHistoryDialog.open) reverseHistoryDialog.showModal();
+  }
+
+  async function deleteReversePrice(id) {
+    const row = reversePriceRows.find((item) => item.id === id);
+    const weapon = pickedReverseWeapon();
+    if (!row || !weapon) return;
+    const odd = REVERSE_CATALYST_ODDS.find((item) => item.bonus === Number(row.bonus));
+    if (!window.confirm(`${weapon.name} ${odd?.label ?? ""} ${formatCount(row.price)} 시장가 기록을 삭제할까요?`)) return;
+    const input = reverseCalculator.querySelector(`[data-reverse-output-price="${Number(row.bonus)}"]`);
+    // 입력칸이 지우는 값(=최신 저장값)을 보이고 있었다면, 지운 뒤 그 이전 기록으로 바꿔 둔다.
+    const wasShowing = input && latestReverse(weapon.id, Number(row.bonus))?.id === row.id && input.value === String(row.price);
+    const supabase = await getSupabase();
+    const { error } = await supabase.from("maker_reverse_prices").delete().eq("id", id);
+    if (!root.isConnected) return;
+    if (error) {
+      notify(translateDbError(error), "error");
+      return;
+    }
+    notify("시장가 기록을 삭제했어요.");
+    await loadReversePrices();
+    if (wasShowing && input?.isConnected) {
+      const next = latestReverse(weapon.id, Number(row.bonus));
+      input.value = next ? String(next.price) : "";
+      updateReverseCalculator();
+    }
+    if (reverseHistoryDialog.open) refreshReverseHistory();
+  }
+
   function updateReverseCalculator() {
     if (!reverseCalculator) return;
     const prices = {};
@@ -1210,10 +1570,11 @@ export async function render(root, mode = "gem") {
       ${attemptCard}
       ${averageCard}
       <article class="reverse-card"><span>${result.complete ? "재료 합계" : "입력된 재료 합계"} + 고정 비용</span><b>${formatCount(result.materialCost)}<small>+ ${formatCount(result.fixedCost)}</small></b><em>${useCatalyst ? "촉진제 사용" : "촉진제 미사용"}</em></article>
-      <article class="reverse-card" data-reverse-profit-card><span>기대 손익</span><b>-</b><em>${useCatalyst ? "실거래가를 적으면 계산" : "촉진제를 쓸 때만 계산해요"}</em></article>
+      <article class="reverse-card" data-reverse-profit-card><span>기대 손익</span><b>-</b><em>${useCatalyst ? "시장가를 적으면 계산" : "촉진제를 쓸 때만 계산해요"}</em></article>
     `;
     updateReverseExpectedValue(result, useCatalyst);
     updateReverseGemSlots();
+    paintReverseSave();
   }
 
   function updateReverseExpectedValue(craftResult, useCatalyst = true) {
@@ -1222,22 +1583,28 @@ export async function render(root, mode = "gem") {
     const baseAttack = baseParsed.value ?? null;
     const outcomePrices = {};
     for (const input of reverseCalculator.querySelectorAll("[data-reverse-output-price]")) {
-      const parsed = readBig(input.value, `+${input.dataset.reverseOutputPrice} 실거래가`, 0n);
+      const parsed = readBig(input.value, `+${input.dataset.reverseOutputPrice} 시장가`, 0n);
       outcomePrices[input.dataset.reverseOutputPrice] = parsed.value ?? null;
     }
     const expected = reverseExpectedValue(baseAttack, outcomePrices, craftResult.attemptCost);
+    const statName = reverseWeaponStat(pickedReverseWeapon()).name;
+    const proof = useCatalyst ? reverseFairProof(craftResult.attemptCost) : null;
+    const proofBody = reverseCalculator.querySelector("[data-reverse-proof-body]");
+    if (proofBody) proofBody.innerHTML = reverseProofHtml(craftResult, proof, statName, baseAttack);
     for (const row of expected.rows) {
       if (row.bonus == null) continue;
-      reverseCalculator.querySelector(`[data-reverse-attack-label="${row.bonus}"]`).textContent = row.attack == null ? "공격력 -" : `공격력 ${formatCount(row.attack)}`;
+      const rowProof = reverseCalculator.querySelector(`[data-reverse-proof="${row.bonus}"]`);
+      if (rowProof) rowProof.innerHTML = reverseRowProofHtml(proof, row.bonus);
+      reverseCalculator.querySelector(`[data-reverse-attack-label="${row.bonus}"]`).textContent = row.attack == null ? `${statName} -` : `${statName} ${formatCount(row.attack)}`;
       reverseCalculator.querySelector(`[data-reverse-fair-price="${row.bonus}"]`).innerHTML = row.fairPrice == null
         ? "제작비 입력 대기"
         : `<span class="reverse-fair-main">${meso(row.fairPrice)}</span><small class="reverse-fair-reading">${escapeHtml(priceReading(row.fairPrice.toString()))}</small>`;
-      // 실거래가를 적은 줄은 적정가와의 차이를 알약 모양으로 보여 줍니다.
+      // 시장가를 적은 줄은 적정가와의 차이를 알약 모양으로 보여 줍니다.
       const diff = reverseCalculator.querySelector(`[data-reverse-diff="${row.bonus}"]`);
       const price = outcomePrices[row.bonus];
       if (price == null || row.fairPrice == null) {
         diff.className = "reverse-grade-diff";
-        diff.textContent = row.fairPrice == null ? "재료 시세를 모두 적으면 비교해요" : "실거래가를 적으면 적정가와 비교해요";
+        diff.textContent = row.fairPrice == null ? "재료 시세를 모두 적으면 비교해요" : "시장가를 적으면 적정가와 비교해요";
       } else {
         const gap = price - row.fairPrice;
         diff.className = `reverse-grade-diff ${gap >= 0n ? "is-gain" : "is-loss"}`;
@@ -1250,11 +1617,11 @@ export async function render(root, mode = "gem") {
     const profitCard = reverseCalculator.querySelector("[data-reverse-profit-card]");
     const summary = reverseCalculator.querySelector("[data-reverse-value-summary]");
     if (baseAttack == null || missingPrices) {
-      if (profitCard && useCatalyst) profitCard.querySelector("em").textContent = `실거래가 ${filled}/${valueRows.length} · 모두 적으면 계산`;
-      const needs = [baseAttack == null ? "정옵 공격력" : null, missingPrices ? `${missingPrices}개 공격력의 실거래가` : null].filter(Boolean).join("과 ");
+      if (profitCard && useCatalyst) profitCard.querySelector("em").textContent = `시장가 ${filled}/${valueRows.length} · 모두 적으면 계산`;
+      const needs = [baseAttack == null ? "정옵 공격력" : null, missingPrices ? `${missingPrices}개 공격력의 시장가` : null].filter(Boolean).join("과 ");
       summary.innerHTML = craftResult.attemptCost == null
         ? `<span>적정가 계산 대기</span><b>재료 시세를 모두 입력해 주세요</b>`
-        : `<span>제작비를 여섯 옵션에 배분한 적정가입니다</span><b>${escapeHtml(needs)}를 입력하면 실거래 손익도 비교합니다</b>`;
+        : `<span>제작비를 여섯 옵션에 배분한 적정가입니다</span><b>${escapeHtml(needs)}를 입력하면 시장가 손익도 비교합니다</b>`;
       summary.className = "reverse-value-summary is-waiting";
       reverseCalculator.querySelector("[data-reverse-target-results]").innerHTML = "";
       return;
@@ -1272,11 +1639,11 @@ export async function render(root, mode = "gem") {
         const gain = expected.expectedProfit >= 0n;
         profitCard.classList.add(gain ? "is-gain" : "is-loss");
         profitCard.querySelector("b").innerHTML = `${gain ? "+" : "−"}${formatCount(gain ? expected.expectedProfit : -expected.expectedProfit)}<small>메소</small>`;
-        profitCard.querySelector("em").textContent = `제작 1회당 기대 ${gain ? "이득" : "손해"} · 실거래가 ${filled}/${valueRows.length}`;
+        profitCard.querySelector("em").textContent = `제작 1회당 기대 ${gain ? "이득" : "손해"} · 시장가 ${filled}/${valueRows.length}`;
       }
     }
     summary.className = `reverse-value-summary${expected.expectedProfit != null && expected.expectedProfit < 0n ? " is-loss" : " is-complete"}`;
-    summary.innerHTML = `<span>입력한 실거래가 기준 1회 기대 판매가</span><b>${meso(expected.expectedSale)}</b>${profit}`;
+    summary.innerHTML = `<span>입력한 시장가 기준 1회 기대 판매가</span><b>${meso(expected.expectedSale)}</b>${profit}`;
     reverseCalculator.querySelector("[data-reverse-target-results]").innerHTML = craftResult.attemptCost == null
       ? `<div class="reverse-target-wait">재료 시세를 모두 입력하면 목표 옵션별 순제작비가 표시됩니다.</div>`
       : reverseTargetResultsHtml(expected.targets);
@@ -1373,6 +1740,25 @@ export async function render(root, mode = "gem") {
   }
 
   root.addEventListener("click", (event) => {
+    const reverseSave = event.target.closest("[data-reverse-save-prices]");
+    if (reverseSave) {
+      saveReversePrices(reverseSave);
+      return;
+    }
+    const reverseHistoryButton = event.target.closest("[data-reverse-history]");
+    if (reverseHistoryButton) {
+      openReverseHistory(Number(reverseHistoryButton.dataset.reverseHistory));
+      return;
+    }
+    if (event.target.closest("[data-reverse-history-close]")) {
+      reverseHistoryDialog.close();
+      return;
+    }
+    const reverseDelete = event.target.closest("[data-delete-reverse-price]");
+    if (reverseDelete) {
+      deleteReversePrice(reverseDelete.dataset.deleteReversePrice);
+      return;
+    }
     const priceToggle = event.target.closest("[data-toggle-price-board]");
     if (priceToggle) {
       const open = priceToggle.getAttribute("aria-expanded") !== "true";
@@ -1588,10 +1974,6 @@ export async function render(root, mode = "gem") {
         input.setSelectionRange(nextCursor, nextCursor);
       }
     }
-    if (input.matches("[data-reverse-output-price]")) {
-      const reading = priceReading(input.value);
-      reverseCalculator.querySelector(`[data-reverse-output-reading="${input.dataset.reverseOutputPrice}"]`).textContent = reading || "메소";
-    }
     updateReverseCalculator();
   }
 
@@ -1636,6 +2018,7 @@ export async function render(root, mode = "gem") {
 
   root.addEventListener("change", (event) => {
     if (event.target.matches("[data-reverse-catalyst]")) updateReverseCalculator();
+    if (event.target.matches("[data-reverse-weapon]") && event.target.checked) pickReverseWeapon(event.target.value);
   });
 
   root.addEventListener("keydown", (event) => {
@@ -1673,8 +2056,9 @@ export async function render(root, mode = "gem") {
   });
 
   paint();
+  paintReverseWeapons();
   updateReverseCalculator();
-  await loadPrices();
+  await Promise.all([loadPrices(), page.id === "craft" ? loadReverseWeapons().then(loadReversePrices) : null]);
   // 로그인하러 가기 전에 적던 시세가 있으면 되살린다: 다른 칸은 그대로, 시세는 그 시세 창을 열어 채워 둔다(저장은 사용자가 누른다).
   const draft = takeDraft(routeId);
   if (draft && root.isConnected) {

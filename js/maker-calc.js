@@ -336,6 +336,26 @@ export function reverseCraftCost(prices, useCatalyst = true) {
   return { rows, complete, materialCost, highExtraFee, catalystFee, fixedCost, attemptCost, averageCompletedCost, destructionLoss };
 }
 
+/** 적정 판매가가 왜 그 값인지 보여 주는 계산 과정(101회 기준, docs/domain.md 리버스 제작).
+ *  101회 총 제작비를 정옵~+5 여섯 옵션이 1/6씩 나눠 갖고, 각 몫을 101회 동안 그 옵션이 나오는 예상 개수로 나눈다.
+ *  여섯 옵션을 적정가로 모두 팔면 예상 판매 총액이 101회 총 제작비와 같아진다(메소 반올림 차이 제외). */
+export function reverseFairProof(attemptCost) {
+  if (attemptCost == null) return null;
+  const optionCount = BigInt(REVERSE_CATALYST_ODDS.filter((odd) => odd.bonus != null).length);
+  const runs = 101n;
+  const totalCost = attemptCost * runs;
+  const share = divideRound(totalCost, optionCount);
+  const rows = REVERSE_CATALYST_ODDS.map((odd) => {
+    // 101회 중 예상 개수 = 101 × 확률(만분율). 소수 둘째 자리까지 그대로 보여 준다.
+    const expectedCount = Number(runs * odd.basisPoints) / 10_000;
+    if (odd.bonus == null) return { ...odd, expectedCount, share: 0n, fairPrice: 0n, revenue: 0n };
+    const fairPrice = divideRound(attemptCost * 10_000n, optionCount * odd.basisPoints);
+    return { ...odd, expectedCount, share, fairPrice, revenue: divideRound(fairPrice * runs * odd.basisPoints, 10_000n) };
+  });
+  const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0n);
+  return { runs, optionCount, attemptCost, totalCost, share, rows, totalRevenue, roundingGap: totalRevenue - totalCost };
+}
+
 /** 공격력별 실거래가에 촉진제 결과 확률을 적용한 제작 1회의 기대 판매가 */
 export function reverseExpectedValue(baseAttack, outcomePrices, attemptCost = null) {
   // 여섯 완성 옵션이 제작비를 동일하게 회수하도록 배분한다.

@@ -65,6 +65,10 @@ function seed() {
       { id: "e0000000-0000-4000-8000-000000000001", name: "연습용 아대", category: "장비", subcategory: "Claw", required_level: 50, base_options: { attack: 30, remaining_upgrades: 7 }, requirements: { 레벨: 50 }, image_url: null },
       // 거래 장부 확인용(2026-11-04): 장비 1개(옵션 범위 있음)·소비 1개. 그림은 이 사이트 그림을 빌려 쓴다.
       { id: "e0000000-0000-4000-8000-000000000002", name: "연습용 청갑충", category: "장비", subcategory: "Claw", required_level: 70, base_options: { attack: 34, luk: 5, defense: 4, remaining_upgrades: 7 }, requirements: { level: 70 }, image_url: "https://yourmaple.kr/img/chaos-scroll.png" },
+      // 리버스 제작 무기 고르기 확인용(2026-11-07): 무기 2개(완드는 마력 기준)·방어구 1개(목록에서 빠져야 함).
+      { id: "e0000000-0000-4000-8000-000000000011", name: "리버스 페스카즈", category: "Equip", middle_category: "One-Handed Weapon", subcategory: "Dagger", required_level: 120, base_options: { attack: 105, remaining_upgrades: 7 }, requirements: {}, image_url: "https://yourmaple.kr/img/maker-icon.png" },
+      { id: "e0000000-0000-4000-8000-000000000012", name: "리버스 엔릴 티어", category: "Equip", middle_category: "One-Handed Weapon", subcategory: "Wand", required_level: 118, base_options: { attack: 81, magic_attack: 133, remaining_upgrades: 7 }, requirements: {}, image_url: null },
+      { id: "e0000000-0000-4000-8000-000000000013", name: "리버스 코럴", category: "Equip", middle_category: "Armor", subcategory: "Hat", required_level: 120, base_options: { int: 6, defense: 60 }, requirements: {}, image_url: null },
       { id: "e0000000-0000-4000-8000-000000000003", name: "연습용 엘릭서", category: "소비", subcategory: "Potion", required_level: null, base_options: {}, requirements: {}, image_url: "https://yourmaple.kr/img/rift.png" },
     ],
     catalog_item_stats: [
@@ -76,7 +80,7 @@ function seed() {
     catalog_monster_drops: [],
     hunts: [], level_exp: [], quests: [], character_quests: [], quest_notes: [], monsters: [], links: [],
     trades: [],
-    maker_gem_prices: [], enhance_profiles: [], account_deletions: [],
+    maker_gem_prices: [], maker_reverse_prices: [], enhance_profiles: [], account_deletions: [],
   };
 }
 
@@ -199,6 +203,13 @@ class Query {
   }
   lte(column, value) {
     this.filters.push((row) => compare(row[column], value) <= 0);
+    return this;
+  }
+  // 이름 검색 흉내: % 는 아무 글자, 대소문자 무시.
+  ilike(column, pattern) {
+    const source = String(pattern).split("%").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+    const regex = new RegExp(`^${source}$`, "i");
+    this.filters.push((row) => regex.test(String(row[column] ?? "")));
     return this;
   }
   is(column, value) {

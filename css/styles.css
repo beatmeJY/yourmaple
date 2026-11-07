@@ -16497,3 +16497,109 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .catalog-page .catalog-item-art img, .mo-page .mo-card .mo-art .catalog-monster-image { transition: none; }
   .catalog-page .catalog-item:hover .catalog-item-art img, .mo-page .mo-card:hover .mo-art .catalog-monster-image { transform: none; }
 }
+
+/* ===== 리버스 제작: 무기별 시장가 · 적정가 계산 과정 (2026-11-07) ===== */
+.rv2 .reverse-weapon-pick { display: flex; flex-direction: column; gap: 10px; }
+.rv2 .reverse-weapon-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.rv2 .reverse-weapon-head strong { font-size: 13px; font-weight: 800; color: #d9d3ea; }
+.rv2 .reverse-weapon-head small { font-size: 12px; color: #8f87a8; }
+.rv2 .reverse-weapon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; max-height: 248px; overflow-y: auto; padding: 2px; scrollbar-width: thin; }
+.rv2 .reverse-weapon { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; padding: 8px 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.18); cursor: pointer; transition: transform .25s var(--spring), border-color .2s, background .2s; animation: ym-fade-up .35s calc(var(--i, 0) * .025s) both; }
+.rv2 .reverse-weapon:hover { transform: translateY(-2px); border-color: oklch(0.8 0.14 65 / .45); }
+.rv2 .reverse-weapon input { position: absolute; opacity: 0; pointer-events: none; }
+.rv2 .reverse-weapon:has(input:focus-visible) { outline: 2px solid var(--amber); outline-offset: 2px; }
+.rv2 .reverse-weapon.is-picked { border-color: var(--amber); background: oklch(0.6 0.15 55 / .2); box-shadow: 0 0 18px oklch(0.75 0.15 65 / .25); }
+.rv2 .reverse-weapon-art { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: radial-gradient(circle, rgba(255,255,255,.08), transparent 70%); color: #d9d3ea; font-size: 16px; }
+.rv2 .reverse-weapon-art img { max-width: 34px; max-height: 34px; object-fit: contain; image-rendering: pixelated; }
+.rv2 .reverse-weapon.is-picked .reverse-weapon-art img { animation: equipment-float 4s ease-in-out infinite; }
+.rv2 .reverse-weapon-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rv2 .reverse-weapon-text strong { font-size: 13px; font-weight: 800; color: #f3effb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv2 .reverse-weapon-text small { font-size: 11px; color: #8f87a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv2 .reverse-weapon-saved { position: absolute; top: 4px; right: 6px; padding: 0 6px; border-radius: 999px; background: oklch(0.85 0.15 150 / .16); color: var(--rv-gain); font-size: 10px; font-style: normal; font-weight: 800; }
+.rv2 .reverse-weapon.is-manual .reverse-weapon-art { border: 1px dashed rgba(255,255,255,.22); }
+
+.rv2 .reverse-weapon-save { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; border: 1px solid oklch(0.8 0.14 65 / .3); background: oklch(0.6 0.15 55 / .1); animation: ym-fade-up .3s both; }
+.rv2 .reverse-weapon-save[hidden] { display: none; }
+.rv2 .reverse-weapon-save.has-changes { border-color: var(--amber); }
+.rv2 .reverse-weapon-save-art { display: grid; place-items: center; width: 40px; height: 40px; }
+.rv2 .reverse-weapon-save-art img { max-width: 38px; max-height: 38px; object-fit: contain; image-rendering: pixelated; }
+.rv2 .reverse-weapon-save-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rv2 .reverse-weapon-save-text strong { font-size: 14px; overflow-wrap: anywhere; }
+.rv2 .reverse-weapon-save-text small { font-size: 12px; color: #8f87a8; }
+.rv2 .reverse-weapon-save-text small.is-error { color: var(--rv-warn); }
+.rv2 .reverse-weapon-save-button { height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--amber); background: linear-gradient(135deg, oklch(0.78 0.15 70), oklch(0.66 0.16 50)); color: #1d1206; font: inherit; font-size: 13px; font-weight: 900; cursor: pointer; white-space: nowrap; transition: transform .2s var(--spring), opacity .2s; }
+.rv2 .reverse-weapon-save-button:hover:not(:disabled) { transform: translateY(-1px) scale(1.03); }
+.rv2 .reverse-weapon-save-button:disabled { cursor: default; opacity: .45; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: #b9b1cf; }
+.rv2 .reverse-value-input input.is-changed { border-color: var(--amber); box-shadow: 0 0 0 3px oklch(0.75 0.15 65 / .18); }
+.rv2 .reverse-grade-history { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: transparent; color: #d9d3ea; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.rv2 .reverse-grade-history[hidden] { display: none; }
+.rv2 .reverse-grade-history:hover { border-color: oklch(0.8 0.14 65 / .5); }
+
+/* 등급 줄 펼침: 이 가격이 나온 과정 */
+.rv2 .reverse-proof-steps { flex: 1 1 100%; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,.22); border: 1px dashed color-mix(in oklab, var(--c) 40%, transparent); }
+.rv2 .reverse-proof-steps:empty { display: none; }
+.rv2 .reverse-proof-title { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; color: var(--c); }
+.rv2 .reverse-proof-steps ol { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; counter-reset: rv-step; }
+.rv2 .reverse-proof-steps li { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; color: #b9b1cf; counter-increment: rv-step; }
+.rv2 .reverse-proof-steps li > span::before { content: counter(rv-step) ". "; color: #8f87a8; }
+.rv2 .reverse-proof-steps li b { color: #f3effb; font-variant-numeric: tabular-nums; text-align: right; }
+.rv2 .reverse-proof-steps li.is-result { margin-top: 2px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,.12); }
+.rv2 .reverse-proof-steps li.is-result b { color: var(--amber); font-size: 13px; }
+.rv2 .reverse-proof-wait { margin: 0; font-size: 12px; color: #8f87a8; }
+
+/* 계산 과정 전체 */
+.rv2 .reverse-proof { border-radius: 18px; border: 1px solid oklch(0.8 0.14 65 / .3); background: oklch(0.6 0.15 55 / .06); }
+.rv2 .reverse-proof > summary { display: grid; grid-template-columns: 34px minmax(0, 1fr) 20px; align-items: center; gap: 12px; padding: 12px 14px; list-style: none; cursor: pointer; }
+.rv2 .reverse-proof > summary::-webkit-details-marker { display: none; }
+.rv2 .reverse-proof > summary:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 18px; }
+.rv2 .reverse-proof > summary strong { display: block; font-size: 14px; color: #f3effb; }
+.rv2 .reverse-proof > summary small { display: block; font-size: 12px; color: #8f87a8; }
+.rv2 .reverse-proof-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: oklch(0.6 0.15 55 / .22); color: var(--amber); font-size: 18px; font-weight: 900; }
+.rv2 .reverse-proof[open] .reverse-grade-chev { transform: rotate(90deg); }
+.rv2 .reverse-proof-body { display: flex; flex-direction: column; gap: 14px; padding: 0 14px 16px; animation: ym-fade-up .3s both; }
+.rv2 .reverse-proof-flow { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rv2 .reverse-proof-flow > li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; align-items: start; animation: ym-fade-up .35s calc(var(--n, 0) * .05s) both; }
+.rv2 .reverse-proof-flow > li:nth-child(2) { --n: 1; } .rv2 .reverse-proof-flow > li:nth-child(3) { --n: 2; } .rv2 .reverse-proof-flow > li:nth-child(4) { --n: 3; }
+.rv2 .reverse-proof-no { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: oklch(0.6 0.15 55 / .25); color: var(--amber); font-size: 12px; font-weight: 900; }
+.rv2 .reverse-proof-flow strong { display: block; font-size: 13px; color: #f3effb; }
+.rv2 .reverse-proof-flow p { margin: 4px 0 2px; font-size: 13px; color: #d9d3ea; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.rv2 .reverse-proof-flow p b { color: var(--amber); }
+.rv2 .reverse-proof-flow small { font-size: 11.5px; color: #8f87a8; line-height: 1.5; }
+.rv2 .reverse-proof-receipt { display: flex; flex-direction: column; margin-top: 6px; padding: 6px 12px; border-radius: 12px; background: rgba(0,0,0,.22); border: 1px dashed rgba(255,255,255,.12); }
+.rv2 .reverse-proof-receipt > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 3px 0; font-size: 12px; color: #b9b1cf; }
+.rv2 .reverse-proof-receipt small { margin-left: 4px; color: #8f87a8; font-size: 11px; }
+.rv2 .reverse-proof-receipt b { color: #f3effb; font-variant-numeric: tabular-nums; }
+.rv2 .reverse-proof-receipt .is-total { margin-top: 3px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,.14); font-weight: 800; color: #f3effb; }
+.rv2 .reverse-proof-receipt .is-total b { color: var(--amber); }
+.rv2 .reverse-proof-table { display: flex; flex-direction: column; gap: 4px; }
+/* 결과마다 작은 카드: 이름 줄 + 확률·101회 중·비용 몫 / 적정가·판매 총액(칸이 좁아도 숫자가 겹치지 않게) */
+.rv2 .reverse-proof-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; padding: 9px 12px; border-radius: 12px; background: rgba(0,0,0,.18); border-left: 3px solid var(--c, transparent); font-size: 12.5px; color: #d9d3ea; font-variant-numeric: tabular-nums; animation: ym-fade-up .35s calc(var(--i, 0) * .04s) both; }
+.rv2 .reverse-proof-row.is-head { display: none; }
+.rv2 .reverse-proof-row > .reverse-proof-name { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 8px; }
+.rv2 .reverse-proof-row > span[data-label] { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.rv2 .reverse-proof-row > span[data-label]::before { content: attr(data-label); font-size: 10.5px; color: #8f87a8; font-weight: 600; }
+.rv2 .reverse-proof-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rv2 .reverse-proof-name b { color: var(--c); font-size: 12.5px; }
+.rv2 .reverse-proof-name small { color: #8f87a8; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv2 .reverse-proof-row .is-fair { color: var(--amber); font-weight: 900; }
+.rv2 .reverse-proof-row.is-destroy { background: repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0 8px, transparent 8px 16px); color: #8f87a8; }
+.rv2 .reverse-proof-total { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 10px; margin-top: 4px; padding: 10px 12px; border-radius: 12px; background: oklch(0.85 0.15 150 / .08); border: 1px solid oklch(0.85 0.15 150 / .25); font-size: 13px; color: #d9d3ea; }
+.rv2 .reverse-proof-total b { color: var(--rv-gain); font-size: 15px; font-variant-numeric: tabular-nums; }
+.rv2 .reverse-proof-total small { flex-basis: 100%; font-size: 11.5px; color: #8f87a8; }
+.rv2 .reverse-proof-note { margin: 0; font-size: 11.5px; color: #8f87a8; line-height: 1.6; }
+
+@media (max-width: 640px) {
+  .rv2 .reverse-weapon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 264px; }
+  .rv2 .reverse-weapon { grid-template-columns: 30px minmax(0, 1fr); padding: 7px 8px; gap: 6px; }
+  .rv2 .reverse-weapon-art { width: 30px; height: 30px; }
+  .rv2 .reverse-weapon-art img { max-width: 28px; max-height: 28px; }
+  .rv2 .reverse-weapon-save { grid-template-columns: 34px minmax(0, 1fr); }
+  .rv2 .reverse-weapon-save-art { width: 34px; height: 34px; }
+  .rv2 .reverse-weapon-save-button { grid-column: 1 / -1; width: 100%; }
+  .rv2 .reverse-proof-steps li { flex-direction: column; align-items: flex-start; }
+  .rv2 .reverse-proof-steps li b { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rv2 .reverse-weapon, .rv2 .reverse-weapon.is-picked .reverse-weapon-art img, .rv2 .reverse-weapon-save, .rv2 .reverse-proof-body, .rv2 .reverse-proof-flow > li, .rv2 .reverse-proof-row { animation: none; }
+  .rv2 .reverse-weapon, .rv2 .reverse-weapon-save-button { transition: none; }
+}
