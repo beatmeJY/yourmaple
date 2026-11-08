@@ -21,6 +21,7 @@
 ## 3. 기술 구성
 
 - 빌드 도구 없는 순수 HTML/CSS/JavaScript(ES 모듈) SPA. GitHub Pages로 배포(`.github/workflows/pages.yml`). 배포 때만 `tools/stamp_version.py`가 JS·CSS 주소와 상대 import에 커밋 번호(`?v=`)를 붙여 캐시를 깬다. 그래서 상대 import는 `./x.js`·`../x.js` 문자열 그대로 쓰고, 경로를 변수로 조립하지 않는다.
+- 배포 전 검증: `pages.yml`의 `check` 작업이 `node tools/run-checks.mjs`(js/*.check.mjs 전부 + 브라우저 없는 tools 검사 + PGlite DB 검사)를 돌리고, 실패하면 `deploy`가 실행되지 않는다. 새 계산 검사는 `js/xxx.check.mjs`로 두면 자동 포함. Playwright 화면 검사(`tools/*-ui.check.mjs`)는 로컬 전용. 2026-11-08 (Claude)
 - 배포 주소는 `https://yourmaple.kr`(가비아 DNS → GitHub Pages 커스텀 도메인, Enforce HTTPS). 예전 `beatmejy.github.io/yourmaple/`은 새 주소로 이동한다. DNS 레코드와 설정 위치는 README "도메인" 절에 있다. 코드에 배포 경로를 고정하지 않는다(상대 경로 유지).
 - 데이터·로그인: Supabase(Postgres + RLS). 설정은 `js/config.js`(커밋 안 함, `config.example.js` 참고).
 - 로컬 가짜 DB: 127.0.0.1·localhost 에서 `?mock`(로그인됨)·`?mock=guest`·`?mock=reset`·`?mock=0`. `js/supabase-client.js` 가 이때만 `js/dev-mock.js`(supabase-js 흉내, localStorage `ym-mock-db`)를 불러온다. 쿼리 흉내가 부족하면 그 파일에 추가한다. 사용법 README "로컬에서 로그인 없이 확인하기". 2026-10-20 (Claude) [실측]
@@ -67,8 +68,11 @@
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
 
+- 2026-11-08 (Claude) 배포 전 검증 추가(사용자 요청): `tools/run-checks.mjs`(계산 28·tools 2·PGlite DB 3 = 33개, 하나라도 실패하면 1로 종료, CI에서 PGlite 없으면 실패), `pages.yml`에 `check` 작업(Node 24·PGlite 0.2.17 고정 설치) → `deploy`는 `needs: check`. 로컬 33개 통과·일부러 실패하는 검사 넣으면 종료 1·CI=true에 PGlite 없으면 종료 1, 추적 파일만 복사한 깨끗한 사본에서 CI처럼 설치·실행 33개 통과, YAML 파싱 확인 [실측]. README "배포 전 검증", `.gitignore`에 node_modules. 원격 20e8114(Codex) 받음·AGENTS 충돌 양쪽 유지
+
 - 2026-11-07 (Codex) 사용자 SQL064 실행 완료 보고 [진술]. 별도 운영 DB 접속·재실행 없음.
 - 2026-11-07 (Codex) 메이플랜드 검색 대비 홈 메타·공개 소개/비로그인 문구 갱신, 배 시간표·헬리오스탑 정적 소개(/transport/)와 사이트맵·홈/바닥글·Pages 연결, 무릉/도감 소개를 현행 화면에 맞춤. README에 키워드·색인 확인 절차 추가. Chrome PC1280/375 교통 그림·넘침 없음, 앱 이동·가짜 DB 홈/바닥글·콘솔 오류 없음 [실측]. 미커밋·미배포, Search Console 색인 상태 미확인.
+- 2026-11-07 (Claude) 리버스 무기별 시장가·적정가 계산 과정 1cf72a9 배포(sql/065 사용자 실행 완료 [진술], Pages 성공·공개 v=1cf72a9, 공개 리버스 화면 비로그인으로 무기 17종 로딩·페스카즈 고르면 정옵 105·계산 과정 칸·넘침/콘솔 오류 없음) [실측]. 로그인 저장은 사용자 확인 필요. Codex 미커밋 기록 줄은 커밋에서 뺌
 
 - 2026-11-07 (Claude) 리버스 제작(사용자 요청): ① 공용 도감 리버스 무기 17종 카드 고르기 → 정옵 수치(완드·스태프는 마력 [추정])·그 무기에 저장한 최신 시장가 채움, 바뀐 칸만 "시장가 저장"(새 표 `sql/065_maker_reverse_prices.sql` — 사용자 실행 완료 [진술]), 등급 줄 "기록 n개" 창에서 이전과 차이·삭제, 미저장 상태 무기 변경 확인, 로그인 전 저장 → 로그인 후 같은 무기·값 복원. ② 적정가 계산 과정: 등급 줄 펼치면 101회 총비용 → ÷6 → 예상 개수 → 적정가, 아래 "계산 과정 펼쳐 보기"에 1회 제작비 영수증·결과별 몫/적정가/판매 총액·합계=총비용(반올림 차이) (`reverseFairProof`+check). PGlite 065 두 번 실행·본인 행만·anon 거절·범위/외래키 제약, ?mock PC 1280·모바일 375 고르기/저장/무기 전환/기록 삭제/로그인 복원·넘침 없음, ?mock=0 실제 도감 17종 읽기·콘솔 오류 없음, 전체 node check 통과 [실측]. 실제 로그인 DB 저장 미검증. 미커밋·미배포
 

@@ -15,7 +15,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 배포 전 검증: 계산 규칙 검사(js/*.check.mjs)와 임시 Postgres(PGlite) SQL 검사를 돌린다.
+  # 하나라도 실패하면 deploy 작업이 실행되지 않아 공개 사이트는 이전 버전 그대로 남는다.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 준비
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: PGlite 설치(DB 검사용, 버전 고정)
+        run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.2.17
+
+      - name: 검증 스크립트 실행
+        run: node tools/run-checks.mjs
+
   deploy:
+    needs: check
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

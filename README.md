@@ -302,6 +302,20 @@ py -3 -m http.server 5500
 `py` 가 없으면 `python -m http.server 5500` 을 사용합니다.  
 브라우저에서 http://127.0.0.1:5500 을 엽니다. 터미널에 `Serving HTTP` 가 보이는 동안만 사이트가 열립니다.
 
+## 배포 전 검증 (2026-11-08)
+
+`main`에 push하면 GitHub Actions가 먼저 `check` 작업으로 검증 스크립트를 돌리고, **모두 통과해야** `deploy` 작업이 사이트를 올립니다. 하나라도 실패하면 공개 사이트는 이전 버전 그대로입니다(Actions 화면에서 실패한 검사와 출력 확인).
+
+- 돌리는 것: `js/*.check.mjs`(계산·표시 규칙, 새로 만들면 자동 포함), `tools/`의 브라우저 없이 도는 검사, 임시 Postgres(PGlite)로 SQL을 실행하는 DB 검사(`tools/*-db.check.mjs`)
+- 건너뛰는 것: Playwright(브라우저)가 필요한 `tools/*-ui.check.mjs` 화면 검사 — 로컬에서 따로 돌립니다.
+- 로컬에서 같은 검사:
+
+```bash
+node tools/run-checks.mjs
+```
+
+PGlite가 없으면 DB 검사는 건너뛰고 알려 줍니다. 같이 돌리려면 `npm install --no-save --no-package-lock @electric-sql/pglite@0.2.17` 후 실행합니다(`node_modules/`는 커밋하지 않음).
+
 ## 인터넷 주소로 열기
 
 GitHub 저장소는 공개이고, 데이터는 Supabase에 남습니다.  
