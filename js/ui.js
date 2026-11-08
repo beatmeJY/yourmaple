@@ -119,6 +119,7 @@ export function renderShell() {
             <a href="./monster-park/">몬스터파크</a>
             <a href="./monsters/">몬스터 도감</a>
             <a href="./items/">아이템 도감</a>
+            <a href="./transport/">배 시간표·헬리오스탑</a>
           </nav>
           <p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p>
         </footer>

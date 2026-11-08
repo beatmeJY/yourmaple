@@ -85,7 +85,7 @@ function renderGuest(root) {
         <section class="ym-home-hero ym-glass ym-guest-hero">
           <span class="ym-guest-kicker">메이플랜드 도우미</span>
           <h2>계산은 바로, 기록은 로그인해서</h2>
-          <p>레벨업·메이커·무릉 계산은 로그인 없이 써 보세요. 저장 버튼을 누를 때만 로그인하면 되고, 입력한 값은 로그인 뒤에도 그대로 남아요.</p>
+          <p>메이플랜드(메랜) 레벨업·메이커·무릉 계산과 아이템·몬스터 도감을 로그인 없이 이용해 보세요. 계산값이나 기록을 저장할 때 로그인하면 돼요.</p>
           <div class="ym-guest-providers" role="group" aria-label="로그인 방법 선택">${providerButtons("data-home-oauth")}</div>
           <p class="ym-guest-legal">만 14세 이상만 로그인할 수 있어요. 계속하면 <a href="./terms.html">이용약관</a>과 <a href="./privacy.html">개인정보 처리방침</a>에 동의합니다.</p>
         </section>

@@ -347,11 +347,18 @@ Secret key 는 Secret 에도 넣지 않습니다.
 5. DNS 반영 후 Search Console에서 확인합니다. 바로 확인되지 않으면 전파를 기다린 뒤 재시도합니다. 인증 후에도 TXT를 유지합니다. 필요하면 `dig TXT yourmaple.kr +short`로 값이 보이는지 확인합니다.
 6. 이 변경을 **배포한 뒤**, 사이트맵 메뉴에서 `https://yourmaple.kr/sitemap.xml`을 제출합니다. 홈·`privacy.html`·`terms.html`의 URL 검사에서 실제 페이지 확인 후 필요한 URL의 색인을 요청합니다.
 
-기능 소개 페이지 `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`도 사이트맵에 있습니다. 몬스터파크 페이지는 이벤트가 끝나면(2026-11-30 다음 날) 생성기를 다시 실행해 배포하면 원본 HTML도 종료 안내로 바뀝니다. 문구는 `python3 tools/build_feature_pages.py .`로 다시 만들고, 사이트맵을 바꾼 뒤에는 Search Console에서 다시 제출하지 않아도 Google이 다시 읽습니다(도메인 속성에서는 사이트맵을 `https://yourmaple.kr/sitemap.xml` 전체 주소로 제출).
+기능 소개 페이지 `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`·`/transport/`도 사이트맵에 있습니다. 몬스터파크 페이지는 이벤트가 끝나면(2026-11-30 다음 날) 생성기를 다시 실행해 배포하면 원본 HTML도 종료 안내로 바뀝니다. 문구는 `python3 tools/build_feature_pages.py .`로 다시 만들고, 사이트맵을 바꾼 뒤에는 Search Console에서 다시 제출하지 않아도 Google이 다시 읽습니다(도메인 속성에서는 사이트맵을 `https://yourmaple.kr/sitemap.xml` 전체 주소로 제출).
 
-`robots.txt`는 크롤링을 허용하고 사이트맵 위치를 안내합니다. 접근 제어나 개인정보 보호 수단이 아닙니다. 사이트맵에는 공개된 정규 URL 세 개만 넣고 `#/homework` 같은 해시 화면, OAuth 콜백·코드·토큰 URL이나 개인 기록은 넣지 않습니다. 현재 해시 SPA의 개별 기능 검색 노출을 보장하지 않습니다. Search Console 등록·사이트맵 제출도 색인이나 검색 순위를 보장하지 않습니다.
+`robots.txt`는 크롤링을 허용하고 사이트맵 위치를 안내합니다. 접근 제어나 개인정보 보호 수단이 아닙니다. 사이트맵에는 공개된 정규 URL만 넣고 `#/homework` 같은 해시 화면, OAuth 콜백·코드·토큰 URL이나 개인 기록은 넣지 않습니다. 현재 해시 SPA의 개별 기능 검색 노출을 보장하지 않습니다. Search Console 등록·사이트맵 제출도 색인이나 검색 순위를 보장하지 않습니다.
 
 배포 설정은 새 정적 파일도 `_site`에 복사합니다. 코드 작성과 Google 계정의 소유권 확인은 별개이며, 이번 변경만으로 Search Console에 자동 등록되지 않습니다.
+
+### 검색어와 배포 후 확인
+
+- 홈은 **메이플랜드 도우미**, **메랜 계산기**를 중심으로 소개합니다. 띄어쓰기 변형인 ‘메이플 랜드’는 별도 페이지나 키워드 나열로 반복하지 않습니다.
+- 기능별 우선 검색어: `/dojo/` 메랜 무릉도장 계산기·검은 허리띠 시간, `/maker/` 메이플랜드 메이커 계산기·리버스 제작비, `/items/` 메랜 아이템 도감·장비 옵션 범위, `/monsters/` 메랜 몬스터 드랍 확률, `/transport/` 메랜 배 시간표·헬리오스탑 엘리베이터. 경험치·혼줌 관련 검색어는 각 계산기 소개 페이지에 대응합니다.
+- 배포 후 Search Console **URL 검사**로 홈과 새 `https://yourmaple.kr/transport/`를 우선 확인하고, 변경된 페이지의 색인을 요청합니다. 이미 제출한 사이트맵은 상태와 마지막 읽은 날짜를 확인합니다.
+- **실적 → 검색 결과**에서 검색어와 페이지별 노출수·클릭수를 확인합니다. 위 검색어는 우선 검증할 후보이며 검색량이나 노출 순위를 보장하지 않습니다. [Google SEO 기본 가이드](https://developers.google.com/search/docs/fundamentals/seo-starter-guide) · [색인 요청 안내](https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl)
 
 공식 안내: [DNS TXT 소유권 확인](https://support.google.com/webmasters/answer/9008080), [사이트맵 작성](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap), [URL 구조와 해시](https://developers.google.com/search/docs/crawling-indexing/url-structure).
 

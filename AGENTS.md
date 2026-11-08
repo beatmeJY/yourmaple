@@ -30,7 +30,7 @@
   - 개발 중인 화면·탭 숨기기: `routes.js`의 route에 `dev: true`(메이커 탭은 `TABS`의 `dev: true`)를 붙이면 운영 주소에서는 메뉴·검색·홈 타일에서 빠지고 주소로 열어도 홈으로 간다. 주소에 `?dev`(또는 `#/화면?dev`)를 붙이면 그 탭을 닫을 때까지 보이고 `?dev=0`이면 끈다. 로컬(127.0.0.1·localhost)에서는 늘 보인다(`js/dev-mode.js`). 2026-10-11 강화 계산·리버스 제작을 숨김 [실측]
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
 - 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
-- 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML(`css/public.css`+`css/feature.css`, 앱 스크립트 없음). 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`pages.yml` 복사 목록·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
+- 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`·`/transport/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML(`css/public.css`+`css/feature.css`, 앱 스크립트 없음). 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`pages.yml` 복사 목록·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
 - 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
 
 ## 4. 코드 규칙
@@ -66,6 +66,9 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-07 (Codex) 사용자 SQL064 실행 완료 보고 [진술]. 별도 운영 DB 접속·재실행 없음.
+- 2026-11-07 (Codex) 메이플랜드 검색 대비 홈 메타·공개 소개/비로그인 문구 갱신, 배 시간표·헬리오스탑 정적 소개(/transport/)와 사이트맵·홈/바닥글·Pages 연결, 무릉/도감 소개를 현행 화면에 맞춤. README에 키워드·색인 확인 절차 추가. Chrome PC1280/375 교통 그림·넘침 없음, 앱 이동·가짜 DB 홈/바닥글·콘솔 오류 없음 [실측]. 미커밋·미배포, Search Console 색인 상태 미확인.
 
 - 2026-11-07 (Claude) 리버스 제작(사용자 요청): ① 공용 도감 리버스 무기 17종 카드 고르기 → 정옵 수치(완드·스태프는 마력 [추정])·그 무기에 저장한 최신 시장가 채움, 바뀐 칸만 "시장가 저장"(새 표 `sql/065_maker_reverse_prices.sql` — 사용자 실행 완료 [진술]), 등급 줄 "기록 n개" 창에서 이전과 차이·삭제, 미저장 상태 무기 변경 확인, 로그인 전 저장 → 로그인 후 같은 무기·값 복원. ② 적정가 계산 과정: 등급 줄 펼치면 101회 총비용 → ÷6 → 예상 개수 → 적정가, 아래 "계산 과정 펼쳐 보기"에 1회 제작비 영수증·결과별 몫/적정가/판매 총액·합계=총비용(반올림 차이) (`reverseFairProof`+check). PGlite 065 두 번 실행·본인 행만·anon 거절·범위/외래키 제약, ?mock PC 1280·모바일 375 고르기/저장/무기 전환/기록 삭제/로그인 복원·넘침 없음, ?mock=0 실제 도감 17종 읽기·콘솔 오류 없음, 전체 node check 통과 [실측]. 실제 로그인 DB 저장 미검증. 미커밋·미배포
 
