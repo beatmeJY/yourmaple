@@ -64,3 +64,34 @@ const mean = DEFAULT_CHAOS.deltas.reduce((s, d) => s + d.value * d.percent, 0) /
 assert.ok(Math.abs(ok / runs - 0.6) < 0.005, `성공 비율 ${ok / runs}`);
 assert.ok(Math.abs(sum / ok - mean) < 0.03, `평균 변화량 ${sum / ok} vs ${mean}`);
 console.log("혼돈의 주문서 계산 검증 통과");
+
+// 장비 등급 색: 정옵 대비 점수(0.1점 단위)와 구간 경계
+{
+  const { chaosScoreTenths, chaosGrade, scoreText } = await import("./chaos-calc.js");
+  const base = { str: 3, dex: 3, attack: 1, defense: 50, hp: 0, speed: 0 };
+  assert.equal(chaosScoreTenths(base, base), 0);
+  assert.equal(chaosScoreTenths(base, { ...base, hp: 100 }), 100); // HP 100 = 10점
+  assert.equal(chaosScoreTenths(base, { ...base, hp: 15 }), 15); // 1.5점(소수 그대로)
+  assert.equal(chaosScoreTenths(base, { ...base, speed: 20, jump: 10 }), 0); // 이동속도·점프력 제외
+  assert.equal(chaosScoreTenths(base, { ...base, str: 0, attack: 3 }), -10); // STR 사라짐 −3, 공 +2
+  const key = (score, wins = 1) => chaosGrade(Math.round(score * 10), wins).key;
+  assert.equal(key(-1), "gray");
+  assert.equal(key(-0.5), "gray");
+  assert.equal(key(0, 0), "white");
+  assert.equal(key(5, 0), "white");
+  assert.equal(key(0), "orange");
+  assert.equal(key(5.5), "orange");
+  assert.equal(key(6), "blue");
+  assert.equal(key(22.9), "blue");
+  assert.equal(key(23), "purple");
+  assert.equal(key(39), "purple");
+  assert.equal(key(40), "yellow");
+  assert.equal(key(54), "yellow");
+  assert.equal(key(55), "green");
+  assert.equal(key(69.9), "green");
+  assert.equal(key(70), "red");
+  assert.equal(key(130, 0), "red");
+  assert.equal(scoreText(275), "+27.5");
+  assert.equal(scoreText(-30), "−3");
+  assert.equal(scoreText(0), "0");
+}

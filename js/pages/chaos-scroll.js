@@ -1,4 +1,4 @@
-import { CHAOS_STATS, DEFAULT_CHAOS, applyChaos, checkChaosTable, statDiff } from "../chaos-calc.js";
+import { CHAOS_STATS, DEFAULT_CHAOS, applyChaos, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { burstAt, sfx } from "../effects.js";
 import { notify } from "../toast.js";
@@ -63,6 +63,8 @@ export function render(root) {
   let history = []; // [{ n, success, changes, before }]
   let lastChanges = new Map();
   let autoTimer = 0;
+  let lastGrade = ""; // 등급이 바뀌는 순간에만 테두리 빛을 한 번 퍼뜨린다.
+  let flashTimer = 0;
 
   const statInputs = CHAOS_STATS.map(({ key, label, scale }) => `<label class="cs-stat-input"><span>${escapeHtml(label)}${scale ? ` <small>×${scale}</small>` : ""}</span><em data-range="${key}"></em><input data-stat="${key}" inputmode="numeric" autocomplete="off" placeholder="-" value="${escapeHtml(stored.stats?.[key] ?? "")}" /></label>`).join("");
 
@@ -104,8 +106,8 @@ export function render(root) {
           <label class="cs-field"><span>아이템 이름 <small>선택</small></span><input data-item-name maxlength="40" autocomplete="off" placeholder="예: 노가다 목장갑" value="${escapeHtml(stored.name ?? "")}" /></label>
           <label class="cs-slots-row"><span>업그레이드 가능 횟수</span><input data-item-slots inputmode="numeric" autocomplete="off" placeholder="0" value="${escapeHtml(stored.slots ?? "")}" /></label>
           <div class="cs-stat-grid">${statInputs}</div>
-          <p class="cs-hint">장비를 고르면 도감 기본 옵션이 채워져요. 내 아이템과 다르면 고쳐 주세요(작은 숫자는 가능 범위). 비우거나 0인 능력치는 바뀌지 않아요.</p>
-          <button type="button" class="cs-start" data-start>이 상태로 시작</button>
+          <p class="cs-hint">장비를 고르면 도감 기본 옵션으로 바로 바를 수 있어요. 내 아이템과 다르면 고친 뒤 <b>이 옵션으로 다시 시작</b>을 눌러 주세요(작은 숫자는 가능 범위). 비우거나 0인 능력치는 바뀌지 않아요.</p>
+          <button type="button" class="cs-start" data-start>이 옵션으로 다시 시작</button>
         </section>
 
         <section class="cs-panel cs-stage" aria-labelledby="cs-stage-title" data-stage>
@@ -182,9 +184,37 @@ export function render(root) {
     return `<li class="${change ? `is-changed ${tone}` : ""}"><span>${escapeHtml(label)}</span><b>+${escapeHtml(formatCount(now))}</b>${badge}</li>`;
   }
 
-  function paintTooltip() {
+  function gradeOf(state, wins) {
+    const tenths = chaosScoreTenths(start.base, state.stats);
+    return { tenths, grade: chaosGrade(tenths, wins) };
+  }
+
+  function paintGrade() {
     if (!current) {
-      tooltip.innerHTML = `<p class="cs-empty">왼쪽에 아이템 능력치와 업그레이드 가능 횟수를 적고 <b>이 상태로 시작</b>을 눌러 주세요.</p>`;
+      tooltip.removeAttribute("data-grade");
+      tooltip.style.removeProperty("--grade");
+      lastGrade = "";
+      return null;
+    }
+    const wins = history.filter((item) => item.success).length;
+    const now = gradeOf(current, wins);
+    tooltip.dataset.grade = now.grade.key;
+    tooltip.style.setProperty("--grade", now.grade.color);
+    if (lastGrade && lastGrade !== now.grade.key && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      tooltip.classList.remove("is-grade-flash");
+      void tooltip.offsetWidth;
+      tooltip.classList.add("is-grade-flash");
+      window.clearTimeout(flashTimer);
+      flashTimer = window.setTimeout(() => tooltip.classList.remove("is-grade-flash"), 1100);
+    }
+    lastGrade = now.grade.key;
+    return now;
+  }
+
+  function paintTooltip() {
+    const graded = paintGrade();
+    if (!current) {
+      tooltip.innerHTML = `<p class="cs-empty">왼쪽에서 장비를 고르면 바로 바를 수 있어요. 직접 적었다면 <b>이 옵션으로 다시 시작</b>을 눌러 주세요.</p>`;
       return;
     }
     const wins = history.filter((item) => item.success).length;
@@ -196,7 +226,7 @@ export function render(root) {
     tooltip.innerHTML = `
       <div class="cs-tip-top">
         ${start.image ? `<div class="cs-tip-art">${start.image}</div>` : ""}
-        <div><div class="cs-tip-name${wins ? " is-up" : ""}">${escapeHtml(start.name || "내 아이템")}${wins ? ` <small>(+${wins})</small>` : ""}</div>${start.label ? `<div class="cs-tip-meta">${escapeHtml(start.label)}</div>` : ""}</div>
+        <div class="cs-tip-head"><span class="cs-grade" title="${escapeHtml(start.baseFromCatalog ? "정옵(도감 기본 옵션) 대비 점수 · HP·MP는 10당 1점" : "시작 옵션 대비 점수 · HP·MP는 10당 1점")}"><i aria-hidden="true"></i>${escapeHtml(start.baseFromCatalog ? "정옵" : "시작")} 대비 <b>${escapeHtml(scoreText(graded.tenths))}</b><small>${escapeHtml(graded.grade.name)}</small></span><div class="cs-tip-name${wins ? " is-up" : ""}">${escapeHtml(start.name || "내 아이템")}${wins ? ` <small>(+${wins})</small>` : ""}</div>${start.label ? `<div class="cs-tip-meta">${escapeHtml(start.label)}</div>` : ""}</div>
       </div>
       <ul class="cs-tip-stats">${CHAOS_STATS.map(statLine).join("")}</ul>
       <div class="cs-tip-slots"><span>업그레이드 가능 횟수</span><b>${escapeHtml(formatCount(current.slots))} / ${escapeHtml(formatCount(start.slots))}</b></div>
@@ -218,8 +248,14 @@ export function render(root) {
       <div class="is-ok"><small>성공</small><b>${formatCount(wins)}</b></div>
       <div class="is-fail"><small>실패</small><b>${formatCount(history.length - wins)}</b></div>
       <div class="${net > 0 ? "is-up" : net < 0 ? "is-down" : ""}"><small>합계 변화</small><b>${escapeHtml(signed(Math.round(net)))}</b></div>`;
+    // 줄마다 그 장을 바른 뒤의 등급 색 점(정옵 대비 점수).
+    let winsSoFar = 0;
+    const gradeAfter = history.map((item, index) => {
+      if (item.success) winsSoFar += 1;
+      return gradeOf(history[index + 1]?.before ?? current, winsSoFar);
+    });
     log.innerHTML = history.length
-      ? history.slice().reverse().map((item) => `<li class="${item.success ? "is-success" : "is-fail"}"><div class="cs-log-row"><span class="cs-log-n">${item.n}장째</span><b>${item.success ? "성공" : "실패"}</b></div><div class="cs-log-chips">${item.success ? item.changes.map(changeChip).join("") || `<span class="cs-chip">바뀐 능력치 없음</span>` : `<span class="cs-chip">능력치 변화 없음</span>`}</div></li>`).join("")
+      ? history.slice().reverse().map((item) => `<li class="${item.success ? "is-success" : "is-fail"}"><div class="cs-log-row"><span class="cs-log-n">${item.n}장째</span><b>${item.success ? "성공" : "실패"}</b><span class="cs-log-grade" style="--grade:${gradeAfter[item.n - 1].grade.color}" title="${escapeHtml(`${gradeAfter[item.n - 1].grade.name} · ${scoreText(gradeAfter[item.n - 1].tenths)}`)}"><i aria-hidden="true"></i>${escapeHtml(scoreText(gradeAfter[item.n - 1].tenths))}</span></div><div class="cs-log-chips">${item.success ? item.changes.map(changeChip).join("") || `<span class="cs-chip">바뀐 능력치 없음</span>` : `<span class="cs-chip">능력치 변화 없음</span>`}</div></li>`).join("")
       : `<li class="cs-log-empty">가운데 주문서를 눌러 바르기 시작해요</li>`;
     diffBox.innerHTML = current && history.length
       ? `<p class="cs-field-label">시작 대비</p>${rows.map((row) => `<div class="cs-diff-row ${row.diff > 0 ? "is-up" : row.diff < 0 ? "is-down" : ""}"><span>${escapeHtml(row.label)}</span><small>${escapeHtml(formatCount(row.start))} → ${row.now ? escapeHtml(formatCount(row.now)) : "사라짐"}</small><b>${escapeHtml(signed(row.diff))}</b></div>`).join("")}`
@@ -348,13 +384,21 @@ export function render(root) {
       input.value = stat?.base_value ? String(stat.base_value) : "";
       if (stat?.minimum_value != null && stat.maximum_value != null && stat.minimum_value !== stat.maximum_value) ranges[input.dataset.stat] = [stat.minimum_value, stat.maximum_value];
     }
-    picked = { id: item.id, name: item.name, image_url: item.image_url ?? null, label: [typeName(item), item.required_level == null ? "" : `Lv.${item.required_level}`].filter(Boolean).join(" · "), ranges };
+    // 정옵(도감 기본 옵션): 장비 등급 색의 기준.
+    const base = {};
+    for (const { key } of CHAOS_STATS) {
+      const value = Number(byKey.get(key)?.base_value);
+      if (value > 0) base[key] = value;
+    }
+    picked = { id: item.id, name: item.name, image_url: item.image_url ?? null, base, label: [typeName(item), item.required_level == null ? "" : `Lv.${item.required_level}`].filter(Boolean).join(" · "), ranges };
     root.querySelector("[data-item-search]").value = "";
     void searchItems("");
     paintPicked();
     paintRanges();
     persist({ picked });
-    sfx("tick");
+    // 기본 옵션이 바를 수 있는 상태면 바로 시작한다(시작 버튼을 따로 누르지 않게). 고친 뒤에는 시작 버튼으로 다시 시작.
+    if (readSetup().error) sfx("tick");
+    else startItem();
     if (!stats.some((stat) => stat.stat_key !== "remaining_upgrades" && stat.base_value > 0)) notify("도감에 붙어 있는 능력치가 없어요. 내 아이템 능력치를 직접 적어 주세요.", "info");
   }
 
@@ -426,21 +470,24 @@ export function render(root) {
     paintButtons();
   }
 
-  function startItem() {
+  function startItem({ quiet = false } = {}) {
     const read = readSetup();
     if (read.error) {
-      notify(read.error, "error");
+      if (!quiet) notify(read.error, "error");
       return;
     }
     stopAuto();
     const fromPicked = Boolean(picked && picked.name === read.value.name);
-    start = { ...read.value, image: fromPicked && picked.image_url ? catalogImage(picked.image_url, "cs-tip-image", 64) : "", label: fromPicked ? picked.label : "" };
+    // 정옵은 고른 장비의 도감 옵션, 직접 적었거나 예전에 저장된 장비라 없으면 시작 옵션.
+    const base = fromPicked && picked.base ? picked.base : read.value.stats;
+    start = { ...read.value, base, baseFromCatalog: Boolean(fromPicked && picked.base), image: fromPicked && picked.image_url ? catalogImage(picked.image_url, "cs-tip-image", 64) : "", label: fromPicked ? picked.label : "" };
+    lastGrade = "";
     current = { slots: start.slots, stats: { ...start.stats } };
     history = [];
     lastChanges = new Map();
     result.innerHTML = "";
     persist({ name: start.name, slots: String(start.slots), stats: read.raw });
-    sfx("tick");
+    if (!quiet) sfx("tick");
     paint();
   }
 
@@ -571,6 +618,8 @@ export function render(root) {
   paintOdds();
   paintPicked();
   paintRanges();
+  // 다시 들어오면 적어 둔 옵션으로 바로 바를 수 있게(값이 모자라면 조용히 빈 상태).
+  startItem({ quiet: true });
   paint();
   void searchItems("");
 }

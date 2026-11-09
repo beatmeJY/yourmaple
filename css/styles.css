@@ -16674,6 +16674,23 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .hu-page .hu-well textarea { width: 100%; min-height: 44px; padding: 0; resize: vertical; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: #f3effb; font: inherit; font-size: 14px; outline: none; }
 .hu-preview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 10px 0 0; animation: ym-fade-up 0.35s var(--spring) both; }
 .hu-preview[hidden] { display: none; }
+/* 넓은 화면: 입력을 왼쪽(누가·얼마나·어디서)·오른쪽(얻은 양·비용) 두 열로 나눠 칸이 쓸데없이 길어지지 않게 한다. */
+.hu-timer-grid { display: flex; flex-direction: column; gap: 14px; }
+.hu-timer-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.hu-timer-col .hu-measure, .hu-timer-col .hu-costs { margin: 0; }
+@container (min-width: 900px) {
+  .hu-timer { align-items: flex-start; }
+  .hu-timer .hu-ring { margin-top: 40px; }
+  .hu-timer-body { max-width: 1240px; }
+  .hu-timer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; align-items: start; }
+  .hu-measure-time { max-width: 320px; }
+  .hu-timer-actions { max-width: 560px; }
+}
+/* 기록 목록도 넓으면 카드 두 줄로(한 줄이 너무 길어져 이름과 숫자가 멀어지지 않게). 직업 묶음 제목은 한 줄 전체. */
+@container (min-width: 1140px) {
+  .hu-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(540px, 1fr)); gap: 8px 10px; align-items: stretch; }
+  .hu-list > :not(.hu-row) { grid-column: 1 / -1; }
+}
 .hu-preview span { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: oklch(0.82 0.14 150 / 0.08); border: 1px solid oklch(0.82 0.14 150 / 0.25); min-width: 0; }
 .hu-preview small { color: #a59dbd; font-size: 11px; }
 .hu-preview b { color: oklch(0.92 0.1 150); font-size: 13px; overflow-wrap: anywhere; }
@@ -16684,4 +16701,68 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 @media (prefers-reduced-motion: reduce) {
   .hu-unit { transition: none; }
   .hu-editing, .hu-direct-who, .hu-preview { animation: none; }
+}
+
+/* ==========================================================================
+   혼돈의 주문서 장비 등급 색(2026-11-09 사용자 요청)
+   정옵 대비 점수 구간에 따라 장비 카드 테두리가 그 색으로 빛난다.
+   노랑·연두·빨강은 테두리를 따라 빛줄기가 돌고, 등급이 바뀌는 순간 빛이 한 번 퍼진다.
+   ========================================================================== */
+@property --cs-spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.cs2 .cs-tooltip[data-grade] {
+  border-color: color-mix(in srgb, var(--grade) 70%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--grade) 35%, transparent),
+    inset 0 0 28px -10px color-mix(in srgb, var(--grade) 55%, transparent),
+    0 0 18px -4px color-mix(in srgb, var(--grade) 70%, transparent),
+    0 0 46px -14px var(--grade),
+    0 16px 32px -12px rgba(0, 0, 0, 0.7);
+  transition: border-color 0.45s ease, box-shadow 0.45s ease;
+}
+/* 회색(정옵보다 낮음)은 빛 없이 흐리게, 흰색(노작)은 은은하게 */
+.cs2 .cs-tooltip[data-grade="gray"] { box-shadow: inset 0 0 0 1px rgba(139, 135, 152, 0.25), 0 16px 32px -12px rgba(0, 0, 0, 0.7); }
+.cs2 .cs-tooltip[data-grade="white"] { box-shadow: inset 0 0 0 1px rgba(244, 241, 255, 0.2), 0 0 14px -6px rgba(244, 241, 255, 0.55), 0 16px 32px -12px rgba(0, 0, 0, 0.7); }
+/* 테두리를 따라 도는 빛줄기(테두리 두께만 남기고 안쪽은 가린다) */
+.cs2 .cs-tooltip[data-grade]::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: conic-gradient(from var(--cs-spin), transparent 0 62%, color-mix(in srgb, var(--grade) 80%, transparent) 78%, #fff 84%, color-mix(in srgb, var(--grade) 80%, transparent) 90%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0; transition: opacity 0.5s ease;
+}
+.cs2 .cs-tooltip:is([data-grade="blue"], [data-grade="purple"])::before { opacity: 0.55; animation: cs-grade-spin 6s linear infinite; }
+.cs2 .cs-tooltip:is([data-grade="yellow"], [data-grade="green"])::before { opacity: 0.9; animation: cs-grade-spin 3.6s linear infinite; }
+.cs2 .cs-tooltip[data-grade="red"]::before { opacity: 1; padding: 2px; animation: cs-grade-spin 2.4s linear infinite; }
+.cs2 .cs-tooltip[data-grade="red"] { animation: cs-grade-breathe 2.4s ease-in-out infinite; }
+/* 등급이 바뀐 순간: 바깥으로 빛이 한 번 퍼짐 */
+.cs2 .cs-tooltip.is-grade-flash::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--grade), inset 0 0 40px -6px var(--grade);
+  animation: cs-grade-flash 1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* 이름과 등급 배지도 같은 색 */
+.cs2 .cs-tooltip[data-grade] .cs-tip-name { color: color-mix(in srgb, var(--grade) 85%, #fff); text-shadow: 0 0 14px color-mix(in srgb, var(--grade) 45%, transparent); transition: color 0.45s ease; }
+.cs2 .cs-tooltip[data-grade="gray"] .cs-tip-name { color: #b3aec2; text-shadow: none; }
+.cs2 .cs-tooltip[data-grade] .cs-tip-name small { color: inherit; opacity: 0.85; }
+.cs2 .cs-grade {
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 4px; padding: 2px 9px 2px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; color: #cfc8e2; white-space: nowrap;
+  background: color-mix(in srgb, var(--grade, #8b8798) 14%, rgba(0, 0, 0, 0.3)); border: 1px solid color-mix(in srgb, var(--grade, #8b8798) 45%, transparent);
+}
+.cs2 .cs-grade i { width: 7px; height: 7px; border-radius: 50%; background: var(--grade, #8b8798); box-shadow: 0 0 8px var(--grade, #8b8798); }
+.cs2 .cs-grade b { color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; }
+.cs2 .cs-grade small { color: color-mix(in srgb, var(--grade, #8b8798) 85%, #fff); font-size: 11px; font-weight: 800; }
+/* 바른 기록: 그 장 뒤의 등급 점 */
+.cs2 .cs-log-row { gap: 8px; }
+.cs2 .cs-log-row b { margin-right: auto; }
+.cs2 .cs-log-grade { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 800; color: color-mix(in srgb, var(--grade) 80%, #fff); font-variant-numeric: tabular-nums; }
+.cs2 .cs-log-grade i { width: 8px; height: 8px; border-radius: 50%; background: var(--grade); box-shadow: 0 0 8px var(--grade); }
+@keyframes cs-grade-spin { to { --cs-spin: 360deg; } }
+@keyframes cs-grade-flash { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.06); } }
+@keyframes cs-grade-breathe {
+  0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--grade) 35%, transparent), inset 0 0 28px -10px color-mix(in srgb, var(--grade) 55%, transparent), 0 0 18px -4px color-mix(in srgb, var(--grade) 70%, transparent), 0 0 46px -14px var(--grade), 0 16px 32px -12px rgba(0, 0, 0, 0.7); }
+  50% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--grade) 55%, transparent), inset 0 0 36px -8px color-mix(in srgb, var(--grade) 70%, transparent), 0 0 26px -2px color-mix(in srgb, var(--grade) 85%, transparent), 0 0 64px -10px var(--grade), 0 16px 32px -12px rgba(0, 0, 0, 0.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs2 .cs-tooltip[data-grade], .cs2 .cs-tooltip[data-grade]::before, .cs2 .cs-tooltip.is-grade-flash::after { animation: none !important; }
 }

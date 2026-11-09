@@ -172,6 +172,8 @@ export async function render(root) {
                 <span>기록 수정 중 · <b data-editing-title></b></span>
                 <button type="button" class="hu-act" data-cancel-edit>수정 취소</button>
               </div>
+              <div class="hu-timer-grid">
+              <div class="hu-timer-col">
               <label class="hu-well"><span>기록할 캐릭터</span><select data-timer-character aria-label="기록할 캐릭터"></select></label>
               <div class="hu-wells hu-direct-who" data-direct-who hidden>
                 <label class="hu-well" data-direct-field="charName"><span>캐릭터명</span><input data-timer-field="charName" autocomplete="off" placeholder="이름" /></label>
@@ -189,12 +191,16 @@ export async function render(root) {
               <div class="hu-wells">
                 <label class="hu-well is-wide"><span>사냥터</span><input data-timer-field="title" autocomplete="off" placeholder="예: 엘나스 헥터, 파풀라투스" /></label>
               </div>
+              </div>
+              <div class="hu-timer-col">
               ${gainBoxHtml("exp", "EXP", "경험치")}
               ${gainBoxHtml("meso", "메소", "메소")}
               <div class="hu-wells hu-costs">
                 <label class="hu-well"><span>그동안 쓴 물약값</span><input data-timer-field="potion" inputmode="numeric" data-grouped placeholder="없으면 0" /></label>
                 <label class="hu-well"><span>그동안 쩔값 (+받음 / −지불)</span><input data-timer-field="leech" inputmode="text" data-grouped data-signed placeholder="내가 내면 -" /></label>
                 <label class="hu-well is-wide"><span>메모</span><textarea data-timer-field="memo" rows="2" placeholder="누구에게 얼마를 받았는지처럼 남겨 둘 내용"></textarea></label>
+              </div>
+              </div>
               </div>
               <p class="hu-preview" data-timer-preview aria-live="polite"></p>
               <p class="hu-timer-who" data-timer-who></p>
