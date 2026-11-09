@@ -16,7 +16,8 @@ import { notify } from "../toast.js";
 
 // 몬스터파크 계산(이벤트 기간 전용 화면, 2026-10-27). 계산 규칙은 js/monster-park-calc.js.
 // 캐릭터 카드를 누르면 레벨·경험치가 채워지고, 오늘 남은 입장과 함께 곧바로 다시 계산한다.
-// 몬파 레벨(50~129)이 아닌 캐릭터는 접어 둔다. "한 판 끝" 은 한 판 경험치를 더하고 오늘 입장을 줄이며,
+// 몬파 레벨(50~129)이 아닌 캐릭터는 접어 둔다. "오늘 몬파 끝" 은 오늘 남은 입장을 한 번에 돌아 경험치를 더하고 입장을 0으로 만들며
+// (2026-11-09 사용자 요청, 예전 "한 판 끝" 대체),
 // 고른 캐릭터면 레벨·경험치를 캐릭터에 바로 저장한다(2026-10-28 사용자 요청). 손으로 고친 값은 저장 버튼으로.
 // 고른 캐릭터의 "오늘 남은 입장"은 숙제표 몬스터파크 1회·2회 체크(homework_checks)와 같은 값이다. 표가 없으면 이 기기에만 기억.
 // 이 기기에만 기억: 직접 입력 시 오늘 남은 입장(날짜가 바뀌면 2회로).
@@ -29,6 +30,8 @@ const curve = new Map(levelExpSeed.map(([level, exp]) => [level, asBig(exp)]));
 // 구역 문 이름(디자인: 50~70 얼룩말, 71~100 표범, 101~129 호랑이)
 const GATE_NAME = { low: "얼룩말 문", mid: "표범 문", high: "호랑이 문" };
 const SPAN = MONSTER_PARK.maxLevel - MONSTER_PARK.minLevel; // 50 → 130, 80칸
+// 달력에서 레벨이 오르는 날 붙이는 그림(사용자 제공 LEVEL UP 그림, 2026-11-09)
+const LEVEL_UP_ICON = `<img class="mp-day-up" src="img/level-up.png" alt="" width="188" height="240" loading="lazy" />`;
 
 function readStore() {
   try {
@@ -383,23 +386,54 @@ export async function render(root) {
     return level >= realMaxLevel() ? `Lv.${level}` : `Lv.${level} · ${formatCount(exp)} EXP`;
   }
 
+  // 오늘 남은 입장을 지금 레벨·경험치에서 모두 돌았을 때. 만렙(cap)·구역 바뀜·구역 경험치 모름이면 거기서 멈춘다.
+  // 경험치는 직업 만렙 기준으로 더한다(배틀메이지는 130이 돼도 넘친 경험치가 남는다).
+  function todayPlan() {
+    const top = cap();
+    const left = ticketsToday();
+    let state = { level, exp };
+    let runs = 0;
+    let gained = 0n;
+    let wasted = 0n;
+    let lost = 0;
+    let levels = 0;
+    for (let slot = 0; slot < left; slot += 1) {
+      if (state.level >= top) break;
+      const zone = zoneOf(state.level);
+      const gain = zone ? zoneExp[zone.id] : null;
+      if (gain == null) break;
+      const after = gainRun(state.level, state.exp, gain, curve, realMaxLevel());
+      runs += 1;
+      gained += gain;
+      wasted += after.wasted;
+      if (after.leveled) levels += 1;
+      state = { level: after.level, exp: after.exp };
+      if (after.level < top && zoneOf(after.level)?.id !== zone.id) {
+        lost = left - slot - 1;
+        break;
+      }
+    }
+    return { runs, gained, wasted, lost, levels, after: state };
+  }
+
   function paintApply() {
     const box = root.querySelector("[data-apply]");
     const zone = level < cap() ? zoneOf(level) : null;
     const gain = zone ? zoneExp[zone.id] : null;
     const left = ticketsToday();
     const canRun = !expError && Boolean(zone) && gain != null && left > 0;
-    const runNote = !zone ? (level < MONSTER_PARK.minLevel ? "50레벨부터" : cap() < realMaxLevel() ? "몬파 졸업" : `${cap()} 달성`) : gain == null ? "구역 경험치 모름" : left <= 0 ? "오늘 입장 끝" : `+${formatCount(gain)}`;
+    const plan = canRun ? todayPlan() : null;
+    const runNote = !zone ? (level < MONSTER_PARK.minLevel ? "50레벨부터" : cap() < realMaxLevel() ? "몬파 졸업" : `${cap()} 달성`) : gain == null ? "구역 경험치 모름" : left <= 0 ? "오늘 입장 끝" : `${plan.runs}판 · +${formatCount(plan.gained)}`;
     const character = pickedCharacter();
     const dirty = isDirty(character);
     const saveHtml = !character
       ? `<span class="mp-apply-note">${isLoggedIn() ? "캐릭터를 고르면 레벨을 바로 저장할 수 있어요" : ""}</span>`
       : dirty
         ? `<button type="button" class="mp-save" data-save ${saving || expError ? "disabled" : ""}>${saving ? "저장 중…" : `${escapeHtml(character.name)}에 ${escapeHtml(savedText())} 저장`}</button>`
-        : `<span class="mp-apply-note is-saved">✓ ${escapeHtml(character.name)} 저장된 값과 같아요 · 한 판 끝을 누르면 바로 저장돼요</span>`;
+        : `<span class="mp-apply-note is-saved">✓ ${escapeHtml(character.name)} 저장된 값과 같아요 · 오늘 몬파 끝을 누르면 바로 저장돼요</span>`;
     box.innerHTML = `
       <button type="button" class="mp-run-done" data-run-done ${canRun && !saving ? "" : "disabled"}>
-        <span>한 판 끝!</span><small>${escapeHtml(runNote)}</small>
+        <span>오늘 몬파 끝!</span><small>${escapeHtml(runNote)}</small>
       </button>
       <div class="mp-apply-foot">${saveHtml}</div>`;
   }
@@ -431,7 +465,7 @@ export async function render(root) {
     paintRace();
   }
 
-  // 한 판 끝 연출: 경험치 글자가 떠오르고, 레벨업이면 고리·불꽃·LEVEL UP. 모션 축소면 건너뛴다.
+  // 오늘 몬파 끝 연출: 경험치 글자가 떠오르고, 레벨업이면 고리·불꽃·LEVEL UP. 모션 축소면 건너뛴다.
   function playRunFx(leveled, gain) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const layer = root.querySelector("[data-fx]");
@@ -444,25 +478,26 @@ export async function render(root) {
     }, 1300);
   }
 
-  // 한 판 경험치를 더하고 오늘 입장을 하나 줄인다. 구역이 바뀌면 오늘 남은 입장은 못 쓰니 0.
-  function finishRun() {
+  // 오늘 남은 입장을 한 번에 돌고 입장을 0으로. 구역이 바뀌면 남은 입장은 못 쓰니 역시 0.
+  function finishToday() {
     const zone = level < cap() ? zoneOf(level) : null;
     const gain = zone ? zoneExp[zone.id] : null;
-    const left = ticketsToday();
-    if (expError || !zone || gain == null || left <= 0) return;
+    if (expError || !zone || gain == null || ticketsToday() <= 0) return;
     const top = cap();
-    // 실제 경험치는 직업 만렙 기준(배틀메이지는 130이 돼도 넘친 경험치가 남는다)
-    const after = gainRun(level, exp, gain, curve, realMaxLevel());
-    const changed = after.level < top && zoneOf(after.level)?.id !== zone.id;
-    level = after.level;
-    exp = after.exp;
-    saveTickets(changed || after.level >= top ? 0 : left - 1);
-    if (after.leveled) {
+    const plan = todayPlan();
+    if (!plan.runs) return;
+    level = plan.after.level;
+    exp = plan.after.exp;
+    saveTickets(0);
+    if (plan.levels) {
       sfx(level >= top ? "fanfare" : "check");
       burstAt(levelInput, ["#ffd38a", "#ffb35c", "#ffffff"], 18, 1);
     } else sfx("tick");
-    playRunFx(after.leveled, gain);
-    if (after.wasted > 0n) notify(`1레벨 제한으로 경험치 ${formatCount(after.wasted)}이 버려졌어요`, "info");
+    playRunFx(plan.levels > 0, plan.gained);
+    const notes = [];
+    if (plan.lost) notes.push(`구역이 바뀌어 남은 입장 ${plan.lost}회는 못 써요`);
+    if (plan.wasted > 0n) notes.push(`1레벨 제한으로 경험치 ${formatCount(plan.wasted)}이 버려졌어요`);
+    if (notes.length) notify(notes.join(" · "), "info");
     paint();
     saveCharacter({ silent: true });
   }
@@ -515,10 +550,10 @@ export async function render(root) {
     root.querySelector("[data-hw-link]").hidden = !syncsHomework();
     const left = ticketsToday();
     root.querySelector("[data-left-text]").textContent = `${left}회`;
-    // 입장권 2장: 앞에서부터 남은 만큼 "입장 가능". 누르면 그 장을 쓰거나 되돌린다.
+    // 입장권 2장: 앞에서부터 남은 만큼 "입장 가능". 누르면 한 장씩만 쓰거나 되돌린다(2026-11-09 사용자 요청).
     root.querySelector("[data-tickets]").innerHTML = Array.from({ length: MONSTER_PARK.perDay }, (_, index) => {
       const on = index < left;
-      return `<button type="button" class="mp-ticket${on ? " is-on" : ""}" data-ticket="${on ? index : index + 1}" aria-pressed="${on}" title="${on ? "사용함으로 바꾸기" : "입장 가능으로 되돌리기"}">
+      return `<button type="button" class="mp-ticket${on ? " is-on" : ""}" data-ticket="${on ? left - 1 : left + 1}" aria-pressed="${on}" title="${on ? "사용함으로 바꾸기" : "입장 가능으로 되돌리기"}">
         <span class="mp-ticket-n">${index + 1}</span>
         <span class="mp-ticket-copy"><b>${on ? "입장 가능" : "사용함"}</b><small>${on ? "누르면 사용 처리" : "누르면 되돌리기"}</small></span>
       </button>`;
@@ -663,7 +698,7 @@ export async function render(root) {
       <div class="mp-lanes">${lanes.join("")}</div>`;
   }
 
-  // 이벤트 달력: 고른 캐릭터의 오늘~마감. 월요일부터 7칸, 하루 두 칸이 그날 입장권.
+  // 이벤트 달력: 고른 캐릭터의 오늘~마감. 일요일부터 7칸(2026-11-09 사용자 요청), 하루 두 칸이 그날 입장권.
   function paintCalendar(event) {
     const box = root.querySelector("[data-calendar]");
     const character = pickedCharacter();
@@ -680,7 +715,7 @@ export async function render(root) {
       byDay.get(run.day).push(run);
     }
     const lastRunDay = event.runs.at(-1)?.day ?? -1;
-    const lead = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7;
+    const lead = new Date(`${today}T00:00:00Z`).getUTCDay();
     const cells = Array.from({ length: lead }, () => `<span class="mp-day is-blank" aria-hidden="true"></span>`);
     const runText = (run) => (run.after.level > run.before.level ? `Lv.${run.before.level} → ${run.after.level}` : `+경험치 · ${percentOf(run.after.exp, curve.get(run.after.level))}%`);
     calDetails = [];
@@ -716,9 +751,10 @@ export async function render(root) {
       calDetails.push({ date: shortDate(date, today), runs: runs.map((run, index) => ({ text: `${index + 1}판 · ${runText(run)}`, up: run.after.level > run.before.level })), note });
       const week = (lead + day) % 7;
       const label = `${shortDate(date, today)} · ${done ? "끝" : levelText(after, top)}${badge ? ` · ${badge}` : ""}`;
-      cells.push(`<button type="button" class="mp-day${day === 0 ? " is-today" : ""}${goalHit ? " is-goal" : up > 0 ? " is-up" : ""}${done ? " is-done" : ""}${day === calPick ? " is-picked" : ""}${week === 5 ? " is-sat" : week === 6 ? " is-sun" : ""}" data-cal-day="${day}" aria-label="${escapeHtml(label)}" style="--i:${Math.min(day, 30)}">
+      cells.push(`<button type="button" class="mp-day${day === 0 ? " is-today" : ""}${goalHit ? " is-goal" : up > 0 ? " is-up" : ""}${done ? " is-done" : ""}${day === calPick ? " is-picked" : ""}${week === 6 ? " is-sat" : week === 0 ? " is-sun" : " is-weekday"}" data-cal-day="${day}" aria-label="${escapeHtml(label)}" style="--i:${Math.min(day, 30)}">
         <span class="mp-day-top"><b>${dateNum === 1 || day === 0 ? `${month}/` : ""}${dateNum}</b>${badge ? `<em class="${badgeClass}">${escapeHtml(badge)}</em>` : ""}</span>
         <span class="mp-day-lv"><b>${done ? "—" : `Lv.${after.level}`}</b><small>${done || after.level >= top ? "" : `${percentOf(after.exp, curve.get(after.level))}%`}</small></span>
+        ${up > 0 ? LEVEL_UP_ICON : ""}
         <span class="mp-day-pips">${pips}</span>
       </button>`);
     }
@@ -731,7 +767,7 @@ export async function render(root) {
       </div>
       <div class="mp-cal-scroll">
         <div class="mp-cal-grid">
-          ${["월", "화", "수", "목", "금", "토", "일"].map((name, index) => `<span class="mp-dow${index === 5 ? " is-sat" : index === 6 ? " is-sun" : ""}">${name}</span>`).join("")}
+          ${["일", "월", "화", "수", "목", "금", "토"].map((name, index) => `<span class="mp-dow${index === 6 ? " is-sat" : index === 0 ? " is-sun" : ""}">${name}</span>`).join("")}
           ${cells.join("")}
         </div>
       </div>
@@ -779,7 +815,7 @@ export async function render(root) {
       return;
     }
     if (event.target.closest("[data-run-done]")) {
-      finishRun();
+      finishToday();
       return;
     }
     if (event.target.closest("[data-cygnus]")) {

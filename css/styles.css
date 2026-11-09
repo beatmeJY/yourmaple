@@ -17005,3 +17005,27 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .mp-page *, .mp-page *::before, .mp-page *::after { animation: none !important; transition: none !important; }
   .main[data-page="monster-park"]::before { transition: none; }
 }
+
+/* 몬스터파크 달력: 주말 강조·레벨업 화살표(2026-11-09 사용자 요청) */
+.mp-day { position: relative; overflow: hidden; }
+.mp-dow.is-sat, .mp-dow.is-sun { border-radius: 999px; padding: 2px 0; }
+.mp-dow.is-sat { background: rgba(110, 160, 255, 0.16); }
+.mp-dow.is-sun { background: oklch(0.72 0.16 32 / 0.18); }
+.mp-day.is-sat:not(.is-blank) { background: linear-gradient(180deg, rgba(110, 160, 255, 0.2), rgba(110, 160, 255, 0.07)); border-color: rgba(138, 184, 255, 0.4); box-shadow: inset 0 3px 0 rgba(138, 184, 255, 0.85); }
+.mp-day.is-sun:not(.is-blank) { background: linear-gradient(180deg, oklch(0.72 0.16 32 / 0.24), oklch(0.72 0.16 32 / 0.08)); border-color: oklch(0.72 0.16 32 / 0.45); box-shadow: inset 0 3px 0 oklch(0.72 0.16 32 / 0.9); }
+.mp-day.is-sat.is-picked { box-shadow: inset 0 3px 0 rgba(138, 184, 255, 0.85), 0 0 0 2px var(--mp-accent); }
+.mp-day.is-sun.is-picked { box-shadow: inset 0 3px 0 oklch(0.72 0.16 32 / 0.9), 0 0 0 2px var(--mp-accent); }
+.mp-day.is-sat.is-today, .mp-day.is-sun.is-today { border: 2px solid #fbe7cf; }
+.mp-day.is-sat .mp-day-top b, .mp-day.is-sun .mp-day-top b { font-size: 14px; font-weight: 900; }
+.mp-day-up { position: absolute; right: 4px; bottom: 14px; width: 36px; height: auto; filter: drop-shadow(0 0 6px rgba(140, 255, 80, 0.5)); animation: mp-up-bob 2.2s ease-in-out infinite; pointer-events: none; }
+.mp-day-lv { padding-right: 34px; }
+/* 평일 칸은 연하게 해서 주말이 더 눈에 띄게 */
+.mp-day.is-weekday { background: rgba(255, 255, 255, 0.018); border-color: rgba(255, 255, 255, 0.06); }
+.mp-day.is-weekday.is-up { background: oklch(0.6 0.14 58 / 0.05); }
+.mp-day.is-weekday .mp-day-top b { color: var(--mp-text4); }
+.mp-day.is-weekday .mp-day-lv b { color: var(--mp-text2); }
+.mp-dow:not(.is-sat):not(.is-sun) { color: var(--mp-text5); }
+.mp-day.is-weekday.is-today { border-color: #fbe7cf; }
+.mp-day.is-weekday.is-goal { border-color: var(--mp-gold); background: oklch(0.6 0.14 58 / 0.24); }
+@keyframes mp-up-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .mp-day-up { animation: none; } }
