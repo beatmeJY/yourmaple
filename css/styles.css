@@ -15886,6 +15886,14 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 @keyframes cs-pop-b { 0% { transform: scale(1); } 30% { transform: scale(1.14); } 60% { transform: scale(.97); } 100% { transform: scale(1); } }
 
 /* 기록 */
+.cs2 .cs-next:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.cs2 .cs-cost { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--glass-line); border-radius: 14px; background: var(--glass); }
+.cs2 .cs-cost-prices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cs2 .cs-cost-prices input { width: 100%; min-width: 0; font-variant-numeric: tabular-nums; }
+.cs2 .cs-cost-prices input[aria-invalid="true"] { border-color: var(--danger); }
+.cs2 .cs-cost-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.cs2 .cs-cost-total small { color: var(--text-soft); }
+.cs2 .cs-cost-total strong { color: var(--gold); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .cs2 .cs-log-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .cs2 .cs-log-head span { font-size: 12px; color: #8f87a8; }
 .cs2 .cs-log-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }

@@ -1,5 +1,5 @@
-import { CHAOS_STATS, DEFAULT_CHAOS, applyChaos, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
-import { escapeHtml, formatCount } from "../format.js";
+import { CHAOS_STATS, DEFAULT_CHAOS, HORNTAIL_EGG_BONUS, applyChaos, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
+import { escapeHtml, formatCount, readBig } from "../format.js";
 import { burstAt, sfx } from "../effects.js";
 import { notify } from "../toast.js";
 import { catalogRpc } from "../catalog-api.js";
@@ -24,8 +24,12 @@ const CHAOS_TYPES = {
 const MAX_SLOTS = 99;
 // 자주 바르는 장비는 아이콘으로 바로 고른다(2026-11-01 사용자 지정). 나머지는 이름으로 찾는다.
 // 도감 이름과 띄어쓰기만 달라도 맞도록 띄어쓰기를 빼고 비교한다.
-const FAVORITE_ITEMS = ["검은색 허리띠", "부보안관 은뱃지", "혼테일의 목걸이", "얼음결정 페이스페인팅"];
+const HORNTAIL_NECKLACE = "혼테일의 목걸이";
+const FAVORITE_ITEMS = ["검은색 허리띠", "부보안관 은뱃지", HORNTAIL_NECKLACE, "얼음결정 페이스페인팅"];
 const squash = (text) => String(text ?? "").replace(/\s+/g, "");
+const isHorntailNecklace = (item) => item.subcategory === "Pendant" && squash(item.name) === squash(HORNTAIL_NECKLACE);
+const eggImage = '<img src="img/horntail-egg.png" alt="" width="40" height="40" class="cs-fav-image" />';
+
 
 function loadStore() {
   try {
@@ -60,6 +64,8 @@ export function render(root) {
   let table = stored.table && checkChaosTable(stored.table).ok ? cloneTable(stored.table) : cloneTable(DEFAULT_CHAOS);
   let start = null; // { name, slots, stats }
   let current = null;
+  let replacedItems = 0;
+  let previousScrolls = 0;
   let history = []; // [{ n, success, changes, before }]
   let lastChanges = new Map();
   let autoTimer = 0;
@@ -126,12 +132,22 @@ export function render(root) {
           <div class="cs-stage-actions">
             <button type="button" class="cs-ghost" data-auto disabled>남은 횟수 모두 바르기</button>
             <button type="button" class="cs-ghost" data-undo disabled>한 장 되돌리기</button>
-            <button type="button" class="cs-ghost" data-reset disabled>처음 상태로</button>
+            <button type="button" class="cs-ghost cs-next" data-next-item disabled>다음 장비 가져오기</button>
+            <button type="button" class="cs-ghost" data-reset disabled>시도 전체 초기화</button>
           </div>
         </section>
 
         <section class="cs-panel cs-log" aria-labelledby="cs-log-title">
-          <div class="cs-log-head"><h2 id="cs-log-title">바른 기록</h2><span data-log-count></span></div>
+          <div class="cs-cost">
+            <div class="cs-log-head"><h2>누적 비용</h2></div>
+            <div class="cs-cost-prices">
+              <label class="cs-field"><span>장비 한 개 가격</span><input data-cost="item" inputmode="numeric" autocomplete="off" placeholder="메소" value="${escapeHtml(stored.prices?.item ?? "")}" /></label>
+              <label class="cs-field"><span>혼줌 한 장 가격</span><input data-cost="scroll" inputmode="numeric" autocomplete="off" placeholder="메소" value="${escapeHtml(stored.prices?.scroll ?? "")}" /></label>
+            </div>
+            <div class="cs-cost-total" aria-live="polite"><small data-cost-count></small><strong data-cost-total></strong></div>
+            <p class="cs-hint" data-cost-hint></p>
+          </div>
+          <div class="cs-log-head"><h2 id="cs-log-title">현재 장비 기록</h2><span data-log-count></span></div>
           <div class="cs-log-stats" data-log-stats></div>
           <div class="cs-diff" data-diff></div>
           <ol class="cs-log-list" data-log></ol>
@@ -145,6 +161,9 @@ export function render(root) {
   const rollButton = root.querySelector("[data-roll]");
   const autoButton = root.querySelector("[data-auto]");
   const undoButton = root.querySelector("[data-undo]");
+  const nextButton = root.querySelector("[data-next-item]");
+  const itemPrice = root.querySelector('[data-cost="item"]');
+  const scrollPrice = root.querySelector('[data-cost="scroll"]');
   const resetButton = root.querySelector("[data-reset]");
   const log = root.querySelector("[data-log]");
   const diffBox = root.querySelector("[data-diff]");
@@ -226,7 +245,7 @@ export function render(root) {
     tooltip.innerHTML = `
       <div class="cs-tip-top">
         ${start.image ? `<div class="cs-tip-art">${start.image}</div>` : ""}
-        <div class="cs-tip-head"><span class="cs-grade" title="${escapeHtml(start.baseFromCatalog ? "정옵(도감 기본 옵션) 대비 점수 · HP·MP는 10당 1점" : "시작 옵션 대비 점수 · HP·MP는 10당 1점")}"><i aria-hidden="true"></i>${escapeHtml(start.baseFromCatalog ? "정옵" : "시작")} 대비 <b>${escapeHtml(scoreText(graded.tenths))}</b><small>${escapeHtml(graded.grade.name)}</small></span><div class="cs-tip-name${wins ? " is-up" : ""}">${escapeHtml(start.name || "내 아이템")}${wins ? ` <small>(+${wins})</small>` : ""}</div>${start.label ? `<div class="cs-tip-meta">${escapeHtml(start.label)}</div>` : ""}</div>
+        <div class="cs-tip-head"><span class="cs-grade" title="${escapeHtml(`${start.baseLabel} 대비 점수 · HP·MP는 10당 1점`)}"><i aria-hidden="true"></i>${escapeHtml(start.baseLabel)} 대비 <b>${escapeHtml(scoreText(graded.tenths))}</b><small>${escapeHtml(graded.grade.name)}</small></span><div class="cs-tip-name${wins ? " is-up" : ""}">${escapeHtml(start.name || "내 아이템")}${wins ? ` <small>(+${wins})</small>` : ""}</div>${start.label ? `<div class="cs-tip-meta">${escapeHtml(start.label)}</div>` : ""}</div>
       </div>
       <ul class="cs-tip-stats">${CHAOS_STATS.map(statLine).join("")}</ul>
       <div class="cs-tip-slots"><span>업그레이드 가능 횟수</span><b>${escapeHtml(formatCount(current.slots))} / ${escapeHtml(formatCount(start.slots))}</b></div>
@@ -262,6 +281,21 @@ export function render(root) {
       : "";
   }
 
+  function paintCost() {
+    const items = start ? replacedItems + 1 : 0;
+    const scrolls = previousScrolls + history.length;
+    const item = readBig(itemPrice.value, "장비 가격");
+    const scroll = readBig(scrollPrice.value, "혼줌 가격");
+    itemPrice.setAttribute("aria-invalid", String(Boolean(item.error)));
+    scrollPrice.setAttribute("aria-invalid", String(Boolean(scroll.error)));
+    const error = item.error || scroll.error;
+    const missing = (items > 0 && item.value == null) || (scrolls > 0 && scroll.value == null);
+    const total = BigInt(items) * (item.value ?? 0n) + BigInt(scrolls) * (scroll.value ?? 0n);
+    root.querySelector("[data-cost-count]").textContent = `장비 ${formatCount(items)}개 · 혼줌 ${formatCount(scrolls)}장`;
+    root.querySelector("[data-cost-total]").textContent = error || missing ? "—" : `${formatCount(total)} 메소`;
+    root.querySelector("[data-cost-hint]").textContent = error || (missing ? "사용한 장비와 주문서의 단가를 입력해 주세요." : "입력한 단가를 지금까지 사용한 수량에 적용해요.");
+  }
+
   function paintButtons() {
     const can = Boolean(current) && current.slots > 0 && checkChaosTable(table).ok;
     rollButton.disabled = !can || Boolean(autoTimer);
@@ -269,7 +303,8 @@ export function render(root) {
     autoButton.textContent = autoTimer ? "멈추기" : "남은 횟수 모두 바르기";
     if (autoTimer) autoButton.disabled = false;
     undoButton.disabled = !history.length || Boolean(autoTimer);
-    resetButton.disabled = !history.length || Boolean(autoTimer);
+    nextButton.disabled = !history.length || Boolean(autoTimer);
+    resetButton.disabled = (!history.length && !replacedItems) || Boolean(autoTimer);
     root.querySelector("[data-stage]").classList.toggle("is-done", Boolean(current) && current.slots === 0);
   }
 
@@ -302,11 +337,20 @@ export function render(root) {
       return;
     }
     const rows = FAVORITE_ITEMS.map((name) => allowedItems.find((row) => squash(row.name) === squash(name))).filter(Boolean);
-    favs.innerHTML = rows.length
-      ? rows.map((row, index) => `<button type="button" class="cs-fav${row.id === picked?.id ? " is-on" : ""}" data-pick-item="${escapeHtml(row.id)}" aria-pressed="${row.id === picked?.id}" title="${escapeHtml([row.name, typeName(row), optionText(row)].filter(Boolean).join(" · "))}" style="--i:${index}">
-          <span class="cs-fav-art">${catalogImage(row.image_url, "cs-fav-image", 40) || `<i aria-hidden="true">${escapeHtml([...row.name][0] ?? "?")}</i>`}</span>
-          <span class="cs-fav-name">${escapeHtml(row.name)}</span>
-        </button>`).join("")
+    const choices = rows.flatMap((row) => isHorntailNecklace(row) && Number(row.base_options.remaining_upgrades) > 1
+      ? [{ row, egg: false }, { row, egg: true }]
+      : [{ row, egg: false }]);
+    favs.innerHTML = choices.length
+      ? choices.map(({ row, egg }, index) => {
+          const active = row.id === picked?.id && egg === Boolean(picked.egg);
+          const name = egg ? `${row.name} (알 적용)` : row.name;
+          const art = egg ? eggImage : catalogImage(row.image_url, "cs-fav-image", 40) || `<i aria-hidden="true">${escapeHtml([...row.name][0] ?? "?")}</i>`;
+          const title = egg ? "알 1회 적용 · 성공 100% · 업그레이드 횟수 −1" : [row.name, typeName(row), optionText(row)].filter(Boolean).join(" · ");
+          return `<button type="button" class="cs-fav${active ? " is-on" : ""}" data-pick-item="${escapeHtml(row.id)}" ${egg ? "data-egg" : ""} aria-pressed="${active}" title="${escapeHtml(title)}" style="--i:${index}">
+            <span class="cs-fav-art">${art}</span>
+            <span class="cs-fav-name">${escapeHtml(name)}</span>
+          </button>`;
+        }).join("")
       : `<p class="cs-hint">자주 쓰는 장비가 도감에 아직 없어요. 아래에서 찾아 주세요.</p>`;
   }
   async function searchItems(query) {
@@ -334,7 +378,7 @@ export function render(root) {
       .sort((left, right) => left.rank - right.rank)
       .map((item) => item.row);
     results.innerHTML = rows.length
-      ? rows.map((row, index) => `<button type="button" class="cs-pick-row${row.id === picked?.id ? " is-on" : ""}" data-pick-item="${escapeHtml(row.id)}" role="option" aria-selected="${row.id === picked?.id}" style="--i:${Math.min(index, 12)}">
+      ? rows.map((row, index) => `<button type="button" class="cs-pick-row${row.id === picked?.id && !picked.egg ? " is-on" : ""}" data-pick-item="${escapeHtml(row.id)}" role="option" aria-selected="${row.id === picked?.id && !picked.egg}" style="--i:${Math.min(index, 12)}">
           <span class="cs-pick-art">${catalogImage(row.image_url, "cs-pick-image", 32) || `<i aria-hidden="true">${escapeHtml([...row.name][0] ?? "?")}</i>`}</span>
           <span class="cs-pick-copy"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml([typeName(row), row.required_level == null ? "" : `Lv.${row.required_level}`, `업그레이드 ${formatCount(row.base_options.remaining_upgrades)}`, optionText(row)].filter(Boolean).join(" · "))}</small></span>
         </button>`).join("")
@@ -356,7 +400,7 @@ export function render(root) {
     }
   }
 
-  async function pickItem(id) {
+  async function pickItem(id, egg = false) {
     const request = ++searchId;
     const out = await catalogRpc("catalog_item_detail", { p_id: id });
     if (request !== searchId || !root.isConnected) return;
@@ -371,26 +415,31 @@ export function render(root) {
       notify("혼돈의 주문서를 쓸 수 없는 장비예요.", "error");
       return;
     }
-    if (!(Number(byKey.get("remaining_upgrades")?.base_value) > 0)) {
+    if (egg && !isHorntailNecklace(item)) return;
+    const slots = Number(byKey.get("remaining_upgrades")?.base_value) - Number(egg);
+    if (!(slots > 0)) {
       notify("업그레이드 가능 횟수가 없는 장비라 혼돈의 주문서를 바를 수 없어요.", "error");
       return;
     }
-    root.querySelector("[data-item-name]").value = item.name;
-    const slots = byKey.get("remaining_upgrades")?.base_value;
-    root.querySelector("[data-item-slots]").value = slots == null ? "" : String(slots);
+    const name = egg ? `${item.name} (알 적용)` : item.name;
+    root.querySelector("[data-item-name]").value = name;
+    root.querySelector("[data-item-slots]").value = String(slots);
     const ranges = {};
-    for (const input of root.querySelectorAll("[data-stat]")) {
-      const stat = byKey.get(input.dataset.stat);
-      input.value = stat?.base_value ? String(stat.base_value) : "";
-      if (stat?.minimum_value != null && stat.maximum_value != null && stat.minimum_value !== stat.maximum_value) ranges[input.dataset.stat] = [stat.minimum_value, stat.maximum_value];
-    }
-    // 정옵(도감 기본 옵션): 장비 등급 색의 기준.
     const base = {};
-    for (const { key } of CHAOS_STATS) {
-      const value = Number(byKey.get(key)?.base_value);
+    for (const input of root.querySelectorAll("[data-stat]")) {
+      const key = input.dataset.stat;
+      const stat = byKey.get(key);
+      const bonus = egg ? HORNTAIL_EGG_BONUS[key] ?? 0 : 0;
+      const value = Number(stat?.base_value ?? 0) + bonus;
+      input.value = value ? String(value) : "";
       if (value > 0) base[key] = value;
+      if (stat?.minimum_value != null && stat.maximum_value != null && stat.minimum_value !== stat.maximum_value) {
+        ranges[key] = [Number(stat.minimum_value) + bonus, Number(stat.maximum_value) + bonus];
+      }
     }
-    picked = { id: item.id, name: item.name, image_url: item.image_url ?? null, base, label: [typeName(item), item.required_level == null ? "" : `Lv.${item.required_level}`].filter(Boolean).join(" · "), ranges };
+    // 알 적용 장비는 알을 바른 뒤의 옵션을 혼줌 등급 계산의 기준으로 쓴다.
+    const label = [typeName(item), item.required_level == null ? "" : `Lv.${item.required_level}`, egg ? "알 1회 적용 · 성공 100% · 업그레이드 횟수 −1" : ""].filter(Boolean).join(" · ");
+    picked = { id: item.id, name, image_url: item.image_url ?? null, base, label, ranges, egg };
     root.querySelector("[data-item-search]").value = "";
     void searchItems("");
     paintPicked();
@@ -399,12 +448,13 @@ export function render(root) {
     // 기본 옵션이 바를 수 있는 상태면 바로 시작한다(시작 버튼을 따로 누르지 않게). 고친 뒤에는 시작 버튼으로 다시 시작.
     if (readSetup().error) sfx("tick");
     else startItem();
-    if (!stats.some((stat) => stat.stat_key !== "remaining_upgrades" && stat.base_value > 0)) notify("도감에 붙어 있는 능력치가 없어요. 내 아이템 능력치를 직접 적어 주세요.", "info");
+    if (!Object.keys(base).length) notify("도감에 붙어 있는 능력치가 없어요. 내 아이템 능력치를 직접 적어 주세요.", "info");
   }
 
   function paint() {
     paintTooltip();
     paintLog();
+    paintCost();
     paintButtons();
   }
 
@@ -479,16 +529,27 @@ export function render(root) {
     stopAuto();
     const fromPicked = Boolean(picked && picked.name === read.value.name);
     // 정옵은 고른 장비의 도감 옵션, 직접 적었거나 예전에 저장된 장비라 없으면 시작 옵션.
-    const base = fromPicked && picked.base ? picked.base : read.value.stats;
-    start = { ...read.value, base, baseFromCatalog: Boolean(fromPicked && picked.base), image: fromPicked && picked.image_url ? catalogImage(picked.image_url, "cs-tip-image", 64) : "", label: fromPicked ? picked.label : "" };
-    lastGrade = "";
-    current = { slots: start.slots, stats: { ...start.stats } };
-    history = [];
-    lastChanges = new Map();
-    result.innerHTML = "";
+    const catalogBase = fromPicked ? picked.base : null;
+    const baseLabel = catalogBase ? (picked.egg ? "알 적용 옵션" : "정옵") : "시작 옵션";
+    start = { ...read.value, base: catalogBase ?? read.value.stats, baseLabel, image: fromPicked && picked.image_url ? catalogImage(picked.image_url, "cs-tip-image", 64) : "", label: fromPicked ? picked.label : "" };
+    replacedItems = 0;
+    previousScrolls = 0;
+    resetCurrentItem();
     persist({ name: start.name, slots: String(start.slots), stats: read.raw });
     if (!quiet) sfx("tick");
     paint();
+  }
+
+  function resetCurrentItem() {
+    lastGrade = "";
+    tooltip.classList.remove("is-grade-flash");
+    window.clearTimeout(fxTimer);
+    root.querySelector("[data-stage]").classList.remove("is-ok", "is-fail", "pop-a", "pop-b", "shake-a", "shake-b");
+    root.querySelector("[data-fx]").replaceChildren();
+    current = { slots: start.slots, stats: { ...start.stats } };
+    history = [];
+    lastChanges = new Map();
+    result.textContent = "";
   }
 
   // 확률 설정
@@ -523,7 +584,7 @@ export function render(root) {
     }
     const pickButton = event.target.closest("[data-pick-item]");
     if (pickButton) {
-      pickItem(pickButton.dataset.pickItem);
+      pickItem(pickButton.dataset.pickItem, pickButton.hasAttribute("data-egg"));
       return;
     }
     if (event.target.closest("[data-unpick]")) {
@@ -568,11 +629,19 @@ export function render(root) {
       paint();
       return;
     }
-    if (event.target.closest("[data-reset]") && start) {
-      current = { slots: start.slots, stats: { ...start.stats } };
-      history = [];
-      lastChanges = new Map();
-      result.innerHTML = "";
+    if (event.target.closest("[data-next-item]") && !nextButton.disabled) {
+      previousScrolls += history.length;
+      replacedItems += 1;
+      resetCurrentItem();
+      result.textContent = `${replacedItems + 1}번째 장비를 가져왔어요.`;
+      sfx("tick");
+      paint();
+      return;
+    }
+    if (event.target.closest("[data-reset]") && !resetButton.disabled) {
+      replacedItems = 0;
+      previousScrolls = 0;
+      resetCurrentItem();
       sfx("uncheck");
       paint();
       return;
@@ -592,6 +661,13 @@ export function render(root) {
       searchTimer = window.setTimeout(() => searchItems(query), 250);
       return;
     }
+    if (event.target.matches("[data-cost]")) {
+      const input = event.target;
+      const parsed = readBig(input.value, "가격");
+      if (!parsed.error) persist({ prices: { ...loadStore().prices, [input.dataset.cost]: parsed.value?.toString() ?? "" } });
+      paintCost();
+      return;
+    }
     if (event.target.matches("[data-success]")) {
       table.successRate = Number(event.target.value.replace(",", "."));
     } else if (event.target.matches("[data-delta]")) {
@@ -602,6 +678,11 @@ export function render(root) {
   });
   root.addEventListener("change", (event) => {
     if (event.target.matches("[data-delta]")) paintOdds();
+    if (event.target.matches("[data-cost]")) {
+      const input = event.target;
+      const parsed = readBig(input.value, "가격");
+      if (!parsed.error && parsed.value != null) input.value = formatCount(parsed.value);
+    }
   });
   root.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.isComposing && event.target.matches("[data-item-search]")) {

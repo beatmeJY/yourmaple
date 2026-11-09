@@ -20,6 +20,10 @@ export const CHAOS_STATS = [
   { key: "mp", label: "MP", scale: 10 },
 ];
 
+export const HORNTAIL_EGG_BONUS = {
+  str: 15, dex: 15, int: 15, luk: 15, defense: 140, magic_defense: 140, avoidability: 15,
+};
+
 // 변화량별 확률(%). 합이 100.
 export const DEFAULT_CHAOS = {
   successRate: 60,

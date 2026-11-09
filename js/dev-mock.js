@@ -63,6 +63,8 @@ function seed() {
     notes: [{ id: "n1", user_id: USER.id, title: "목업 메모", content: "?mock 으로 연 가짜 데이터입니다.", category: "일반", created_at: iso(-10), updated_at: iso(-10) }],
     catalog_monsters: [{ id: "d0000000-0000-4000-8000-000000000001", name: "연습용 달팽이", level: 1, hp: 15, exp: 3, required_accuracy: 1, accuracy_per_level: 0.1, weak_elements: null, resist_elements: null }],
     catalog_items: [
+      // 혼줌 알 적용 확인용 장비. 수치는 가짜 데이터다.
+      { id: "e0000000-0000-4000-8000-000000000014", name: "혼테일의 목걸이", category: "장비", subcategory: "Pendant", required_level: 120, base_options: { str: 7, dex: 7, int: 7, luk: 7, defense: 100, magic_defense: 100, avoidability: 0, remaining_upgrades: 3 }, requirements: {}, image_url: null },
       { id: "e0000000-0000-4000-8000-000000000001", name: "연습용 아대", category: "장비", subcategory: "Claw", required_level: 50, base_options: { attack: 30, remaining_upgrades: 7 }, requirements: { 레벨: 50 }, image_url: null },
       // 거래 장부 확인용(2026-11-04): 장비 1개(옵션 범위 있음)·소비 1개. 그림은 이 사이트 그림을 빌려 쓴다.
       { id: "e0000000-0000-4000-8000-000000000002", name: "연습용 청갑충", category: "장비", subcategory: "Claw", required_level: 70, base_options: { attack: 34, luk: 5, defense: 4, remaining_upgrades: 7 }, requirements: { level: 70 }, image_url: "https://yourmaple.kr/img/chaos-scroll.png" },
