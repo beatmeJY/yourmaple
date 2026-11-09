@@ -72,3 +72,28 @@ assert.equal(perHour(0n, 60), 0n);
   assert.equal(timerGain({ start: "9007199254740993", end: "9007199254740999", direct: "" }, "메소").value, 6n);
 }
 console.log("hunt-calc timerGain ok");
+
+// 사냥 기록 단위 환산: 파풀 한 판(EXP 고정, 12분 30초)과 1시간 값만 있는 예전 기록
+{
+  const { formatRatio, expRatio, hourToUnit, measuredHour } = await import("./hunt-calc.js");
+  const ratioText = (row, unit) => { const r = expRatio(row, unit); return formatRatio(r.numerator, r.denominator); };
+  const run = { measured_seconds: 750, exp_gain: "500000", exp_per_hour: "2400000" };
+  // 500,000 ÷ 750초 = 666.6667/초 → 1분 40,000, 15분 600,000, 1시간 2,400,000
+  assert.equal(ratioText(run, 1), "40,000");
+  assert.equal(ratioText(run, 15), "600,000");
+  assert.equal(ratioText(run, 60), "2,400,000");
+  // 7분에 100만 → 1분 142,857.1429 (손계산 1,000,000 ÷ 7)
+  assert.equal(ratioText({ measured_seconds: 420, exp_gain: "1000000" }, 1), "142,857.1429");
+  // 예전 기록: 1시간 400만 → 1분 66,666.6667, 15분 100만
+  const old = { exp_per_hour: "4000000" };
+  assert.equal(ratioText(old, 1), "66,666.6667");
+  assert.equal(ratioText(old, 15), "1,000,000");
+  // 실측 칸이 비어 있으면 1시간 값으로
+  assert.equal(ratioText({ measured_seconds: null, exp_gain: null, exp_per_hour: "60" }, 1), "1");
+  assert.equal(formatRatio(-10n, 3n), "-3.3333");
+  assert.equal(formatRatio(0n, 7n), "0");
+  assert.equal(hourToUnit(-200000n, 15), -50000n);
+  assert.equal(hourToUnit(100n, 1), 2n);
+  assert.deepEqual(measuredHour({ seconds: 750, exp: 500000n, meso: 30000n }), { exp: 2400000n, meso: 144000n });
+}
+console.log("hunt-calc units ok");

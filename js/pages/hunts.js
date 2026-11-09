@@ -2,7 +2,7 @@ import { translateDbError } from "../db-error.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
 import { matchesPointLevel, matchesText, readLevelFilter } from "../filters.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
-import { asBig, formatPerMinute, formatSigned, hourMeso, perHour, shortCount, timerGain } from "../hunt-calc.js";
+import { asBig, expRatio, formatPerMinute, formatRatio, formatSigned, HUNT_UNITS, hourMeso, hourToUnit, measuredHour, mulDivRound, perHour, shortCount, timerGain } from "../hunt-calc.js";
 import { findJob, jobDisplayName, jobStyle, normalizeJobName } from "../job-label.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { getSupabase } from "../supabase-client.js";
@@ -10,6 +10,8 @@ import { notify } from "../toast.js";
 
 const huntColumns =
   "id, character_id, character_name, job, level, potion_cost, leech_fee, exp_per_hour, meso_per_hour, title, memo, created_at";
+// sql/066 실행 뒤에 생기는 실측 칸(걸린 초·얻은 EXP·메소). 실행 전이면 위 칸만 읽고 실측은 저장하지 않는다.
+const measuredColumns = `${huntColumns}, measured_seconds, exp_gain, meso_gain`;
 
 const jobFamilies = ["전사", "마법사", "궁수", "도적", "해적"];
 
@@ -105,6 +107,19 @@ function readTimer() {
 
 let timer = readTimer();
 
+// 사냥 기록 목록의 환산 단위(1·15·60분). 이 기기에 기억한다.
+const UNIT_KEY = "maple-note-hunt-unit";
+function readUnit() {
+  try {
+    const saved = Number(localStorage.getItem(UNIT_KEY));
+    if (HUNT_UNITS.some((unit) => unit.minutes === saved)) return saved;
+  } catch {
+    // 저장이 막힌 브라우저는 1시간 기준
+  }
+  return 60;
+}
+let huntUnit = readUnit();
+
 function saveTimer() {
   try {
     localStorage.setItem(TIMER_KEY, JSON.stringify(timer));
@@ -191,6 +206,14 @@ export async function render(root) {
               <label class="field"><span>직업</span><input name="job" autocomplete="off" /></label>
               <label class="field"><span>레벨</span><input name="level" inputmode="numeric" autocomplete="off" /></label>
               <label class="field span-all"><span>사냥 이름</span><input name="title" autocomplete="off" placeholder="맵, 자리처럼 이 사냥을 구분하는 이름" /></label>
+              <div class="hu-measured span-all" data-measured-group>
+                <p class="hu-measured-head"><b>실제로 잰 값</b><span>선택 · 파풀 한 판처럼 걸린 시간과 얻은 양을 적으면 1분·15분·1시간 값이 자동으로 계산돼요</span></p>
+                <label class="field"><span>걸린 시간(분)</span><input name="measured_min" inputmode="numeric" autocomplete="off" placeholder="예: 12" /></label>
+                <label class="field"><span>초</span><input name="measured_sec" inputmode="numeric" autocomplete="off" placeholder="0" /></label>
+                <label class="field"><span>얻은 경험치</span><input name="exp_gain" inputmode="numeric" data-grouped autocomplete="off" placeholder="예: 500,000" /></label>
+                <label class="field"><span>얻은 메소</span><input name="meso_gain" inputmode="numeric" data-grouped autocomplete="off" placeholder="없으면 비움" /></label>
+                <p class="hu-measured-note" data-measured-note hidden></p>
+              </div>
               <label class="field"><span>분당 경험치</span><input name="exp_minute" inputmode="numeric" data-grouped autocomplete="off" placeholder="1시간 대신 가능" /></label>
               <label class="field"><span>1시간 경험치</span><input name="exp_hour" inputmode="numeric" data-grouped autocomplete="off" placeholder="분당 대신 가능" /></label>
               <label class="field span-all"><span>순메소</span><input name="meso_amount" inputmode="text" data-grouped data-signed autocomplete="off" placeholder="적자는 -. 없으면 비움" /></label>
@@ -215,7 +238,10 @@ export async function render(root) {
             <div class="hu-records-head">
               <div class="hu-records-title">
                 <h2>사냥 기록</h2>
-                <span>1시간 기준으로 환산 · 쩔비는 받으면 +, 내면 −</span>
+                <span data-unit-note></span>
+              </div>
+              <div class="hu-units" role="group" aria-label="환산 단위">
+                ${HUNT_UNITS.map((unit) => `<button type="button" class="hu-unit" data-hunt-unit="${unit.minutes}">${unit.label}</button>`).join("")}
               </div>
               <button class="hu-add" type="button" data-add-hunt>+ 직접 적기</button>
             </div>
@@ -263,6 +289,7 @@ export async function render(root) {
   let pickedJobKey = "";
   let huntExpSource = "minute";
   let loadId = 0;
+  let measuredReady = true;
   // 타이머 기록에 쓰는 캐릭터. 처음에는 대표 캐릭터.
   let timerCharacterId = "";
 
@@ -279,6 +306,58 @@ export async function render(root) {
     if (parsed.error || parsed.value == null) return;
     if (parsed.value % 60n === 0n) writeGrouped(minute, parsed.value / 60n);
     else minute.value = "";
+  }
+
+  // 직접 적기의 "실제로 잰 값": 모두 비우면 없음, 일부만 적으면 오류.
+  function readMeasured(form) {
+    const minText = form.elements.measured_min.value.trim();
+    const secText = form.elements.measured_sec.value.trim();
+    const expText = form.elements.exp_gain.value.trim();
+    const mesoText = form.elements.meso_gain.value.trim();
+    if (!minText && !secText && !expText && !mesoText) return { value: null };
+    const minutes = readCount(minText, "걸린 시간(분)", 0);
+    if (minutes.error) return minutes;
+    const secs = readCount(secText, "초", 0);
+    if (secs.error) return secs;
+    if ((secs.value ?? 0) > 59) return { error: "초는 0~59로 적어 주세요." };
+    const seconds = (minutes.value ?? 0) * 60 + (secs.value ?? 0);
+    if (seconds < 1) return { error: "걸린 시간을 적어 주세요." };
+    if (seconds > 86400) return { error: "걸린 시간은 24시간(1440분) 이하로 적어 주세요." };
+    const exp = readBig(expText, "얻은 경험치", 1n);
+    if (exp.error) return exp;
+    if (exp.value == null) return { error: "얻은 경험치를 적어 주세요." };
+    const meso = readBig(mesoText, "얻은 메소", 0n);
+    if (meso.error) return meso;
+    return { value: { seconds, exp: exp.value, meso: meso.value ?? 0n } };
+  }
+
+  // 실측을 적으면 1시간 EXP·순메소 칸은 실측으로 채우고 잠근다(두 값이 어긋나지 않게).
+  function paintMeasured() {
+    const group = huntForm.querySelector("[data-measured-group]");
+    group.hidden = !measuredReady;
+    const note = huntForm.querySelector("[data-measured-note]");
+    const parsed = measuredReady ? readMeasured(huntForm) : { value: null };
+    const filled = measuredReady && ["measured_min", "measured_sec", "exp_gain", "meso_gain"].some((name) => huntForm.elements[name].value.trim());
+    for (const name of ["exp_minute", "exp_hour", "meso_amount"]) huntForm.elements[name].readOnly = filled;
+    group.classList.toggle("is-on", filled);
+    group.classList.toggle("is-error", Boolean(parsed.error));
+    if (!filled) {
+      note.hidden = true;
+      return;
+    }
+    note.hidden = false;
+    if (parsed.error) {
+      note.textContent = parsed.error;
+      return;
+    }
+    const hour = measuredHour(parsed.value);
+    writeGrouped(huntForm.elements.exp_hour, hour.exp);
+    huntExpSource = "hour";
+    syncExp(huntForm, "hour");
+    writeSigned(huntForm.elements.meso_amount, hour.meso);
+    paintHuntNet();
+    const ratio = expRatio({ measured_seconds: parsed.value.seconds, exp_gain: parsed.value.exp }, 1);
+    note.textContent = `${spanText(parsed.value.seconds)}에 ${formatCount(parsed.value.exp)} EXP → 1분 ${formatRatio(ratio.numerator, ratio.denominator)} · 1시간 ${formatCount(hour.exp)}. 1시간 칸은 이 값으로 채워집니다.`;
   }
 
   function readHourExp(form, source) {
@@ -563,6 +642,13 @@ export async function render(root) {
     paintHuntNet();
     huntForm.elements.title.value = row.title || "";
     huntForm.elements.memo.value = row.memo || "";
+    const seconds = Number(row.measured_seconds);
+    const hasMeasured = Number.isInteger(seconds) && seconds > 0 && row.exp_gain != null;
+    huntForm.elements.measured_min.value = hasMeasured ? String(Math.floor(seconds / 60)) : "";
+    huntForm.elements.measured_sec.value = hasMeasured && seconds % 60 ? String(seconds % 60) : "";
+    huntForm.elements.exp_gain.value = hasMeasured ? asBig(row.exp_gain).toLocaleString("ko-KR") : "";
+    huntForm.elements.meso_gain.value = hasMeasured && row.meso_gain != null && asBig(row.meso_gain) !== 0n ? asBig(row.meso_gain).toLocaleString("ko-KR") : "";
+    paintMeasured();
     huntForm.elements.character_id.focus();
   }
 
@@ -572,6 +658,7 @@ export async function render(root) {
     huntForm.reset();
     showNameField(true);
     huntExpSource = "minute";
+    paintMeasured();
   }
 
   function filteredHunts() {
@@ -658,8 +745,36 @@ export async function render(root) {
       .join("");
   }
 
+  function unitInfo() {
+    return HUNT_UNITS.find((unit) => unit.minutes === huntUnit) ?? HUNT_UNITS[HUNT_UNITS.length - 1];
+  }
+
+  function paintUnits() {
+    const unit = unitInfo();
+    for (const button of root.querySelectorAll("[data-hunt-unit]")) {
+      const on = Number(button.dataset.huntUnit) === unit.minutes;
+      button.classList.toggle("is-on", on);
+      button.setAttribute("aria-pressed", String(on));
+    }
+    const note = root.querySelector("[data-unit-note]");
+    if (note) note.textContent = `${unit.label} 기준으로 환산 · 잰 시간이 있는 기록은 그 시간으로 계산 · 쩔비는 받으면 +, 내면 −`;
+  }
+
   function huntRow(row, { best, index, showJob }) {
     const rate = hourRate(row);
+    const unit = unitInfo();
+    const ratio = (() => {
+      try {
+        return expRatio(row, unit.minutes);
+      } catch {
+        return { numerator: 0n, denominator: 1n };
+      }
+    })();
+    const unitExp = mulDivRound(ratio.numerator, 1n, ratio.denominator);
+    const measuredSeconds = Number(row.measured_seconds);
+    const measured = Number.isInteger(measuredSeconds) && measuredSeconds > 0 && row.exp_gain != null
+      ? `<span class="hu-row-measured" title="실제로 잰 값">실측 ${escapeHtml(spanText(measuredSeconds))} · ${escapeHtml(shortCount(asBig(row.exp_gain)))} EXP</span>`
+      : "";
     const top = best > 0n && rate === best;
     const heading = String(row.title || "").trim() || row.character_name;
     const memo = String(row.memo || "").trim();
@@ -675,7 +790,9 @@ export async function render(root) {
         return 0n;
       }
     })();
-    const fee = leech === 0n ? "—" : `${leech > 0n ? "+" : "−"}${shortCount(leech > 0n ? leech : -leech)}`;
+    const unitLeech = hourToUnit(leech, unit.minutes);
+    const fee = unitLeech === 0n ? "—" : `${unitLeech > 0n ? "+" : "−"}${shortCount(unitLeech > 0n ? unitLeech : -unitLeech)}`;
+    const unitNet = net == null ? null : hourToUnit(net, unit.minutes);
     const memoButton = memo
       ? `<button class="hu-act" type="button" data-open-memo="${row.id}" title="${escapeHtml(memo.replace(/\s+/g, " ").slice(0, 80))}">메모</button>`
       : "";
@@ -683,14 +800,15 @@ export async function render(root) {
       <span class="hu-row-name">
         <span class="hu-row-title"><strong>${escapeHtml(heading)}</strong>${top ? `<span class="hu-best">최고</span>` : ""}</span>
         <span class="hu-row-who">${escapeHtml(who)}</span>
+        ${measured}
       </span>
       <span class="hu-row-exp">
-        <span><b>${escapeHtml(shortCount(rate))}</b> EXP/h</span>
+        <span><b>${escapeHtml(shortCount(unitExp))}</b> EXP/${escapeHtml(unit.short)}</span>
         <span class="hu-bar"><i style="width:${Math.max(3, ratioPercent(rate, best))}%"></i></span>
-        <small>분당 ${escapeHtml(formatPerMinute(rate))}</small>
+        <small>${escapeHtml(unit.label)} ${escapeHtml(formatRatio(ratio.numerator, ratio.denominator))}</small>
       </span>
-      <span class="hu-row-num"><small>메소/h</small><strong class="${net == null ? "" : moneyClass(net)}" title="순메소 + 쩔비 − 물약">${net == null ? "-" : escapeHtml(net < 0n ? `−${shortCount(-net)}` : shortCount(net))}</strong></span>
-      <span class="hu-row-num"><small>쩔비</small><strong class="${moneyClass(leech)}">${escapeHtml(fee)}</strong></span>
+      <span class="hu-row-num"><small>메소/${escapeHtml(unit.short)}</small><strong class="${unitNet == null ? "" : moneyClass(unitNet)}" title="순메소 + 쩔비 − 물약">${unitNet == null ? "-" : escapeHtml(unitNet < 0n ? `−${shortCount(-unitNet)}` : shortCount(unitNet))}</strong></span>
+      <span class="hu-row-num"><small>쩔비</small><strong class="${moneyClass(unitLeech)}">${escapeHtml(fee)}</strong></span>
       <span class="hu-row-acts">
         ${memoButton}
         <button class="hu-act" type="button" data-edit-hunt="${row.id}">수정</button>
@@ -846,11 +964,88 @@ export async function render(root) {
     if (potion.error || leech.error) { notify(potion.error || leech.error, "error"); return; }
     if (timer.running) { timer = { ...timer, running: false, before: seconds, startedAt: 0 }; saveTimer(); paintTimer(); }
     const character = timerCharacter();
-    openForm({ id: "", character_id: character?.id, job: character?.job, level: character?.level,
-      title, exp_per_hour: expHour.toString(), meso_per_hour: mesoHour.toString(),
-      potion_cost: perHour(potion.value ?? 0n, seconds).toString(), leech_fee: perHour(leech.value ?? 0n, seconds).toString(),
-      memo: `${memo} · 물약 ${formatCount(potion.value ?? 0n)} · 쩔비 ${formatSigned(leech.value ?? 0n)}` });
-    notify("1시간 기준으로 환산했습니다. 내용을 확인하고 저장해 주세요.", "info");
+    const fullMemo = `${memo} · 물약 ${formatCount(potion.value ?? 0n)} · 쩔비 ${formatSigned(leech.value ?? 0n)}`;
+    const potionHour = perHour(potion.value ?? 0n, seconds);
+    const leechHour = perHour(leech.value ?? 0n, seconds);
+    // 캐릭터를 골랐으면 타이머 값만으로 저장할 수 있으니 바로 남긴다. 직접 입력(이름·레벨 필요)일 때만 저장 칸을 연다.
+    if (!character?.level) {
+      openForm({ id: "", character_id: character?.id, job: character?.job, level: character?.level,
+        title, exp_per_hour: expHour.toString(), meso_per_hour: mesoHour.toString(),
+        potion_cost: potionHour.toString(), leech_fee: leechHour.toString(), memo: fullMemo });
+      notify(character ? "캐릭터 레벨이 없어 저장 칸을 열었습니다. 레벨을 적고 저장해 주세요." : "캐릭터명과 레벨을 적고 저장해 주세요. 1시간 기준 값은 채워 두었습니다.", "info");
+      return;
+    }
+    await saveTimerRecord(button, {
+      character_id: character.id,
+      character_name: character.name,
+      job: character.job?.trim() || null,
+      level: character.level,
+      potion_cost: potionHour.toString(),
+      leech_fee: leechHour.toString(),
+      exp_per_hour: expHour.toString(),
+      meso_per_hour: mesoHour.toString(),
+      title,
+      memo: fullMemo,
+      ...(measuredReady && seconds <= 86400 ? { measured_seconds: seconds, exp_gain: exp.value.toString(), meso_gain: (meso.value ?? 0n).toString() } : {}),
+    });
+  }
+
+  // 타이머 기록 바로 저장: 성공하면 타이머를 비우고, 알림의 "되돌리기"로 방금 기록을 지우고 값을 돌려놓는다.
+  let finishing = false;
+  async function saveTimerRecord(button, payload) {
+    if (finishing) return;
+    finishing = true;
+    button.disabled = true;
+    const before = { ...timer };
+    const measured = root.querySelector("[data-measured-time]").value;
+    const previousBest = hunts.reduce((max, row) => (hourRate(row) > max ? hourRate(row) : max), 0n);
+    let created = null;
+    try {
+      const supabase = await getSupabase();
+      const { data, error } = await supabase.from("hunts").insert(payload).select("id").single();
+      if (error) {
+        if (root.isConnected) notify(translateDbError(error), "error");
+        return;
+      }
+      created = data;
+      // 화면을 떠났어도 같은 측정이 두 번 저장되지 않게 타이머는 먼저 비운다(사냥터 이름은 다음 측정에 그대로 둔다).
+      timer = { ...blankTimer, title: timer.title };
+      saveTimer();
+    } finally {
+      finishing = false;
+      if (root.isConnected) paintTimer();
+    }
+    if (!created || !root.isConnected) return;
+    root.querySelector("[data-measured-time]").value = "";
+    fillTimerFields();
+    paintTimer();
+    closeHuntForm();
+    cheer(button, BigInt(payload.exp_per_hour), previousBest, payload.title);
+    notify("사냥 기록을 저장했습니다.", "info", { label: "되돌리기", onClick: () => undoTimerRecord(created.id, before, measured) });
+    await loadAll();
+  }
+
+  async function undoTimerRecord(id, before, measured) {
+    const supabase = await getSupabase();
+    const { error } = await supabase.from("hunts").delete().eq("id", id);
+    if (error) {
+      notify(translateDbError(error), "error");
+      return;
+    }
+    // 그사이 새 측정을 시작하지 않았을 때만 방금 값으로 되돌려, 고쳐서 다시 남길 수 있게 한다.
+    const restore = !timer.running && elapsedSeconds() === 0;
+    if (restore) {
+      timer = { ...before, running: false, startedAt: 0 };
+      saveTimer();
+    }
+    notify(restore ? "방금 기록을 지우고 타이머 값을 되돌렸습니다." : "방금 기록을 지웠습니다.", "info");
+    if (!root.isConnected) return;
+    if (restore) {
+      root.querySelector("[data-measured-time]").value = measured;
+      fillTimerFields();
+      paintTimer();
+    }
+    await loadAll();
   }
 
   function cheer(target, rate, previousBest, title) {
@@ -887,13 +1082,16 @@ export async function render(root) {
     if (level.value > 200) return { error: "레벨은 200 이하여야 합니다." };
     const title = huntForm.elements.title.value.trim();
     if (!title) return { error: "사냥 이름을 입력해 주세요." };
-    const exp = readHourExp(huntForm, huntExpSource);
+    const measured = measuredReady ? readMeasured(huntForm) : { value: null };
+    if (measured.error) return measured;
+    const measuredHourValue = measured.value ? measuredHour(measured.value) : null;
+    const exp = measuredHourValue ? { value: measuredHourValue.exp } : readHourExp(huntForm, huntExpSource);
     if (exp.error) return exp;
     const potion = readBig(huntForm.elements.potion_cost.value, "1시간 물약", 0n);
     if (potion.error) return potion;
     const leech = readLeech(huntForm.elements.leech_fee.value);
     if (leech.error) return leech;
-    const meso = readMeso(huntForm.elements.meso_amount.value);
+    const meso = measuredHourValue ? { value: measuredHourValue.meso } : readMeso(huntForm.elements.meso_amount.value);
     if (meso.error) return meso;
     return {
       value: {
@@ -907,6 +1105,14 @@ export async function render(root) {
         meso_per_hour: meso.value.toString(),
         title,
         memo: huntForm.elements.memo.value.trim() || null,
+        // 실측을 지우고 저장하면 예전처럼 1시간 값만 남는다.
+        ...(measuredReady
+          ? {
+              measured_seconds: measured.value?.seconds ?? null,
+              exp_gain: measured.value ? measured.value.exp.toString() : null,
+              meso_gain: measured.value ? measured.value.meso.toString() : null,
+            }
+          : {}),
       },
     };
   }
@@ -915,13 +1121,18 @@ export async function render(root) {
     const current = ++loadId;
     if (!hunts.length) huntList.innerHTML = `<p class="hu-empty">불러오는 중입니다.</p>`;
     const supabase = await getSupabase();
-    const [huntResult, firstCharacters, accountResult, jobResult] = await Promise.all([
-      supabase.from("hunts").select(huntColumns).order("created_at", { ascending: false }),
+    let [huntResult, firstCharacters, accountResult, jobResult] = await Promise.all([
+      supabase.from("hunts").select(measuredReady ? measuredColumns : huntColumns).order("created_at", { ascending: false }),
       supabase.from("characters").select("id, account_id, name, job, level, exp"),
       supabase.from("accounts").select("id, name").order("name"),
       supabase.from("jobs").select("id, family, name, color, color_dark, sort_order").order("sort_order"),
       loadMainCharacter(),
     ]);
+    // sql/066 실행 전이면 실측 칸을 빼고 다시 읽는다.
+    if (huntResult.error && measuredReady && /measured_seconds|exp_gain|meso_gain/i.test(`${huntResult.error.message || ""}`)) {
+      measuredReady = false;
+      huntResult = await supabase.from("hunts").select(huntColumns).order("created_at", { ascending: false });
+    }
     // sql/029 실행 전이면 exp 칸을 빼고 캐릭터를 읽는다.
     const characterResult = firstCharacters.error && /\bexp\b/i.test(`${firstCharacters.error.message || ""}`)
       ? await supabase.from("characters").select("id, account_id, name, job, level")
@@ -950,6 +1161,7 @@ export async function render(root) {
     paintCharacterOptions();
     paintHunts();
     paintTimerWho();
+    paintMeasured();
   }
 
   function openForm(row) {
@@ -978,7 +1190,8 @@ export async function render(root) {
     if (event.target.form === huntForm && ["meso_amount", "leech_fee", "potion_cost"].includes(event.target.name)) {
       paintHuntNet();
     }
-    if (event.target.form === huntForm && (event.target.name === "exp_minute" || event.target.name === "exp_hour")) {
+    if (event.target.form === huntForm && ["measured_min", "measured_sec", "exp_gain", "meso_gain"].includes(event.target.name)) paintMeasured();
+    if (event.target.form === huntForm && (event.target.name === "exp_minute" || event.target.name === "exp_hour") && !event.target.readOnly) {
       huntExpSource = event.target.name === "exp_minute" ? "minute" : "hour";
       syncExp(huntForm, huntExpSource);
     }
@@ -1016,6 +1229,18 @@ export async function render(root) {
     }
     if (event.target.closest("[data-cancel-hunt]")) closeHuntForm();
 
+    const unitButton = event.target.closest("[data-hunt-unit]");
+    if (unitButton) {
+      huntUnit = Number(unitButton.dataset.huntUnit);
+      try {
+        localStorage.setItem(UNIT_KEY, String(huntUnit));
+      } catch {
+        // 저장이 막혀도 이번 화면에서는 바뀐다.
+      }
+      sfx("tick");
+      paintUnits();
+      paintHunts();
+    }
     if (event.target.closest("[data-timer-toggle]")) toggleTimer();
     if (event.target.closest("[data-timer-reset]")) resetTimer();
     const finish = event.target.closest("[data-timer-finish]");
@@ -1108,6 +1333,7 @@ export async function render(root) {
   });
 
   const shouldOpenAdd = consumePendingAdd();
+  paintUnits();
   fillTimerFields();
   paintTimer();
   startTicking();

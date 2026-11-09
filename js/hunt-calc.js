@@ -254,3 +254,44 @@ export function timerGain({ start, end, direct }, label, minimum = 0n) {
   if (value < minimum) return { mode: "range", error: `획득 ${label} 값은 ${minimum.toString()} 이상이어야 합니다.`, field: "end" };
   return { mode: "range", value };
 }
+
+// ── 사냥 기록 단위 환산(1분·15분·1시간) ─────────────────────────
+// 실측 기록(걸린 초 + 얻은 양)은 원래 값으로, 예전 기록(1시간 값만)은 1시간 값을 비례해 바꾼다.
+export const HUNT_UNITS = [
+  { minutes: 1, label: "1분", short: "분" },
+  { minutes: 15, label: "15분", short: "15분" },
+  { minutes: 60, label: "1시간", short: "h" },
+];
+
+// numerator ÷ denominator 를 소수 넷째 자리까지(반올림) 쉼표 붙여 보여 준다. 음수도 된다.
+export function formatRatio(numerator, denominator) {
+  const num = asBig(numerator);
+  const den = asBig(denominator);
+  if (den <= 0n) throw new Error("0 이하로 나눌 수 없습니다.");
+  const negative = num < 0n;
+  const scaled = mulDivRound(negative ? -num : num, 10000n, den);
+  const whole = scaled / 10000n;
+  const fraction = (scaled % 10000n).toString().padStart(4, "0").replace(/0+$/, "");
+  const text = fraction ? `${whole.toLocaleString("ko-KR")}.${fraction}` : whole.toLocaleString("ko-KR");
+  return negative && scaled !== 0n ? `-${text}` : text;
+}
+
+// 기록 한 줄의 EXP를 unitMinutes 기준 { numerator, denominator } 로. 실측이 있으면 실측을 쓴다.
+export function expRatio(row, unitMinutes) {
+  const unit = BigInt(unitMinutes);
+  const seconds = Number(row?.measured_seconds);
+  if (Number.isInteger(seconds) && seconds > 0 && row?.exp_gain != null && row.exp_gain !== "") {
+    return { numerator: asBig(row.exp_gain) * unit * 60n, denominator: BigInt(seconds) };
+  }
+  return { numerator: asBig(row?.exp_per_hour) * unit, denominator: 60n };
+}
+
+// 1시간 금액(메소·쩔비·물약)을 unitMinutes 기준 정수로(반올림).
+export function hourToUnit(amountPerHour, unitMinutes) {
+  return mulDivRound(asBig(amountPerHour), BigInt(unitMinutes), 60n);
+}
+
+// 걸린 시간·얻은 양으로 1시간 값을 만든다(직접 적기의 실측 입력). seconds는 1~86400 정수.
+export function measuredHour({ seconds, exp, meso }) {
+  return { exp: perHour(asBig(exp), seconds), meso: perHour(asBig(meso ?? 0n), seconds) };
+}
