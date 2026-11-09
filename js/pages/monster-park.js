@@ -31,7 +31,7 @@ const curve = new Map(levelExpSeed.map(([level, exp]) => [level, asBig(exp)]));
 // 구역 문 이름(디자인: 50~70 얼룩말, 71~100 표범, 101~129 호랑이)
 const GATE_NAME = { low: "얼룩말 문", mid: "표범 문", high: "호랑이 문" };
 const SPAN = MONSTER_PARK.maxLevel - MONSTER_PARK.minLevel; // 50 → 130, 80칸
-// 달력에서 레벨이 오르는 날 붙이는 그림(사용자 제공 LEVEL UP 그림, 2026-11-09)
+// 달력에서 레벨이 오르는 판(입장권 칸)마다 붙이는 그림(사용자 제공 LEVEL UP 그림, 2026-11-09)
 const LEVEL_UP_ICON = `<img class="mp-day-up" src="img/level-up.png" alt="" width="188" height="240" loading="lazy" />`;
 
 function readStore() {
@@ -638,9 +638,9 @@ export async function render(root) {
     root.querySelector("[data-hw-link]").hidden = !syncsHomework();
     const left = ticketsToday();
     root.querySelector("[data-left-text]").textContent = `${left}회`;
-    // 입장권 2장: 앞에서부터 남은 만큼 "입장 가능". 누르면 한 장씩만 쓰거나 되돌린다(2026-11-09 사용자 요청).
+    // 입장권 2장: 쓴 입장은 1번부터 "사용함"(어느 장을 눌러도 1번부터 없어짐, 숙제표 1회·2회 순서). 누르면 한 장씩만 쓰거나 되돌린다(2026-11-09 사용자 요청).
     root.querySelector("[data-tickets]").innerHTML = Array.from({ length: MONSTER_PARK.perDay }, (_, index) => {
-      const on = index < left;
+      const on = index >= MONSTER_PARK.perDay - left;
       return `<button type="button" class="mp-ticket${on ? " is-on" : ""}" data-ticket data-use="${on}" aria-pressed="${on}" title="${on ? "한 판 돌기(경험치 더하기)" : "되돌리기(이 화면에서 더한 경험치 빼기)"}">
         <span class="mp-ticket-n">${index + 1}</span>
         <span class="mp-ticket-copy"><b>${on ? "입장 가능" : "사용함"}</b><small>${on ? "누르면 한 판 경험치 +" : "누르면 되돌리기"}</small></span>
@@ -820,12 +820,18 @@ export async function render(root) {
       const done = after.level >= top && !runs.length;
       const date = addDays(today, day);
       const [, month, dateNum] = date.split("-").map(Number);
-      const pips = Array.from({ length: MONSTER_PARK.perDay }, (_, slot) => {
+      // 입장권 칸: 오늘 이미 쓴 입장은 입장권 화면처럼 1번부터, 그 뒤로 판 결과. 레벨이 오른 판에는 그 칸 위에 LEVEL UP 그림.
+      const usedBefore = day === 0 ? MONSTER_PARK.perDay - tickets : 0;
+      const pips = Array.from({ length: MONSTER_PARK.perDay }, (_, index) => {
+        if (index < usedBefore) return `<span class="mp-pip"><i class="is-used"></i></span>`;
+        const slot = index - usedBefore;
         const run = runs[slot];
-        if (run) return `<i class="${run.after.level > run.before.level ? "is-up" : "is-exp"}"></i>`;
-        if (slot < runs.length + lost) return `<i class="is-lost"></i>`;
-        if (day === 0 && slot >= tickets) return `<i class="is-used"></i>`;
-        return "<i></i>";
+        if (run) {
+          const leveled = run.after.level > run.before.level;
+          return `<span class="mp-pip">${leveled ? LEVEL_UP_ICON : ""}<i class="${leveled ? "is-up" : "is-exp"}"></i></span>`;
+        }
+        if (slot < runs.length + lost) return `<span class="mp-pip"><i class="is-lost"></i></span>`;
+        return `<span class="mp-pip"><i></i></span>`;
       }).join("");
       const badge = goalHit ? "만렙 달성" : day === 0 ? "오늘" : lost ? "구역 변경" : up > 0 ? `+${up}` : "";
       const badgeClass = goalHit ? "is-goal" : day === 0 ? "is-today" : lost ? "is-lost" : up > 0 ? "is-up" : "";
@@ -842,7 +848,6 @@ export async function render(root) {
       cells.push(`<button type="button" class="mp-day${day === 0 ? " is-today" : ""}${goalHit ? " is-goal" : up > 0 ? " is-up" : ""}${done ? " is-done" : ""}${day === calPick ? " is-picked" : ""}${week === 6 ? " is-sat" : week === 0 ? " is-sun" : " is-weekday"}" data-cal-day="${day}" aria-label="${escapeHtml(label)}" style="--i:${Math.min(day, 30)}">
         <span class="mp-day-top"><b>${dateNum === 1 || day === 0 ? `${month}/` : ""}${dateNum}</b>${badge ? `<em class="${badgeClass}">${escapeHtml(badge)}</em>` : ""}</span>
         <span class="mp-day-lv"><b>${done ? "—" : `Lv.${after.level}`}</b><small>${done || after.level >= top ? "" : `${percentOf(after.exp, curve.get(after.level))}%`}</small></span>
-        ${up > 0 ? LEVEL_UP_ICON : ""}
         <span class="mp-day-pips">${pips}</span>
       </button>`);
     }

@@ -16951,7 +16951,7 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .mp-day-lv b { font-size: 18px; font-weight: 900; letter-spacing: -0.02em; }
 .mp-day-lv small { font-size: 11px; color: var(--mp-text4); }
 .mp-day-pips { display: flex; gap: 5px; margin-top: auto; }
-.mp-day-pips i { flex: 1; height: 7px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); }
+.mp-day-pips i { flex: none; height: 7px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); }
 .mp-day-pips i.is-up { border-color: transparent; background: var(--mp-accent); box-shadow: 0 0 8px oklch(0.78 0.16 56 / 0.6); }
 .mp-day-pips i.is-exp { border-color: transparent; background: oklch(0.82 0.15 61 / 0.4); }
 .mp-day-pips i.is-lost { border-color: oklch(0.72 0.16 32 / 0.6); background: repeating-linear-gradient(135deg, var(--mp-rust) 0 2px, transparent 2px 4px); }
@@ -17029,8 +17029,12 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .mp-day.is-sun.is-picked { box-shadow: inset 0 3px 0 oklch(0.72 0.16 32 / 0.9), 0 0 0 2px var(--mp-accent); }
 .mp-day.is-sat.is-today, .mp-day.is-sun.is-today { border: 2px solid #fbe7cf; }
 .mp-day.is-sat .mp-day-top b, .mp-day.is-sun .mp-day-top b { font-size: 14px; font-weight: 900; }
-.mp-day-up { position: absolute; right: 4px; bottom: 14px; width: 36px; height: auto; filter: drop-shadow(0 0 6px rgba(140, 255, 80, 0.5)); animation: mp-up-bob 2.2s ease-in-out infinite; pointer-events: none; }
-.mp-day-lv { padding-right: 34px; }
+/* 입장권 칸마다: 레벨이 오른 판은 막대 위에 작은 LEVEL UP 그림. 그림이 없는 칸도 같은 높이를 잡아 막대 줄이 맞게 */
+.mp-day-pips { align-items: flex-end; min-height: 28px; }
+.mp-pip { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.mp-pip > i { align-self: stretch; }
+.mp-day-up { width: 18px; height: auto; filter: drop-shadow(0 0 4px rgba(140, 255, 80, 0.5)); animation: mp-up-bob 2.2s ease-in-out infinite; pointer-events: none; }
+.mp-pip + .mp-pip .mp-day-up { animation-delay: 0.3s; }
 /* 평일 칸은 연하게 해서 주말이 더 눈에 띄게 */
 .mp-day.is-weekday { background: rgba(255, 255, 255, 0.018); border-color: rgba(255, 255, 255, 0.06); }
 .mp-day.is-weekday.is-up { background: oklch(0.6 0.14 58 / 0.05); }
