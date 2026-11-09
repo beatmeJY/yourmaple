@@ -18,7 +18,8 @@ import { notify } from "../toast.js";
 // 캐릭터 카드를 누르면 레벨·경험치가 채워지고, 오늘 남은 입장과 함께 곧바로 다시 계산한다.
 // 몬파 레벨(50~129)이 아닌 캐릭터는 접어 둔다. "오늘 몬파 끝" 은 오늘 남은 입장을 한 번에 돌아 경험치를 더하고 입장을 0으로 만들며
 // (2026-11-09 사용자 요청, 예전 "한 판 끝" 대체),
-// 고른 캐릭터면 레벨·경험치를 캐릭터에 바로 저장한다(2026-10-28 사용자 요청). 손으로 고친 값은 저장 버튼으로.
+// 입장권 한 장을 쓰면 한 판 경험치를 더하고, 되돌리면 이 화면에서 더한 경험치를 뺀다. 고른 캐릭터면 레벨·경험치를 바꿀 때마다
+// (입장권·오늘 몬파 끝·손으로 고친 값 모두) 캐릭터에 바로 저장한다(2026-11-09 사용자 요청, 저장 버튼 없앰).
 // 고른 캐릭터의 "오늘 남은 입장"은 숙제표 몬스터파크 1회·2회 체크(homework_checks)와 같은 값이다. 표가 없으면 이 기기에만 기억.
 // 이 기기에만 기억: 직접 입력 시 오늘 남은 입장(날짜가 바뀌면 2회로).
 // 2026-11-09 v2 디자인(design/design_handoff_monster_park_v2, 사용자 요청): 주황·갈색 테마, 입장권 2장, 레벨 구역 문 막대,
@@ -106,6 +107,10 @@ export async function render(root) {
   let expError = "";
   let lastReach = false;
   let saving = false;
+  let saveTimer = 0;
+  let saveChain = Promise.resolve();
+  // 이 화면에서 입장권으로 돈 판 기록(되돌리기용). 그 뒤 레벨·경험치를 손으로 바꾸지 않았을 때만 되돌린다.
+  const runLog = [];
   let outOpen = false; // 몬파 못 가는 캐릭터 펼침
   let manualCygnus = false; // 직접 입력할 때 시그너스(만렙 120)인지
   let homeworkReady = false; // homework_checks 를 읽었으면 고른 캐릭터의 입장 횟수를 숙제와 맞춘다
@@ -426,43 +431,55 @@ export async function render(root) {
     const runNote = !zone ? (level < MONSTER_PARK.minLevel ? "50레벨부터" : cap() < realMaxLevel() ? "몬파 졸업" : `${cap()} 달성`) : gain == null ? "구역 경험치 모름" : left <= 0 ? "오늘 입장 끝" : `${plan.runs}판 · +${formatCount(plan.gained)}`;
     const character = pickedCharacter();
     const dirty = isDirty(character);
+    // 고른 캐릭터는 레벨·경험치를 바꾸면 바로 캐릭터에 저장한다(2026-11-09 사용자 요청).
     const saveHtml = !character
-      ? `<span class="mp-apply-note">${isLoggedIn() ? "캐릭터를 고르면 레벨을 바로 저장할 수 있어요" : ""}</span>`
-      : dirty
-        ? `<button type="button" class="mp-save" data-save ${saving || expError ? "disabled" : ""}>${saving ? "저장 중…" : `${escapeHtml(character.name)}에 ${escapeHtml(savedText())} 저장`}</button>`
-        : `<span class="mp-apply-note is-saved">✓ ${escapeHtml(character.name)} 저장된 값과 같아요 · 오늘 몬파 끝을 누르면 바로 저장돼요</span>`;
+      ? `<span class="mp-apply-note">${isLoggedIn() ? "캐릭터를 고르면 레벨·경험치가 캐릭터에 바로 저장돼요" : ""}</span>`
+      : expError
+        ? `<span class="mp-apply-note is-error">경험치를 고치면 ${escapeHtml(character.name)}에 저장돼요</span>`
+        : dirty || saving
+          ? `<span class="mp-apply-note">${escapeHtml(character.name)}에 저장 중…</span>`
+          : `<span class="mp-apply-note is-saved">✓ ${escapeHtml(character.name)}에 ${escapeHtml(savedText())} 저장됨</span>`;
     box.innerHTML = `
-      <button type="button" class="mp-run-done" data-run-done ${canRun && !saving ? "" : "disabled"}>
+      <button type="button" class="mp-run-done" data-run-done ${canRun ? "" : "disabled"}>
         <span>오늘 몬파 끝!</span><small>${escapeHtml(runNote)}</small>
       </button>
       <div class="mp-apply-foot">${saveHtml}</div>`;
   }
 
-  async function saveCharacter({ silent = false } = {}) {
-    const character = pickedCharacter();
-    if (!character || saving || expError || !isDirty(character)) return;
-    saving = true;
-    paintApply();
+  // 캐릭터에 레벨·경험치 저장. 저장은 차례로 처리하고(빠르게 여러 번 바꿔도 마지막 값이 남게), 성공 알림은 띄우지 않는다.
+  function saveCharacter(character = pickedCharacter()) {
+    window.clearTimeout(saveTimer);
+    if (!character || expError || !isDirty(character)) return saveChain;
     const values = { level, exp: exp.toString() };
-    const summary = savedText();
-    const supabase = await getSupabase();
-    const { error } = await supabase.from("characters").update(values).eq("id", character.id);
-    saving = false;
-    if (!root.isConnected) return;
-    if (error) {
-      sfx("fail");
-      notify(translateDbError(error), "error");
+    saveChain = saveChain.then(async () => {
+      if (character.level === values.level && String(character.exp ?? 0) === values.exp) return;
+      saving = true;
+      if (root.isConnected) paintApply();
+      const supabase = await getSupabase();
+      const { error } = await supabase.from("characters").update(values).eq("id", character.id);
+      saving = false;
+      if (!root.isConnected) return;
+      if (error) {
+        sfx("fail");
+        notify(`${character.name}에 저장하지 못했어요. ${translateDbError(error)}`, "error");
+        paintApply();
+        return;
+      }
+      character.level = values.level;
+      character.exp = values.exp;
+      loadMainCharacter(true).then(paintProfileButton);
+      paintPick();
       paintApply();
-      return;
-    }
-    character.level = values.level;
-    character.exp = values.exp;
-    if (!silent) sfx("tick");
-    notify(`${character.name} ${summary} 저장했습니다.`, "success");
-    loadMainCharacter(true).then(paintProfileButton);
-    paintPick();
-    paintApply();
-    paintRace();
+      paintRace();
+    });
+    return saveChain;
+  }
+
+  // 입력하는 동안은 잠깐 기다렸다가 저장한다.
+  function scheduleSave() {
+    window.clearTimeout(saveTimer);
+    if (!pickedCharacter() || expError) return;
+    saveTimer = window.setTimeout(() => saveCharacter(), 600);
   }
 
   // 오늘 몬파 끝 연출: 경험치 글자가 떠오르고, 레벨업이면 고리·불꽃·LEVEL UP. 모션 축소면 건너뛴다.
@@ -478,31 +495,102 @@ export async function render(root) {
     }, 1300);
   }
 
-  // 오늘 남은 입장을 한 번에 돌고 입장을 0으로. 구역이 바뀌면 남은 입장은 못 쓰니 역시 0.
-  function finishToday() {
+  // 지금 상태에서 몬파 한 판을 돌 수 있으면 한 판 경험치
+  function runGain() {
     const zone = level < cap() ? zoneOf(level) : null;
     const gain = zone ? zoneExp[zone.id] : null;
-    if (expError || !zone || gain == null || ticketsToday() <= 0) return;
+    return expError || gain == null ? null : gain;
+  }
+
+  // 한 판을 돌고 기록을 남긴다. 구역이 바뀌거나 만렙이면 오늘 남은 입장은 못 쓰니 0. 남은 입장 수를 돌려준다.
+  function applyRun(left) {
+    const gain = runGain();
     const top = cap();
-    const plan = todayPlan();
-    if (!plan.runs) return;
-    level = plan.after.level;
-    exp = plan.after.exp;
-    saveTickets(0);
-    if (plan.levels) {
-      sfx(level >= top ? "fanfare" : "check");
+    const zone = zoneOf(level);
+    const before = { level, exp };
+    // 경험치는 직업 만렙 기준으로 더한다(배틀메이지는 130이 돼도 넘친 경험치가 남는다).
+    const after = gainRun(level, exp, gain, curve, realMaxLevel());
+    level = after.level;
+    exp = after.exp;
+    const next = after.level >= top || zoneOf(after.level)?.id !== zone.id ? 0 : left - 1;
+    runLog.push({ characterId: picked, before, after: { level, exp }, ticketsBefore: left });
+    return { next, gain, leveled: after.leveled, wasted: after.wasted, lost: left - 1 - next };
+  }
+
+  function runEffects(levels, gained, wasted, lost) {
+    if (levels) {
+      sfx(level >= cap() ? "fanfare" : "check");
       burstAt(levelInput, ["#ffd38a", "#ffb35c", "#ffffff"], 18, 1);
     } else sfx("tick");
-    playRunFx(plan.levels > 0, plan.gained);
+    playRunFx(levels > 0, gained);
     const notes = [];
-    if (plan.lost) notes.push(`구역이 바뀌어 남은 입장 ${plan.lost}회는 못 써요`);
-    if (plan.wasted > 0n) notes.push(`1레벨 제한으로 경험치 ${formatCount(plan.wasted)}이 버려졌어요`);
+    if (lost > 0) notes.push(`구역이 바뀌어 남은 입장 ${lost}회는 못 써요`);
+    if (wasted > 0n) notes.push(`1레벨 제한으로 경험치 ${formatCount(wasted)}이 버려졌어요`);
     if (notes.length) notify(notes.join(" · "), "info");
+  }
+
+  // 오늘 남은 입장을 한 번에 돌고 입장을 0으로(2026-11-09 사용자 요청, 예전 "한 판 끝" 대체).
+  function finishToday() {
+    let left = ticketsToday();
+    if (runGain() == null || left <= 0) return;
+    let levels = 0;
+    let gained = 0n;
+    let wasted = 0n;
+    let lost = 0;
+    while (left > 0 && runGain() != null) {
+      const run = applyRun(left);
+      left = run.next;
+      gained += run.gain;
+      wasted += run.wasted;
+      lost += run.lost;
+      if (run.leveled) levels += 1;
+    }
+    saveTickets(0);
+    runEffects(levels, gained, wasted, lost);
     paint();
-    saveCharacter({ silent: true });
+    saveCharacter();
+  }
+
+  // 입장권 한 장: 쓰면 한 판 경험치를 더하고, 되돌리면 이 화면에서 더한 경험치를 뺀다(2026-11-09 사용자 요청).
+  function toggleTicket(use) {
+    const left = ticketsToday();
+    if (use) {
+      if (left <= 0) return;
+      if (runGain() == null) {
+        // 구역 경험치를 모르거나 만렙이면 입장 횟수만 바꾼다.
+        sfx("tick");
+        saveTickets(left - 1);
+        paint();
+        return;
+      }
+      const run = applyRun(left);
+      saveTickets(run.next);
+      runEffects(run.leveled ? 1 : 0, run.gain, run.wasted, run.lost);
+      paint();
+      saveCharacter();
+      return;
+    }
+    if (left >= MONSTER_PARK.perDay) return;
+    sfx("tick");
+    const last = runLog.at(-1);
+    if (last && last.characterId === picked && last.after.level === level && last.after.exp === exp) {
+      runLog.pop();
+      level = last.before.level;
+      exp = last.before.exp;
+      expError = "";
+      saveTickets(Math.max(left + 1, Math.min(MONSTER_PARK.perDay, last.ticketsBefore)));
+      paint();
+      saveCharacter();
+      return;
+    }
+    saveTickets(left + 1);
+    notify("이 화면에서 돈 판이 아니라 입장 횟수만 되돌렸어요. 경험치는 직접 고쳐 주세요.", "info");
+    paint();
   }
 
   function pickCharacter(id) {
+    // 저장을 기다리던 값은 캐릭터를 바꾸기 전에 저장한다.
+    if (saveTimer) saveCharacter();
     picked = id;
     const character = characters.find((item) => item.id === id);
     if (character?.level) {
@@ -553,9 +641,9 @@ export async function render(root) {
     // 입장권 2장: 앞에서부터 남은 만큼 "입장 가능". 누르면 한 장씩만 쓰거나 되돌린다(2026-11-09 사용자 요청).
     root.querySelector("[data-tickets]").innerHTML = Array.from({ length: MONSTER_PARK.perDay }, (_, index) => {
       const on = index < left;
-      return `<button type="button" class="mp-ticket${on ? " is-on" : ""}" data-ticket="${on ? left - 1 : left + 1}" aria-pressed="${on}" title="${on ? "사용함으로 바꾸기" : "입장 가능으로 되돌리기"}">
+      return `<button type="button" class="mp-ticket${on ? " is-on" : ""}" data-ticket data-use="${on}" aria-pressed="${on}" title="${on ? "한 판 돌기(경험치 더하기)" : "되돌리기(이 화면에서 더한 경험치 빼기)"}">
         <span class="mp-ticket-n">${index + 1}</span>
-        <span class="mp-ticket-copy"><b>${on ? "입장 가능" : "사용함"}</b><small>${on ? "누르면 사용 처리" : "누르면 되돌리기"}</small></span>
+        <span class="mp-ticket-copy"><b>${on ? "입장 가능" : "사용함"}</b><small>${on ? "누르면 한 판 경험치 +" : "누르면 되돌리기"}</small></span>
       </button>`;
     }).join("");
     const total = eventDays ? left + MONSTER_PARK.perDay * (eventDays - 1) : 0;
@@ -825,10 +913,6 @@ export async function render(root) {
       paint();
       return;
     }
-    if (event.target.closest("[data-save]")) {
-      saveCharacter();
-      return;
-    }
     if (event.target.closest("[data-toggle-out]")) {
       sfx("tick");
       outOpen = !outOpen;
@@ -856,14 +940,11 @@ export async function render(root) {
       sfx("tick");
       setLevel(level + Number(step.dataset.levelStep));
       paint();
+      scheduleSave();
       return;
     }
     const ticket = event.target.closest("[data-ticket]");
-    if (ticket) {
-      sfx("tick");
-      saveTickets(Number(ticket.dataset.ticket));
-      paint();
-    }
+    if (ticket) toggleTicket(ticket.dataset.use === "true");
   });
 
   root.addEventListener("input", (event) => {
@@ -872,12 +953,14 @@ export async function render(root) {
       if (value) {
         setLevel(value);
         paint();
+        scheduleSave();
       }
       return;
     }
     if (event.target === expField) {
       setExperience(expField.value);
       paint();
+      scheduleSave();
       return;
     }
   });
