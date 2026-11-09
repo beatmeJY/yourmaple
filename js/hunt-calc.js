@@ -290,8 +290,3 @@ export function expRatio(row, unitMinutes) {
 export function hourToUnit(amountPerHour, unitMinutes) {
   return mulDivRound(asBig(amountPerHour), BigInt(unitMinutes), 60n);
 }
-
-// 걸린 시간·얻은 양으로 1시간 값을 만든다(직접 적기의 실측 입력). seconds는 1~86400 정수.
-export function measuredHour({ seconds, exp, meso }) {
-  return { exp: perHour(asBig(exp), seconds), meso: perHour(asBig(meso ?? 0n), seconds) };
-}

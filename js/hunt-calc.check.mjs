@@ -75,7 +75,7 @@ console.log("hunt-calc timerGain ok");
 
 // 사냥 기록 단위 환산: 파풀 한 판(EXP 고정, 12분 30초)과 1시간 값만 있는 예전 기록
 {
-  const { formatRatio, expRatio, hourToUnit, measuredHour } = await import("./hunt-calc.js");
+  const { formatRatio, expRatio, hourToUnit } = await import("./hunt-calc.js");
   const ratioText = (row, unit) => { const r = expRatio(row, unit); return formatRatio(r.numerator, r.denominator); };
   const run = { measured_seconds: 750, exp_gain: "500000", exp_per_hour: "2400000" };
   // 500,000 ÷ 750초 = 666.6667/초 → 1분 40,000, 15분 600,000, 1시간 2,400,000
@@ -94,6 +94,5 @@ console.log("hunt-calc timerGain ok");
   assert.equal(formatRatio(0n, 7n), "0");
   assert.equal(hourToUnit(-200000n, 15), -50000n);
   assert.equal(hourToUnit(100n, 1), 2n);
-  assert.deepEqual(measuredHour({ seconds: 750, exp: 500000n, meso: 30000n }), { exp: 2400000n, meso: 144000n });
 }
 console.log("hunt-calc units ok");

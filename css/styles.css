@@ -16612,20 +16612,31 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .hu-unit.is-on { background: oklch(0.82 0.14 150 / 0.2); color: oklch(0.92 0.1 150); box-shadow: inset 0 0 0 1px oklch(0.82 0.14 150 / 0.45), 0 0 14px oklch(0.82 0.14 150 / 0.18); }
 .hu-unit:focus-visible { outline: 2px solid oklch(0.82 0.14 150 / 0.8); outline-offset: 1px; }
 .hu-row-measured { justify-self: start; align-self: start; display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 1px 8px; border-radius: var(--radius-pill); border: 1px solid oklch(0.85 0.12 85 / 0.4); background: oklch(0.85 0.12 85 / 0.1); color: oklch(0.9 0.1 85); font-size: 11px; font-weight: 800; white-space: nowrap; }
-.hu-measured { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; padding: 10px 12px 12px; border-radius: 12px; border: 1px dashed rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.02); transition: border-color 0.25s, background 0.25s; }
-.hu-measured[hidden] { display: none; }
-.hu-measured.is-on { border-style: solid; border-color: oklch(0.85 0.12 85 / 0.45); background: oklch(0.85 0.12 85 / 0.06); }
-.hu-measured.is-error { border-color: rgba(248, 113, 113, 0.55); }
-.hu-measured-head { grid-column: 1 / -1; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 12px; color: #8f87a8; line-height: 1.45; }
-.hu-measured-head b { color: #e9e4f7; font-size: 13px; }
-.hu-measured-note { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.5; color: oklch(0.9 0.1 85); animation: ym-fade-up 0.35s var(--spring) both; }
-.hu-measured.is-error .hu-measured-note { color: var(--danger); }
-.hu-form input[readonly] { opacity: 0.62; cursor: not-allowed; }
 @media (max-width: 640px) {
-  .hu-measured { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hu-units { margin-left: 0; }
 }
+
+/* 사냥 기록: 타이머와 기록 추가를 한 칸으로 (2026-11-09) */
+.hu-editing { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 12px; border: 1px solid oklch(0.85 0.12 85 / 0.45); background: oklch(0.85 0.12 85 / 0.08); color: #e9e4f7; font-size: 12.5px; animation: ym-fade-up 0.35s var(--spring) both; }
+.hu-editing[hidden] { display: none; }
+.hu-editing b { color: oklch(0.92 0.1 85); }
+.hu-timer.is-editing { box-shadow: inset 0 0 0 1px oklch(0.85 0.12 85 / 0.35), var(--shadow); }
+.hu-direct-who { grid-template-columns: repeat(3, minmax(0, 1fr)); animation: ym-fade-up 0.35s var(--spring) both; }
+.hu-direct-who[hidden], .hu-direct-who [hidden] { display: none; }
+.hu-direct-who .hu-well.is-wide { grid-column: 1 / -1; }
+.hu-measure > span small { display: block; margin-top: 2px; color: #8f87a8; font-size: 11.5px; }
+.hu-measure-time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hu-page .hu-well textarea { width: 100%; min-height: 44px; padding: 0; resize: vertical; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: #f3effb; font: inherit; font-size: 14px; outline: none; }
+.hu-preview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 10px 0 0; animation: ym-fade-up 0.35s var(--spring) both; }
+.hu-preview[hidden] { display: none; }
+.hu-preview span { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: oklch(0.82 0.14 150 / 0.08); border: 1px solid oklch(0.82 0.14 150 / 0.25); min-width: 0; }
+.hu-preview small { color: #a59dbd; font-size: 11px; }
+.hu-preview b { color: oklch(0.92 0.1 150); font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .hu-direct-who { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hu-direct-who [data-direct-field="charName"] { grid-column: 1 / -1; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .hu-unit, .hu-measured { transition: none; }
-  .hu-measured-note { animation: none; }
+  .hu-unit { transition: none; }
+  .hu-editing, .hu-direct-who, .hu-preview { animation: none; }
 }
