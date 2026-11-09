@@ -6,7 +6,7 @@ import { homeworkState } from "../homework-calc.js";
 import { asBig } from "../hunt-calc.js";
 import { CYGNUS_MAX_LEVEL, findJob, isCygnusJob, jobStyle, maxLevelOf } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
-import { MONSTER_PARK, PARK_STORE_KEY, ZONES, addDays, daysLeft, gainRun, parkDays, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
+import { MONSTER_PARK, PARK_STORE_KEY, ZONES, addDays, daysLeft, gainRun, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
 import { loadParkSettings, saveParkSettings, zoneExpValues } from "../monster-park-settings.js";
 import { translateDbError } from "../db-error.js";
 import { loadMainCharacter, mainCharacterId, paintProfileButton } from "../profile.js";
@@ -20,10 +20,15 @@ import { notify } from "../toast.js";
 // 고른 캐릭터면 레벨·경험치를 캐릭터에 바로 저장한다(2026-10-28 사용자 요청). 손으로 고친 값은 저장 버튼으로.
 // 고른 캐릭터의 "오늘 남은 입장"은 숙제표 몬스터파크 1회·2회 체크(homework_checks)와 같은 값이다. 표가 없으면 이 기기에만 기억.
 // 이 기기에만 기억: 직접 입력 시 오늘 남은 입장(날짜가 바뀌면 2회로).
+// 2026-11-09 v2 디자인(design/design_handoff_monster_park_v2, 사용자 요청): 주황·갈색 테마, 입장권 2장, 레벨 구역 문 막대,
+// 캐릭터 레이스(성장 그래프 대체), 이벤트 달력(날짜별 표 대체). 계산·저장·숙제표 연동은 그대로.
 
 const STORE_KEY = PARK_STORE_KEY;
 const PARK_KEYS = ["monster-park", "monster-park-2"]; // 숙제표 1회·2회 칸(homework-calc.js RAIDS)
 const curve = new Map(levelExpSeed.map(([level, exp]) => [level, asBig(exp)]));
+// 구역 문 이름(디자인: 50~70 얼룩말, 71~100 표범, 101~129 호랑이)
+const GATE_NAME = { low: "얼룩말 문", mid: "표범 문", high: "호랑이 문" };
+const SPAN = MONSTER_PARK.maxLevel - MONSTER_PARK.minLevel; // 50 → 130, 80칸
 
 function readStore() {
   try {
@@ -47,6 +52,12 @@ function shortDate(date, today) {
   return `${month}/${day} (${date === today ? "오늘" : week})`;
 }
 
+// "2026-11-24" → "11/24"
+function tinyDate(date) {
+  const [, month, day] = date.split("-").map(Number);
+  return `${month}/${day}`;
+}
+
 // "2026-11-30" → "11월 30일"
 const endLabel = (() => {
   const [, month, day] = MONSTER_PARK.end.split("-").map(Number);
@@ -62,6 +73,16 @@ function levelText(state, top = MONSTER_PARK.maxLevel) {
   if (state.level >= top) return `Lv.${state.level}`;
   return `Lv.${state.level} · ${percentOf(state.exp, curve.get(state.level))}%`;
 }
+
+// 레벨 + 그 레벨 진행률(0~1)을 한 숫자로. 끝 레벨 이상이면 끝 레벨.
+function levelValue(state, top) {
+  if (state.level >= top) return top;
+  const need = curve.get(state.level);
+  return state.level + (need ? Number((state.exp * 10000n) / need) / 10000 : 0);
+}
+
+// 50~130 막대 위 위치(%)
+const trackX = (value) => Math.max(0, Math.min(100, ((value - MONSTER_PARK.minLevel) / SPAN) * 100));
 
 export async function render(root) {
   const today = seoulDate();
@@ -81,72 +102,90 @@ export async function render(root) {
   let exp = 0n;
   let expError = "";
   let lastReach = false;
-  let painted = false;
   let saving = false;
   let outOpen = false; // 몬파 못 가는 캐릭터 펼침
   let manualCygnus = false; // 직접 입력할 때 시그너스(만렙 120)인지
   let homeworkReady = false; // homework_checks 를 읽었으면 고른 캐릭터의 입장 횟수를 숙제와 맞춘다
+  let calPick = 0; // 달력에서 자세히 보는 날(0 = 오늘)
+  let calDetails = [];
+  let fxTimer = 0;
   const parkChecks = new Map(); // "캐릭터id:task_key" → checked_at
   const eventDays = daysLeft(today);
+  const dday = eventDays ? (eventDays === 1 ? "오늘 마감" : `D-${eventDays - 1}`) : "종료";
 
   root.innerHTML = `
     <div class="mp-page">
-      <header class="ym-page-head">
-        <h1>몬스터파크 계산</h1>
-        <p>몬스터파크 경험치만으로 만렙(130, 시그너스 120)까지 며칠 걸리는지, 이벤트가 끝나는 날 몇 레벨이 되는지 알려 드려요.</p>
+      <header class="mp-head">
+        <div class="mp-head-copy">
+          <span class="mp-kicker">MONSTER PARK EVENT</span>
+          <h1>몬스터파크 계산</h1>
+          <p>몬스터파크 경험치만으로 만렙(130, 시그너스 120)까지 며칠 걸리는지, 이벤트가 끝나는 날 몇 레벨이 되는지 알려 드려요.</p>
+        </div>
+        <section class="mp-event" aria-label="이벤트 기간">
+          <span class="mp-event-thatch" aria-hidden="true"></span>
+          <span class="mp-event-shade" aria-hidden="true"></span>
+          <span class="mp-event-shine" aria-hidden="true"></span>
+          <img class="mp-event-art" src="img/monster-park.png" alt="" width="88" height="88" />
+          <div class="mp-event-copy">
+            <div class="mp-event-top"><span class="mp-event-badge">이벤트</span><span>${eventDays ? `${endLabel}까지` : "이벤트가 끝났어요"}</span></div>
+            <div class="mp-event-mid"><strong>${escapeHtml(dday)}</strong><span data-event-left></span></div>
+            <span class="mp-event-sub">하루 ${MONSTER_PARK.perDay}회 · 한 판에 1레벨까지만 올라요</span>
+          </div>
+        </section>
       </header>
-      <section class="mp-event ym-glass">
-        <img class="mp-event-art" src="img/monster-park.png" alt="" width="96" height="96" />
-        <span class="ym-badge is-gold">이벤트</span>
-        <strong>${eventDays ? `${endLabel}까지 · ${eventDays === 1 ? "오늘 마감" : `D-${eventDays - 1}`}` : "이벤트가 끝났어요"}</strong>
-        <span class="mp-event-sub">하루 ${MONSTER_PARK.perDay}회 · 한 판에 1레벨까지만 올라요</span>
-      </section>
-      <section class="mp-pick" data-pick hidden></section>
-      <section class="mp-input ym-glass">
-        <div class="mp-field">
-          <span class="mp-label">현재 레벨</span>
-          <span class="mp-stepper">
-            <button type="button" data-level-step="-10" aria-label="10레벨 내리기">−10</button>
+
+      <section class="mp-pick" data-pick aria-label="캐릭터 고르기"></section>
+
+      <div class="mp-board">
+        <section class="mp-card mp-now" aria-labelledby="mp-now-title">
+          <div class="mp-now-head">
+            <h2 id="mp-now-title">지금 상태</h2>
+            <span class="mp-who" data-who></span>
+            <button type="button" class="mp-cygnus-toggle" data-cygnus hidden aria-pressed="false">시그너스 · 만렙 ${CYGNUS_MAX_LEVEL}</button>
+          </div>
+          <div class="mp-stepper">
+            <button type="button" class="is-ten" data-level-step="-10" aria-label="10레벨 내리기">−10</button>
             <button type="button" data-level-step="-1" aria-label="1레벨 내리기">−</button>
-            <label class="mp-lv"><span>Lv.</span><input data-level inputmode="numeric" aria-label="현재 레벨" /></label>
+            <label class="mp-lv"><span>Lv.</span><input data-level inputmode="numeric" autocomplete="off" aria-label="현재 레벨" /><span class="mp-fx" data-fx aria-hidden="true"></span></label>
             <button type="button" data-level-step="1" aria-label="1레벨 올리기">+</button>
-            <button type="button" data-level-step="10" aria-label="10레벨 올리기">+10</button>
-          </span>
-          <span class="mp-zone" data-zone></span>
-          <button type="button" class="ym-chip mp-cygnus-toggle" data-cygnus hidden aria-pressed="false">시그너스 · 만렙 ${CYGNUS_MAX_LEVEL}</button>
+            <button type="button" class="is-ten" data-level-step="10" aria-label="10레벨 올리기">+10</button>
+          </div>
+          <div class="mp-block">
+            <div class="mp-row-head"><span>레벨 구역</span><span class="mp-zone-note" data-zone></span></div>
+            <div class="mp-gates" data-gates></div>
+          </div>
+          <div class="mp-block">
+            <div class="mp-row-head"><label for="mp-current-exp">현재 경험치</label><span class="mp-exp-ratio" data-exp-ratio></span></div>
+            <div class="mp-exp-bar" aria-hidden="true"><i data-exp-bar></i></div>
+            <span class="mp-exp-input">
+              <input id="mp-current-exp" data-current-exp inputmode="numeric" autocomplete="off" aria-describedby="mp-exp-hint" />
+              <span>EXP</span>
+            </span>
+            <span class="mp-exp-exact" id="mp-exp-hint" data-exp-exact aria-live="polite"></span>
+          </div>
+          <div class="mp-block">
+            <div class="mp-row-head"><span>오늘 남은 입장 <small class="mp-hw-link" data-hw-link hidden>숙제표와 같이 바뀌어요</small></span><b class="mp-left-text" data-left-text></b></div>
+            <div class="mp-tickets" role="group" aria-label="오늘 남은 입장" data-tickets></div>
+          </div>
+          <div class="mp-apply" data-apply></div>
+        </section>
+        <div class="mp-side">
+          <div class="mp-results" data-results></div>
+          <div class="mp-warnings" data-warnings></div>
         </div>
-        <div class="mp-field">
-          <label class="mp-label" for="mp-current-exp">현재 경험치</label>
-          <span class="mp-exp-input">
-            <input id="mp-current-exp" data-current-exp inputmode="numeric" aria-describedby="mp-exp-hint" />
-            <span>EXP</span>
-          </span>
-          <span class="mp-exp-exact" id="mp-exp-hint" data-exp-exact aria-live="polite"></span>
-        </div>
-        <div class="mp-field">
-          <span class="mp-label">오늘 남은 입장 <small class="mp-hw-link" data-hw-link hidden>숙제표와 같이 바뀌어요</small></span>
-          <span class="mp-tickets" role="group" aria-label="오늘 남은 입장">
-            ${[0, 1, 2].map((count) => `<button type="button" class="mp-ticket" data-ticket="${count}">${count}회</button>`).join("")}
-          </span>
-        </div>
-        <div class="mp-apply" data-apply></div>
-      </section>
-      <section class="mp-results" data-results></section>
-      <section class="mp-warnings" data-warnings></section>
-      <section class="mp-growth ym-glass" data-growth aria-label="캐릭터별 성장 경로"></section>
-      <details class="mp-timeline ym-glass" data-timeline>
-        <summary>날짜별 상세 표</summary>
-        <div data-day-table></div>
-      </details>
-      <details class="mp-zones ym-glass">
-        <summary>구역별 한 판 경험치</summary>
-        <p>${settings.error ? "기준 경험치를 불러오지 못했어요. 새로고침한 뒤 다시 확인해 주세요." : "모든 사용자에게 적용되는 구역별 기준이에요."}</p>
+      </div>
+
+      <section class="mp-card mp-race" data-race aria-labelledby="mp-race-title"></section>
+      <section class="mp-card mp-cal" data-calendar aria-labelledby="mp-cal-title"></section>
+
+      <details class="mp-zones" data-zones>
+        <summary><b>구역별 한 판 경험치</b><span>${settings.error ? "기준 경험치를 불러오지 못했어요. 새로고침한 뒤 다시 확인해 주세요." : "모든 사용자에게 적용되는 구역별 기준이에요."}</span></summary>
         <form data-zone-form>
           <div class="mp-zone-grid">
             ${ZONES.map((zone) => `
-              <label class="mp-zone-field">
-                <span>Lv.${zoneLabel(zone)}</span>
-                <input name="${zone.id}" inputmode="numeric" value="${escapeHtml(formatCount(zoneExp[zone.id]))}" ${canEditZones ? "" : "readonly"} />
+              <label class="mp-zone-field" data-zone-field="${zone.id}">
+                <span>Lv.${zoneLabel(zone)} <small>${GATE_NAME[zone.id]}</small></span>
+                <input name="${zone.id}" inputmode="numeric" placeholder="모름" value="${escapeHtml(formatCount(zoneExp[zone.id]))}" ${canEditZones ? "" : "readonly"} />
               </label>`).join("")}
           </div>
           ${canEditZones ? '<button type="submit" class="mp-save">구역 경험치 저장</button>' : ""}
@@ -290,33 +329,44 @@ export async function render(root) {
     }
   }
 
+  // 얼굴(없으면 이름 첫 글자, 직업 색 바탕)
+  function faceHtml(character, className) {
+    const face = faceMarkup(character.face_url);
+    return `<span class="${className}">${face || `<b>${escapeHtml((character.name || "?").slice(0, 1))}</b>`}</span>`;
+  }
+
   function paintPick() {
     const box = root.querySelector("[data-pick]");
     if (!isLoggedIn()) {
-      box.hidden = false;
-      box.innerHTML = `<p class="mp-login">로그인하면 내 캐릭터를 눌러 레벨·경험치를 바로 채울 수 있어요. <button type="button" class="text-button" data-login-open>로그인</button></p>`;
+      box.innerHTML = `<p class="mp-login"><span>로그인하면 내 캐릭터를 눌러 레벨·경험치를 바로 채울 수 있어요.</span><button type="button" class="mp-login-button" data-login-open>로그인</button></p>`;
       return;
     }
-    box.hidden = false;
-    const card = (character) => {
+    const card = (character, index) => {
       const on = picked === character.id;
-      const percent = character.level && character.exp != null && curve.has(character.level) ? `${percentOf(asBig(character.exp), curve.get(character.level))}%` : "";
-      const out = !usable(character);
+      const current = on ? level : character.level;
+      const raw = on ? exp : asBig(character.exp ?? 0);
+      const need = current ? curve.get(current) : null;
+      const percent = current && need && current < parkMaxLevel(character.job) ? percentOf(raw >= need ? need - 1n : raw, need) : "";
       const cygnus = isCygnusJob(character.job);
-      return `<button type="button" class="mp-char${on ? " is-on" : ""}${out ? " is-out" : ""}" data-character="${escapeHtml(character.id)}" aria-pressed="${on}" style="${jobStyle(findJob(jobs, character.job))}">
-        <span class="mp-char-face">${faceMarkup(character.face_url) || `<b>${escapeHtml((character.name || "?").slice(0, 1))}</b>`}</span>
-        <span class="mp-char-name">${escapeHtml(character.name)}</span>
-        <span class="mp-char-lv">${character.level ? `Lv.${character.level}` : "레벨 없음"}${percent ? ` <small>${percent}</small>` : ""}${cygnus ? ` <i class="mp-cygnus" title="시그너스 기사단 · 만렙 ${CYGNUS_MAX_LEVEL}">${CYGNUS_MAX_LEVEL}</i>` : ""}</span>
+      return `<button type="button" class="mp-char${on ? " is-on" : ""}" data-character="${escapeHtml(character.id)}" aria-pressed="${on}" style="${jobStyle(findJob(jobs, character.job))};--i:${Math.min(index, 10)}">
+        <span class="mp-char-top">
+          ${faceHtml(character, "mp-char-face")}
+          <span class="mp-char-copy"><strong>${escapeHtml(character.name)}</strong><small>${escapeHtml(character.job || "직업 없음")}</small></span>
+        </span>
+        <span class="mp-char-lv"><b>${current ? `Lv.${current}` : "레벨 없음"}</b>${percent ? `<small>${percent}%</small>` : ""}${cygnus ? `<i class="mp-cygnus" title="시그너스 기사단 · 만렙 ${CYGNUS_MAX_LEVEL}">만렙 ${CYGNUS_MAX_LEVEL}</i>` : ""}</span>
+        <span class="mp-char-bar"><i style="width:${percent || 0}%"></i></span>
       </button>`;
     };
     const manualOn = picked === "";
     // 몬파 못 가는 캐릭터는 접어 둔다(고른 캐릭터는 늘 보이게).
     const shown = characters.filter((item) => usable(item) || item.id === picked);
     const hidden = characters.filter((item) => !usable(item) && item.id !== picked);
+    const why = (character) => (!character.level ? "레벨 없음" : character.level < MONSTER_PARK.minLevel ? "50레벨부터" : "몬파 졸업");
     const more = hidden.length
-      ? `<details class="mp-char-more" data-char-more${outOpen ? " open" : ""}><summary><span>몬파 레벨이 아닌 캐릭터 <b>${hidden.length}</b>명</span></summary><div class="mp-char-grid">${hidden.map(card).join("")}</div></details>`
+      ? `<button type="button" class="mp-out-toggle" data-toggle-out aria-expanded="${outOpen}">${outOpen ? "▴" : "▾"} 몬파 레벨이 아닌 캐릭터 <b>${hidden.length}</b>명</button>
+        ${outOpen ? `<div class="mp-out-list">${hidden.map((character) => `<button type="button" class="mp-out" data-character="${escapeHtml(character.id)}" style="${jobStyle(findJob(jobs, character.job))}">${faceHtml(character, "mp-out-face")}<b>${escapeHtml(character.name)}</b><span>${character.level ? `Lv.${character.level} · ` : ""}${why(character)}</span></button>`).join("")}</div>` : ""}`
       : "";
-    box.innerHTML = `<div class="mp-char-grid">${shown.map(card).join("")}<button type="button" class="mp-char is-manual${manualOn ? " is-on" : ""}" data-character="" aria-pressed="${manualOn}"><span class="mp-char-face"><b>✎</b></span><span class="mp-char-name">직접 입력</span><span class="mp-char-lv">레벨을 골라요</span></button></div>${more}`;
+    box.innerHTML = `<div class="mp-char-row">${shown.map(card).join("")}<button type="button" class="mp-char is-manual${manualOn ? " is-on" : ""}" data-character="" aria-pressed="${manualOn}"><span class="mp-char-face"><b>✎</b></span><strong>직접 입력</strong><small>레벨을 골라요</small></button></div>${more}`;
   }
 
   // 고른 캐릭터의 저장된 레벨·경험치와 지금 값이 다른가
@@ -346,12 +396,12 @@ export async function render(root) {
       ? `<span class="mp-apply-note">${isLoggedIn() ? "캐릭터를 고르면 레벨을 바로 저장할 수 있어요" : ""}</span>`
       : dirty
         ? `<button type="button" class="mp-save" data-save ${saving || expError ? "disabled" : ""}>${saving ? "저장 중…" : `${escapeHtml(character.name)}에 ${escapeHtml(savedText())} 저장`}</button>`
-        : `<span class="mp-apply-note is-saved">✓ ${escapeHtml(character.name)} 저장된 값과 같아요</span>`;
+        : `<span class="mp-apply-note is-saved">✓ ${escapeHtml(character.name)} 저장된 값과 같아요 · 한 판 끝을 누르면 바로 저장돼요</span>`;
     box.innerHTML = `
       <button type="button" class="mp-run-done" data-run-done ${canRun && !saving ? "" : "disabled"}>
         <span>한 판 끝!</span><small>${escapeHtml(runNote)}</small>
       </button>
-      ${saveHtml}`;
+      <div class="mp-apply-foot">${saveHtml}</div>`;
   }
 
   async function saveCharacter({ silent = false } = {}) {
@@ -378,7 +428,20 @@ export async function render(root) {
     loadMainCharacter(true).then(paintProfileButton);
     paintPick();
     paintApply();
-    paintComparison();
+    paintRace();
+  }
+
+  // 한 판 끝 연출: 경험치 글자가 떠오르고, 레벨업이면 고리·불꽃·LEVEL UP. 모션 축소면 건너뛴다.
+  function playRunFx(leveled, gain) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const layer = root.querySelector("[data-fx]");
+    window.clearTimeout(fxTimer);
+    layer.innerHTML = leveled
+      ? `<i class="mp-fx-ring"></i>${Array.from({ length: 12 }, (_, i) => `<i class="mp-fx-spark" style="--a:${i * 30}deg;--w:${(i % 3) * 0.04}s"></i>`).join("")}<b class="mp-fx-word">LEVEL UP</b>`
+      : `<b class="mp-fx-gain">+${escapeHtml(formatCount(gain))} EXP</b>`;
+    fxTimer = window.setTimeout(() => {
+      layer.innerHTML = "";
+    }, 1300);
   }
 
   // 한 판 경험치를 더하고 오늘 입장을 하나 줄인다. 구역이 바뀌면 오늘 남은 입장은 못 쓰니 0.
@@ -396,8 +459,9 @@ export async function render(root) {
     saveTickets(changed || after.level >= top ? 0 : left - 1);
     if (after.leveled) {
       sfx(level >= top ? "fanfare" : "check");
-      burstAt(levelInput, ["#ffe28a", "#9ff0c4", "#ffffff"], 18, 1);
+      burstAt(levelInput, ["#ffd38a", "#ffb35c", "#ffffff"], 18, 1);
     } else sfx("tick");
+    playRunFx(after.leveled, gain);
     if (after.wasted > 0n) notify(`1레벨 제한으로 경험치 ${formatCount(after.wasted)}이 버려졌어요`, "info");
     paint();
     saveCharacter({ silent: true });
@@ -413,11 +477,14 @@ export async function render(root) {
       if (need && exp >= need) exp = need - 1n;
       expError = "";
     }
+    calPick = 0;
     paintPick();
     paint();
   }
 
   function paintInputs() {
+    const character = pickedCharacter();
+    root.querySelector("[data-who]").textContent = character ? `${character.name}${character.job ? ` · ${character.job}` : ""}` : "직접 입력";
     if (document.activeElement !== levelInput) levelInput.value = String(level);
     expField.disabled = level >= realMaxLevel();
     expField.setAttribute("aria-invalid", String(Boolean(expError)));
@@ -425,21 +492,39 @@ export async function render(root) {
     const cygnusToggle = root.querySelector("[data-cygnus]");
     cygnusToggle.hidden = picked !== "";
     cygnusToggle.setAttribute("aria-pressed", String(manualCygnus));
-    const zone = level < cap() ? zoneOf(level) : null;
+    const top = cap();
+    const zone = level < top ? zoneOf(level) : null;
     const zoneBox = root.querySelector("[data-zone]");
-    zoneBox.textContent = zone ? `${zoneLabel(zone)} 구역 · 한 판 ${zoneExp[zone.id] != null ? formatCount(zoneExp[zone.id]) : "경험치 모름"}` : level < MONSTER_PARK.minLevel ? "50레벨부터 들어갈 수 있어요" : cap() < realMaxLevel() ? `${cap()}레벨부터는 못 들어가요` : `이미 ${cap()}이에요`;
-    zoneBox.classList.toggle("is-unknown", Boolean(zone) && zoneExp[zone.id] == null);
+    zoneBox.textContent = zone ? (zoneExp[zone.id] != null ? `한 판 +${formatCount(zoneExp[zone.id])}` : "이 구역 경험치를 몰라요") : level < MONSTER_PARK.minLevel ? "50레벨부터 들어갈 수 있어요" : top < realMaxLevel() ? `${top}레벨부터는 못 들어가요` : `이미 ${top}이에요`;
+    zoneBox.classList.toggle("is-unknown", !zone || zoneExp[zone.id] == null);
+    // 레벨 구역 문 막대: 지금 구역은 선명하게, 지나온 구역은 조금, 앞 구역은 많이 흐리게
+    root.querySelector("[data-gates]").innerHTML = `${ZONES.map((item) => {
+      const state = zone?.id === item.id ? "is-now" : level > item.max ? "is-past" : "is-ahead";
+      return `<div class="mp-gate ${state}" style="--flex:${item.max - item.min + 1}">
+        <span class="mp-gate-bar is-${item.id}"></span>
+        <span class="mp-gate-copy"><b>${zoneLabel(item)} <small>· ${GATE_NAME[item.id]}</small></b><span>한 판 ${zoneExp[item.id] != null ? formatCount(zoneExp[item.id]) : "모름"}</span></span>
+      </div>`;
+    }).join("")}<span class="mp-gate-mark" style="--x:${trackX(levelValue({ level, exp }, top))}%"></span>`;
     const need = curve.get(level);
-    root.querySelector("[data-exp-exact]").textContent = expError || (need && !expField.disabled
-      ? `다음 레벨까지 ${formatCount(need - exp)} EXP · 현재 ${percentOf(exp, need)}%`
-      : "");
+    const showExp = Boolean(need) && !expField.disabled;
+    root.querySelector("[data-exp-bar]").style.width = `${showExp && !expError ? Number((exp * 10000n) / need) / 100 : expField.disabled ? 100 : 0}%`;
+    root.querySelector("[data-exp-ratio]").textContent = showExp && !expError ? `${percentOf(exp, need)}%` : "";
+    const exact = root.querySelector("[data-exp-exact]");
+    exact.textContent = expError || (showExp ? `다음 레벨까지 ${formatCount(need - exp)} EXP · ${formatCount(exp)} / ${formatCount(need)}` : "");
+    exact.classList.toggle("is-error", Boolean(expError));
     root.querySelector("[data-hw-link]").hidden = !syncsHomework();
     const left = ticketsToday();
-    for (const button of root.querySelectorAll("[data-ticket]")) {
-      const on = Number(button.dataset.ticket) === left;
-      button.classList.toggle("is-on", on);
-      button.setAttribute("aria-pressed", String(on));
-    }
+    root.querySelector("[data-left-text]").textContent = `${left}회`;
+    // 입장권 2장: 앞에서부터 남은 만큼 "입장 가능". 누르면 그 장을 쓰거나 되돌린다.
+    root.querySelector("[data-tickets]").innerHTML = Array.from({ length: MONSTER_PARK.perDay }, (_, index) => {
+      const on = index < left;
+      return `<button type="button" class="mp-ticket${on ? " is-on" : ""}" data-ticket="${on ? index : index + 1}" aria-pressed="${on}" title="${on ? "사용함으로 바꾸기" : "입장 가능으로 되돌리기"}">
+        <span class="mp-ticket-n">${index + 1}</span>
+        <span class="mp-ticket-copy"><b>${on ? "입장 가능" : "사용함"}</b><small>${on ? "누르면 사용 처리" : "누르면 되돌리기"}</small></span>
+      </button>`;
+    }).join("");
+    const total = eventDays ? left + MONSTER_PARK.perDay * (eventDays - 1) : 0;
+    root.querySelector("[data-event-left]").innerHTML = eventDays ? `남은 입장 <b>${formatCount(total)}회</b>` : "";
   }
 
   function stopNote(result) {
@@ -455,40 +540,42 @@ export async function render(root) {
     if (level >= top) {
       // 만렙이 130보다 높은 직업(배틀메이지 200)은 만렙이 아니라 몬파 구역이 끝난 것
       const graduated = top < realMaxLevel();
-      box.innerHTML = `<article class="mp-result is-reach ym-glass"><span class="mp-result-label">${graduated ? "몬파 졸업" : "이미 만렙"}</span><strong>Lv.${level}</strong><p>${graduated ? `${top}레벨부터는 몬스터파크에 들어갈 수 없어요.` : "축하해요! 몬스터파크는 이제 쉬어도 돼요."}</p></article>`;
+      box.innerHTML = `<article class="mp-hero is-reach"><span class="mp-hero-label">${graduated ? "몬파 졸업" : "이미 만렙"}</span><strong>Lv.${level}</strong><span class="mp-hero-sub">${graduated ? `${top}레벨부터는 몬스터파크에 들어갈 수 없어요.` : "축하해요! 몬스터파크는 이제 쉬어도 돼요."}</span></article>`;
+      lastReach = false;
       return;
     }
-    const finalNeed = curve.get(event.final.level);
-    const finalRatio = event.final.level >= top || !finalNeed ? 100 : Number((event.final.exp * 10000n) / finalNeed) / 100;
     const gainedLevels = event.final.level - startLevel;
     const reach = event.stop === "max";
+    const nowX = trackX(levelValue({ level, exp }, top)) * (SPAN / (top - MONSTER_PARK.minLevel));
+    const finalX = trackX(levelValue(event.final, top)) * (SPAN / (top - MONSTER_PARK.minLevel));
+    const goalLast = goal.runs.at(-1);
     let goalHtml;
-    if (goal.stop === "max") {
-      const last = goal.runs.at(-1);
-      const date = addDays(today, last.day);
-      goalHtml = `<strong>${goal.runs.length}판 · ${last.day + 1}일</strong><p>${shortDate(date, today)}에 ${top}${reach ? "" : ` — 이벤트 마감보다 ${last.day + 1 - eventDays}일 더 걸려요`}</p>`;
+    if (goal.stop === "max" && goalLast) {
+      const late = goalLast.day + 1 - eventDays;
+      goalHtml = `<div class="mp-goal-copy"><span class="mp-goal-label">Lv.${top}까지</span><strong>${formatCount(goal.runs.length)}판</strong><span class="mp-goal-sub${reach ? "" : " is-late"}">${shortDate(addDays(today, goalLast.day), today)}에 Lv.${top}${reach ? "" : ` · 마감보다 ${late}일 더 걸려요`}</span></div>
+        <span class="mp-goal-days"><b>${goalLast.day + 1}</b><small>일</small></span>`;
     } else {
-      goalHtml = `<strong>계산 대기</strong><p>${escapeHtml(stopNote(goal))}${goal.runs.length ? ` · 그때까지 ${goal.runs.length}판, ${levelText(goal.final, top)}` : ""}</p>`;
+      goalHtml = `<div class="mp-goal-copy"><span class="mp-goal-label">Lv.${top}까지</span><strong>계산 대기</strong><span class="mp-goal-sub">${escapeHtml(stopNote(goal))}${goal.runs.length ? ` · 그때까지 ${goal.runs.length}판, ${levelText(goal.final, top)}` : ""}</span></div>
+        ${goal.stop === "unknown" ? '<button type="button" class="mp-goal-fill" data-open-zones>경험치 적기</button>' : ""}`;
     }
     box.innerHTML = `
-      <article class="mp-result ${reach ? "is-reach" : ""} ym-glass">
-        <span class="mp-result-label">${reach ? `마감 전 Lv.${top} 달성 가능` : event.stop === "days" ? `${endLabel} 마감 예상` : "현재 계산 가능한 결과"}</span>
+      <article class="mp-hero${reach ? " is-reach" : ""}">
+        <span class="mp-hero-label">${reach ? `마감 전 Lv.${top} 달성 가능` : event.stop === "days" ? `${endLabel} 마감 예상` : "현재 계산 가능한 결과"}</span>
         <strong data-final-level>${reach ? shortDate(addDays(today, event.runs.at(-1).day), today) : levelText(event.final, top)}</strong>
-        <div class="ym-gauge"><i style="--value:${reach ? 100 : finalRatio}%"></i></div>
-        <p>${event.runs.length}판 · ${gainedLevels > 0 ? `+${gainedLevels}레벨` : "레벨 그대로"}${event.stop === "unknown" || event.stop === "low" ? ` · ${escapeHtml(stopNote(event))}` : ""}</p>
+        <span class="mp-hero-sub">${event.runs.length}판 · ${gainedLevels > 0 ? `+${gainedLevels}레벨` : "레벨 그대로"}${event.stop === "unknown" || event.stop === "low" ? ` · ${escapeHtml(stopNote(event))}` : ""}</span>
+        <div class="mp-hero-track" aria-hidden="true">
+          <span class="mp-hero-done" style="width:${nowX}%"></span>
+          <span class="mp-hero-gain" style="left:${nowX}%;width:${Math.max(0, finalX - nowX)}%"></span>
+          <span class="mp-hero-now" style="left:${nowX}%"></span>
+        </div>
+        <div class="mp-hero-scale"><span>Lv.${MONSTER_PARK.minLevel}</span><span>지금 Lv.${level} → 마감 Lv.${event.final.level}</span><span>Lv.${top}</span></div>
       </article>
-      <article class="mp-result ym-glass">
-        <span class="mp-result-label">${top}까지</span>
-        ${goalHtml}
-      </article>`;
+      <article class="mp-goal">${goalHtml}</article>`;
     if (reach && !lastReach) {
       sfx("fanfare");
-      burstAt(box.querySelector("[data-final-level]"), ["#ffe28a", "#9ff0c4", "#ffffff"], 26, 1);
+      burstAt(box.querySelector("[data-final-level]"), ["#ffd38a", "#ffb35c", "#ffffff"], 26, 1);
     }
     lastReach = reach;
-    // 처음 한 번만 떠오르게 한다(입력할 때마다 다시 튀지 않게).
-    box.classList.toggle("is-first", !painted);
-    painted = true;
   }
 
   // 오늘 판은 하나씩 크게, 내일부터는 한 줄로 묶는다.
@@ -513,146 +600,159 @@ export async function render(root) {
         items.push({ today: true, html: `<b>오늘 ${run.slot + 1}번째 판</b>은 1레벨 제한으로 Lv.${run.after.level} 99.99%에서 멈춰요. 버려지는 경험치 <b>${formatCount(run.wasted)}</b>` });
       }
     }
-    if (laterLost) items.push({ today: false, html: `내일부터 구역이 바뀌는 날, 남은 입장 <b>${laterLost}회</b>를 못 써요.` });
-    if (laterWasteRuns) items.push({ today: false, html: `내일부터 <b>${laterWasteRuns}판</b>이 1레벨 제한에 걸려요. 버려지는 경험치 합계 <b>${formatCount(laterWasted)}</b>` });
+    if (laterLost) items.push({ today: false, html: `<b>내일부터 구역이 바뀌는 날</b>, 남은 입장 ${laterLost}회를 못 써요.` });
+    if (laterWasteRuns) items.push({ today: false, html: `<b>내일부터 ${laterWasteRuns}판</b>이 1레벨 제한에 걸려요. 버려지는 경험치 합계 ${formatCount(laterWasted)}` });
     const box = root.querySelector("[data-warnings]");
     box.innerHTML = items
-      .map((item, index) => `<p class="mp-warning${item.today ? " is-today" : ""}" style="--i:${index}"><span aria-hidden="true">${item.today ? "⚠" : "!"}</span><span>${item.html}</span></p>`)
+      .map((item, index) => `<p class="mp-warning${item.today ? " is-today" : ""}" style="--i:${index}"><span class="mp-warning-icon" aria-hidden="true">${item.today ? "!" : "i"}</span><span>${item.html}</span></p>`)
       .join("");
   }
 
-  function paintComparison() {
-    const box = root.querySelector("[data-growth]");
-    const eligible = characters.filter(usable);
-    const entries = eligible.map((character) => {
+  // 캐릭터 레이스: 몬파 갈 수 있는 캐릭터마다 지금 위치 → 마감 위치를 한 줄로(50~130 공통 눈금).
+  function paintRace() {
+    const box = root.querySelector("[data-race]");
+    const entries = characters.filter((character) => usable(character) || (character.id === picked && level >= MONSTER_PARK.minLevel)).map((character) => {
       const top = parkMaxLevel(character.job);
       const current = character.id === picked ? level : character.level;
       const raw = character.id === picked ? exp : asBig(character.exp ?? 0);
       const need = curve.get(current);
       const safe = raw < 0n ? 0n : need && raw >= need ? need - 1n : raw;
-      return { name: character.name, level: current, exp: safe, top, tickets: ticketsToday(character.id), selected: character.id === picked };
+      return { id: character.id, character, level: current, exp: safe, top, tickets: ticketsToday(character.id), selected: character.id === picked };
     });
     // 손님과 등록 캐릭터가 없는 경우에도 직접 입력 결과를 볼 수 있다.
-    if (!entries.length && level >= MONSTER_PARK.minLevel && level < cap()) {
-      entries.push({ name: "직접 입력", level, exp, top: cap(), tickets: ticketsToday(), selected: true });
+    if (!picked && level >= MONSTER_PARK.minLevel && level < cap()) {
+      entries.push({ id: "", character: { name: "직접 입력" }, level, exp, top: cap(), tickets: ticketsToday(), selected: true });
     }
     box.hidden = !eventDays || !entries.length;
     if (box.hidden) {
       box.innerHTML = "";
       return;
     }
-    const min = MONSTER_PARK.minLevel;
-    const max = MONSTER_PARK.maxLevel;
-    const y = (value) => Math.min(100, Math.max(0, (max - value) / (max - min) * 100));
-    const x = (day) => eventDays === 1 ? 50 : day / (eventDays - 1) * 100;
-    const position = (state, top) => y(state.level + (state.level < top ? Number(percentOf(state.exp, curve.get(state.level))) / 100 : 0));
-    const colors = ["accent", "gain", "tier-low", "violet", "gold", "danger"];
-    const tracks = entries.map((entry, index) => {
-      const start = { level: entry.level, exp: entry.exp };
-      const result = simulate({ ...start, curve, zoneExp, todayLeft: entry.tickets, maxLevel: entry.top, days: eventDays });
-      const last = result.runs.at(-1);
-      const summary = result.stop === "max"
-        ? `Lv.${entry.top} 달성${last ? ` · ${shortDate(addDays(today, last.day), today)}` : ""}`
-        : result.stop === "days" ? `마감 ${levelText(result.final, entry.top)}` : `계산 중단 · ${levelText(result.final, entry.top)}`;
-      const from = position(start, entry.top);
-      const days = parkDays(start, result, eventDays, entry.tickets).filter(({ runs }) => runs.length);
-      const line = [`${x(0)},${from}`];
-      const color = `var(--${colors[index % colors.length]})`;
-      const points = days.map(({ day, runs, after, reached }) => {
-        const dateX = x(day);
-        const levelY = position(after, entry.top);
-        line.push(`${dateX},${levelY}`);
-        const before = runs[0].before.level;
-        const gainedLevels = after.level - before;
-        const gained = gainedLevels > 0 ? `${before} → ${after.level} (+${gainedLevels}레벨)` : `Lv.${after.level} 유지`;
-        const detail = `${entry.name} · ${shortDate(addDays(today, day), today)} · ${gained} · ${levelText(after, entry.top)} · ${runs.length}판`;
-        return `<button type="button" class="mp-level-point${gainedLevels > 0 ? " is-up" : ""}${reached ? " is-goal" : ""}" data-growth-point="${escapeHtml(detail)}"
-          aria-label="${escapeHtml(detail)}" aria-pressed="false" style="--x:${dateX}%;--y:${levelY}%;--series:${color}"></button>`;
-      });
-      return {
-        legend: `<li${entry.selected ? ' class="is-current"' : ""} style="--series:${color}"><strong>${escapeHtml(entry.name)}</strong><small>${escapeHtml(summary)}</small></li>`,
-        line: `<polyline points="${line.join(" ")}" stroke="${color}" vector-effect="non-scaling-stroke"/>`,
-        start: `<span class="mp-track-start" style="--x:${x(0)}%;--y:${from}%;--series:${color}" title="${escapeHtml(entry.name + " · 현재 " + levelText(start, entry.top))}"></span>`,
-        points: points.join(""),
-      };
+    const lanes = entries.map((entry, index) => {
+      const start = { level: entry.level, exp: entry.exp, curve, zoneExp, todayLeft: entry.tickets, maxLevel: entry.top };
+      const result = simulate({ ...start, days: eventDays });
+      const goal = simulate({ ...start, days: 400 });
+      const goalLast = goal.runs.at(-1);
+      const done = entry.level >= entry.top;
+      const now = trackX(levelValue(entry, entry.top));
+      const fin = trackX(levelValue(result.final, entry.top));
+      const reached = result.stop === "max";
+      const result1 = done ? "이미 만렙" : reached ? `${tinyDate(addDays(today, result.runs.at(-1)?.day ?? 0))} 만렙` : `마감 Lv.${result.final.level}`;
+      const result2 = done ? "" : reached ? `마감 ${eventDays - 1 - (result.runs.at(-1)?.day ?? 0)}일 전 Lv.${entry.top}` : goal.stop === "max" && goalLast ? `Lv.${entry.top}은 ${tinyDate(addDays(today, goalLast.day))}` : goal.stop === "unknown" ? "구역 경험치 필요" : "";
+      const style = entry.character.job ? jobStyle(findJob(jobs, entry.character.job)) : "";
+      return `<button type="button" class="mp-lane${entry.selected ? " is-on" : ""}${reached || done ? " is-reach" : ""}" data-character="${escapeHtml(entry.id)}" aria-pressed="${entry.selected}" style="${style};--i:${Math.min(index, 10)}"
+        aria-label="${escapeHtml(`${entry.character.name} · 지금 ${levelText(entry, entry.top)} · ${result1}${result2 ? ` · ${result2}` : ""}`)}">
+        <span class="mp-lane-who">${entry.id ? faceHtml(entry.character, "mp-lane-face") : '<span class="mp-lane-face"><b>✎</b></span>'}<span class="mp-lane-name"><b>${escapeHtml(entry.character.name)}</b><small>${escapeHtml(levelText(entry, entry.top))}</small></span></span>
+        <span class="mp-lane-track" aria-hidden="true">
+          <span class="mp-lane-zones">${ZONES.map((zone) => `<i style="--flex:${zone.max - zone.min + 1}"></i>`).join("")}</span>
+          <span class="mp-lane-run" style="left:${now}%;width:${Math.max(0, fin - now)}%"></span>
+          <span class="mp-lane-cap" style="left:${trackX(entry.top)}%"></span>
+          <span class="mp-lane-now" style="left:${now}%"></span>
+          <span class="mp-lane-fin" style="left:${fin}%"></span>
+        </span>
+        <span class="mp-lane-result"><b>${escapeHtml(result1)}</b><small>${escapeHtml(result2)}</small></span>
+      </button>`;
     });
-
-    const lastDay = eventDays - 1;
-    const dateMarks = Array.from({ length: eventDays }, (_, day) => {
-      const edge = day === 0 || day === lastDay;
-      const showEvery = (limit) => {
-        const step = Math.ceil(eventDays / limit);
-        return day % step === 0 && day <= lastDay - step;
-      };
-      const date = shortDate(addDays(today, day), today).split(" ")[0];
-      return `<span class="mp-date-tick${edge ? " is-edge" : ""}${day === 0 ? " is-today" : ""}${showEvery(6) ? " is-narrow" : ""}${showEvery(13) ? " is-medium" : ""}${showEvery(26) ? " is-wide" : ""}" style="--x:${x(day)}%"><b>${escapeHtml(date)}</b></span>`;
-    });
-    const levelMarks = Array.from({ length: (max - min) / 5 + 1 }, (_, index) => {
-      const value = max - index * 5;
-      const major = value % 10 === 0;
-      const goal = entries.some(({ top }) => top === value);
-      return `<span class="mp-level-tick${major ? " is-major" : ""}${goal ? " is-target" : ""}" style="--y:${y(value)}%"><b>${value}</b></span>`;
-    });
+    const scale = [50, 70, 100, 120, 130].map((value) => `<span style="left:${trackX(value)}%">${value}</span>`).join("");
     box.innerHTML = `
-      <div class="mp-growth-head">
-        <div><h2>캐릭터별 성장 경로</h2><p>날짜별 원에 마우스를 올리거나 눌러 상세 결과를 확인하세요.</p></div>
-        <ul class="mp-marker-key" aria-label="날짜 점 범례">
-          <li class="is-up">레벨업</li><li>레벨 유지</li>
-        </ul>
+      <div class="mp-sec-head">
+        <div><h2 id="mp-race-title">캐릭터 레이스</h2><p>지금 위치에서 ${endLabel} 마감까지 얼마나 달리는지 한 줄씩 비교해요</p></div>
+        <ul class="mp-legend" aria-label="범례"><li><i class="is-now"></i>지금</li><li><i class="is-run"></i>마감까지 오를 구간</li><li><i class="is-cap"></i>만렙</li></ul>
       </div>
-      <div class="mp-level-chart">
-        <ul class="mp-chart-legend" aria-label="캐릭터별 마감 결과">${tracks.map(({ legend }) => legend).join("")}</ul>
-        <div class="mp-chart-axes">
-          <span class="mp-chart-axis-name">레벨</span>
-          <div class="mp-date-axis" aria-label="입장 날짜">${dateMarks.join("")}</div>
-          <div class="mp-track-plot" aria-label="날짜별 예상 레벨">
-            ${levelMarks.join("")}
-            <svg class="mp-track-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              ${tracks.map(({ line }) => line).join("")}
-            </svg>
-            ${tracks.map(({ start, points }) => start + points).join("")}
-            <p class="mp-track-detail" data-growth-tooltip hidden aria-hidden="true"></p>
-          </div>
-        </div>
-        <p class="mp-chart-readout" data-growth-detail aria-live="polite">날짜별 원을 선택하면 상세 결과가 표시됩니다.</p>
-      </div>`;
+      <div class="mp-lane-scale" aria-hidden="true"><span></span><span class="mp-lane-ticks">${scale}</span><span></span></div>
+      <div class="mp-lanes">${lanes.join("")}</div>`;
   }
 
-  function selectGrowthPoint(point) {
-    if (!point) return;
-    const chart = point.closest(".mp-level-chart");
-    const previous = chart.querySelector('[data-growth-point][aria-pressed="true"]');
-    if (previous === point) return;
-    previous?.setAttribute("aria-pressed", "false");
-    point.setAttribute("aria-pressed", "true");
-    chart.querySelector("[data-growth-detail]").textContent = point.dataset.growthPoint;
-    const tooltip = chart.querySelector("[data-growth-tooltip]");
-    tooltip.textContent = point.dataset.growthPoint;
-    tooltip.style.setProperty("--x", point.style.getPropertyValue("--x"));
-    tooltip.style.setProperty("--y", point.style.getPropertyValue("--y"));
-    tooltip.hidden = false;
-  }
-
-  function paintTimeline(days, event) {
-    const box = root.querySelector("[data-day-table]");
-    if (!days.length) {
-      box.innerHTML = `<p class="mp-muted">이벤트 기간이 끝났어요.</p>`;
+  // 이벤트 달력: 고른 캐릭터의 오늘~마감. 월요일부터 7칸, 하루 두 칸이 그날 입장권.
+  function paintCalendar(event) {
+    const box = root.querySelector("[data-calendar]");
+    const character = pickedCharacter();
+    const title = `${character ? escapeHtml(character.name) : "직접 입력"}의 이벤트 달력`;
+    if (!eventDays) {
+      box.innerHTML = `<div class="mp-sec-head"><div><h2 id="mp-cal-title">${title}</h2></div></div><p class="mp-muted">이벤트 기간이 끝났어요.</p>`;
+      calDetails = [];
       return;
     }
-    const rows = days.map(({ day, tickets, runs, reached }) => {
+    const top = cap();
+    const byDay = new Map();
+    for (const run of event.runs) {
+      if (!byDay.has(run.day)) byDay.set(run.day, []);
+      byDay.get(run.day).push(run);
+    }
+    const lastRunDay = event.runs.at(-1)?.day ?? -1;
+    const lead = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7;
+    const cells = Array.from({ length: lead }, () => `<span class="mp-day is-blank" aria-hidden="true"></span>`);
+    const runText = (run) => (run.after.level > run.before.level ? `Lv.${run.before.level} → ${run.after.level}` : `+경험치 · ${percentOf(run.after.exp, curve.get(run.after.level))}%`);
+    calDetails = [];
+    let carry = { level, exp };
+    for (let day = 0; day < eventDays; day += 1) {
+      const runs = byDay.get(day) ?? [];
+      const before = carry;
+      const after = runs.at(-1)?.after ?? carry;
+      carry = after;
+      const tickets = day === 0 ? ticketsToday() : MONSTER_PARK.perDay;
       const lost = runs.reduce((sum, run) => sum + run.lostAfter, 0);
-      const cells = Array.from({ length: MONSTER_PARK.perDay }, (_, slot) => {
+      const up = after.level - before.level;
+      const goalHit = event.stop === "max" && runs.length > 0 && day === lastRunDay;
+      const done = after.level >= top && !runs.length;
+      const date = addDays(today, day);
+      const [, month, dateNum] = date.split("-").map(Number);
+      const pips = Array.from({ length: MONSTER_PARK.perDay }, (_, slot) => {
         const run = runs[slot];
-        if (!run) return `<td>${slot < runs.length + lost ? "구역 변경" : "—"}</td>`;
-        return `<td class="${run.after.level > run.before.level ? "is-up" : ""}">${escapeHtml(levelText(run.after, cap()))}</td>`;
+        if (run) return `<i class="${run.after.level > run.before.level ? "is-up" : "is-exp"}"></i>`;
+        if (slot < runs.length + lost) return `<i class="is-lost"></i>`;
+        if (day === 0 && slot >= tickets) return `<i class="is-used"></i>`;
+        return "<i></i>";
       }).join("");
-      const note = !tickets ? "오늘 입장 완료" : reached ? `Lv.${cap()} 달성` : lost ? `입장 ${lost}회 못 씀`
-        : tickets > runs.length ? ({ max: `Lv.${cap()} 달성`, unknown: "경험치 미입력", low: "입장 불가" }[event.stop] ?? "—") : "—";
-      return `<tr${day === 0 ? ' class="is-today"' : ""}><th scope="row">${shortDate(addDays(today, day), today)}</th>${cells}<td>${note}</td></tr>`;
-    });
-    box.innerHTML = `<div class="mp-day-table" role="region" aria-label="날짜별 입장 결과" tabindex="0"><table>
-      <thead><tr><th scope="col">날짜</th><th scope="col">첫 판</th><th scope="col">둘째 판</th><th scope="col">비고</th></tr></thead>
-      <tbody>${rows.join("")}</tbody></table></div>`;
+      const badge = goalHit ? "만렙 달성" : day === 0 ? "오늘" : lost ? "구역 변경" : up > 0 ? `+${up}` : "";
+      const badgeClass = goalHit ? "is-goal" : day === 0 ? "is-today" : lost ? "is-lost" : up > 0 ? "is-up" : "";
+      const wasted = runs.reduce((sum, run) => sum + run.wasted, 0n);
+      const note = done ? `이미 Lv.${top}이에요`
+        : !tickets ? "오늘 입장을 다 썼어요"
+          : lost ? `구역이 바뀌어 ${lost}회를 못 써요`
+            : wasted > 0n ? `1레벨 제한으로 ${formatCount(wasted)} 버려져요`
+              : goalHit ? `Lv.${top} 달성!`
+                : runs.length < tickets ? ({ unknown: "구역 경험치를 몰라 계산을 멈췄어요", low: "50레벨부터 들어갈 수 있어요" }[event.stop] ?? "") : "";
+      calDetails.push({ date: shortDate(date, today), runs: runs.map((run, index) => ({ text: `${index + 1}판 · ${runText(run)}`, up: run.after.level > run.before.level })), note });
+      const week = (lead + day) % 7;
+      const label = `${shortDate(date, today)} · ${done ? "끝" : levelText(after, top)}${badge ? ` · ${badge}` : ""}`;
+      cells.push(`<button type="button" class="mp-day${day === 0 ? " is-today" : ""}${goalHit ? " is-goal" : up > 0 ? " is-up" : ""}${done ? " is-done" : ""}${day === calPick ? " is-picked" : ""}${week === 5 ? " is-sat" : week === 6 ? " is-sun" : ""}" data-cal-day="${day}" aria-label="${escapeHtml(label)}" style="--i:${Math.min(day, 30)}">
+        <span class="mp-day-top"><b>${dateNum === 1 || day === 0 ? `${month}/` : ""}${dateNum}</b>${badge ? `<em class="${badgeClass}">${escapeHtml(badge)}</em>` : ""}</span>
+        <span class="mp-day-lv"><b>${done ? "—" : `Lv.${after.level}`}</b><small>${done || after.level >= top ? "" : `${percentOf(after.exp, curve.get(after.level))}%`}</small></span>
+        <span class="mp-day-pips">${pips}</span>
+      </button>`);
+    }
+    while (cells.length % 7) cells.push(`<span class="mp-day is-blank" aria-hidden="true"></span>`);
+    if (calPick >= calDetails.length) calPick = 0;
+    box.innerHTML = `
+      <div class="mp-sec-head">
+        <div><h2 id="mp-cal-title">${title}</h2><p>하루 두 칸이 그날 입장권이에요 · 칸에 마우스를 올리거나 누르면 판별 결과가 보여요</p></div>
+        <ul class="mp-legend" aria-label="범례"><li><i class="is-pip-up"></i>레벨업</li><li><i class="is-pip-exp"></i>경험치만</li><li><i class="is-pip-lost"></i>구역 변경으로 못 씀</li><li><i class="is-pip-used"></i>이미 씀</li></ul>
+      </div>
+      <div class="mp-cal-scroll">
+        <div class="mp-cal-grid">
+          ${["월", "화", "수", "목", "금", "토", "일"].map((name, index) => `<span class="mp-dow${index === 5 ? " is-sat" : index === 6 ? " is-sun" : ""}">${name}</span>`).join("")}
+          ${cells.join("")}
+        </div>
+      </div>
+      <p class="mp-cal-detail" data-cal-detail aria-live="polite"></p>`;
+    paintCalDetail();
+  }
+
+  function paintCalDetail() {
+    const box = root.querySelector("[data-cal-detail]");
+    const detail = calDetails[calPick];
+    if (!box || !detail) return;
+    box.innerHTML = `<b>${escapeHtml(detail.date)}</b>${detail.runs.map((run) => `<span class="mp-cal-run${run.up ? " is-up" : ""}">${escapeHtml(run.text)}</span>`).join("")}<span class="mp-cal-note">${escapeHtml(detail.note || (detail.runs.length ? "" : "입장 없음"))}</span>`;
+    for (const cell of root.querySelectorAll("[data-cal-day]")) cell.classList.toggle("is-picked", Number(cell.dataset.calDay) === calPick);
+  }
+
+  function pickCalDay(cell) {
+    if (!cell) return;
+    const day = Number(cell.dataset.calDay);
+    if (day === calPick) return;
+    calPick = day;
+    paintCalDetail();
   }
 
   function paint() {
@@ -664,19 +764,18 @@ export async function render(root) {
     const goal = simulate({ ...start, days: 400 });
     paintResults(event, goal);
     paintWarnings(event);
-    const days = parkDays(start, event, eventDays, start.todayLeft);
-    paintComparison();
-    paintTimeline(days, event);
+    paintRace();
+    paintCalendar(event);
   }
 
   for (const type of ["pointerover", "focusin"]) {
-    root.addEventListener(type, (event) => selectGrowthPoint(event.target.closest("[data-growth-point]")));
+    root.addEventListener(type, (event) => pickCalDay(event.target.closest?.("[data-cal-day]")));
   }
 
   root.addEventListener("click", (event) => {
-    const point = event.target.closest("[data-growth-point]");
-    if (point) {
-      selectGrowthPoint(point);
+    const day = event.target.closest("[data-cal-day]");
+    if (day) {
+      pickCalDay(day);
       return;
     }
     if (event.target.closest("[data-run-done]")) {
@@ -694,8 +793,24 @@ export async function render(root) {
       saveCharacter();
       return;
     }
+    if (event.target.closest("[data-toggle-out]")) {
+      sfx("tick");
+      outOpen = !outOpen;
+      paintPick();
+      return;
+    }
+    if (event.target.closest("[data-open-zones]")) {
+      const zones = root.querySelector("[data-zones]");
+      zones.open = true;
+      const zone = zoneOf(level);
+      const field = zone ? zoneForm.elements.namedItem(zone.id) : null;
+      zones.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+      field?.focus({ preventScroll: true });
+      return;
+    }
     const character = event.target.closest("[data-character]");
     if (character) {
+      if (character.dataset.character === picked && character.closest("[data-race]")) return;
       sfx("tick");
       pickCharacter(character.dataset.character);
       return;
@@ -730,10 +845,6 @@ export async function render(root) {
       return;
     }
   });
-
-  root.addEventListener("toggle", (event) => {
-    if (event.target.matches?.("[data-char-more]")) outOpen = event.target.open;
-  }, true);
 
   root.addEventListener("focusout", (event) => {
     if (event.target === expField && !expError) expField.value = formatCount(exp);
