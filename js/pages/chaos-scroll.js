@@ -261,12 +261,12 @@ export function render(root) {
     const wins = history.filter((item) => item.success).length;
     root.querySelector("[data-log-count]").textContent = history.length ? `${formatCount(history.length)}장 사용` : "";
     // 합계 변화는 HP·MP를 10으로 나눠 다른 능력치와 같은 단위로 더한다.
-    const rows = current && start ? statDiff(start, current) : [];
+    const rows = current ? statDiff(start, current) : [];
     const net = rows.reduce((sum, row) => sum + row.diff / (CHAOS_STATS.find((stat) => stat.key === row.key)?.scale || 1), 0);
     root.querySelector("[data-log-stats]").innerHTML = `
       <div class="is-ok"><small>성공</small><b>${formatCount(wins)}</b></div>
       <div class="is-fail"><small>실패</small><b>${formatCount(history.length - wins)}</b></div>
-      <div class="${net > 0 ? "is-up" : net < 0 ? "is-down" : ""}"><small>합계 변화</small><b>${escapeHtml(signed(Math.round(net)))}</b></div>`;
+      <div class="${net > 0 ? "is-up" : net < 0 ? "is-down" : ""}"><small>${start?.egg ? "혼줌 합계 변화" : "합계 변화"}</small><b>${escapeHtml(signed(Math.round(net)))}</b></div>`;
     // 줄마다 그 장을 바른 뒤의 등급 색 점(정옵 대비 점수).
     let winsSoFar = 0;
     const gradeAfter = history.map((item, index) => {
@@ -276,8 +276,8 @@ export function render(root) {
     log.innerHTML = history.length
       ? history.slice().reverse().map((item) => `<li class="${item.success ? "is-success" : "is-fail"}"><div class="cs-log-row"><span class="cs-log-n">${item.n}장째</span><b>${item.success ? "성공" : "실패"}</b><span class="cs-log-grade" style="--grade:${gradeAfter[item.n - 1].grade.color}" title="${escapeHtml(`${gradeAfter[item.n - 1].grade.name} · ${scoreText(gradeAfter[item.n - 1].tenths)}`)}"><i aria-hidden="true"></i>${escapeHtml(scoreText(gradeAfter[item.n - 1].tenths))}</span></div><div class="cs-log-chips">${item.success ? item.changes.map(changeChip).join("") || `<span class="cs-chip">바뀐 능력치 없음</span>` : `<span class="cs-chip">능력치 변화 없음</span>`}</div></li>`).join("")
       : `<li class="cs-log-empty">가운데 주문서를 눌러 바르기 시작해요</li>`;
-    diffBox.innerHTML = current && history.length
-      ? `<p class="cs-field-label">시작 대비</p>${rows.map((row) => `<div class="cs-diff-row ${row.diff > 0 ? "is-up" : row.diff < 0 ? "is-down" : ""}"><span>${escapeHtml(row.label)}</span><small>${escapeHtml(formatCount(row.start))} → ${row.now ? escapeHtml(formatCount(row.now)) : "사라짐"}</small><b>${escapeHtml(signed(row.diff))}</b></div>`).join("")}`
+    diffBox.innerHTML = current && (start.egg || history.length)
+      ? `<p class="cs-field-label">${start.egg ? "알 적용 옵션 대비" : "시작 대비"}</p>${rows.map((row) => `<div class="cs-diff-row ${row.diff > 0 ? "is-up" : row.diff < 0 ? "is-down" : ""}"><span>${escapeHtml(row.label)}</span><small>${escapeHtml(formatCount(row.start))} → ${row.now ? escapeHtml(formatCount(row.now)) : "사라짐"}</small><b>${escapeHtml(signed(row.diff))}</b></div>`).join("")}`
       : "";
   }
 
@@ -437,7 +437,7 @@ export function render(root) {
         ranges[key] = [Number(stat.minimum_value) + bonus, Number(stat.maximum_value) + bonus];
       }
     }
-    // 알 적용 장비는 알을 바른 뒤의 옵션을 혼줌 등급 계산의 기준으로 쓴다.
+    // 이전에 저장한 장비와 같이 알 적용 후 수치를 보관한다.
     const label = [typeName(item), item.required_level == null ? "" : `Lv.${item.required_level}`, egg ? "알 1회 적용 · 성공 100% · 업그레이드 횟수 −1" : ""].filter(Boolean).join(" · ");
     picked = { id: item.id, name, image_url: item.image_url ?? null, base, label, ranges, egg };
     root.querySelector("[data-item-search]").value = "";
@@ -530,8 +530,14 @@ export function render(root) {
     const fromPicked = Boolean(picked && picked.name === read.value.name);
     // 정옵은 고른 장비의 도감 옵션, 직접 적었거나 예전에 저장된 장비라 없으면 시작 옵션.
     const catalogBase = fromPicked ? picked.base : null;
-    const baseLabel = catalogBase ? (picked.egg ? "알 적용 옵션" : "정옵") : "시작 옵션";
-    start = { ...read.value, base: catalogBase ?? read.value.stats, baseLabel, image: fromPicked && picked.image_url ? catalogImage(picked.image_url, "cs-tip-image", 64) : "", label: fromPicked ? picked.label : "" };
+    const egg = Boolean(catalogBase && picked.egg);
+    const base = { ...(catalogBase ?? read.value.stats) };
+    if (egg) {
+      // 예전에 저장된 알 프리셋도 같은 형식이다. 정옵 비교에는 알 상승분을 빼서 원본을 복원한다.
+      for (const [key, bonus] of Object.entries(HORNTAIL_EGG_BONUS)) base[key] -= bonus;
+    }
+    const baseLabel = egg ? "원본 정옵" : catalogBase ? "정옵" : "시작 옵션";
+    start = { ...read.value, base, baseLabel, egg, image: fromPicked && picked.image_url ? catalogImage(picked.image_url, "cs-tip-image", 64) : "", label: fromPicked ? picked.label : "" };
     replacedItems = 0;
     previousScrolls = 0;
     resetCurrentItem();

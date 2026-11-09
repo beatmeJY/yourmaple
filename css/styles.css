@@ -15802,7 +15802,7 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-tooltip { position: relative; overflow: hidden; width: 100%; padding: 16px; border-radius: 18px; background: rgba(8,6,20,.82); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 16px 32px -12px rgba(0,0,0,.7); }
 .cs2 .cs-empty { margin: 0; font-size: 13px; line-height: 1.6; color: #b9b1cf; text-align: center; }
 .cs2 .cs-tip-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.cs2 .cs-tip-art { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: radial-gradient(circle, oklch(0.5 0.2 305 / .45), transparent 70%); }
+.cs2 .cs-tip-art { position: relative; isolation: isolate; flex: none; display: grid; place-items: center; width: 52px; height: 52px; }
 .cs2 .cs-tip-art img { max-width: 48px; max-height: 48px; object-fit: contain; image-rendering: pixelated; }
 .cs2 .cs-tip-name { font-size: 17px; font-weight: 900; color: #f3effb; overflow-wrap: anywhere; }
 .cs2 .cs-tip-name.is-up, .cs2 .cs-tip-name small { color: var(--cs-gold); }
@@ -16565,6 +16565,18 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none;
   box-shadow: 0 0 0 2px var(--grade), inset 0 0 40px -6px var(--grade);
   animation: cs-grade-flash 1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* 장비 이미지 뒤에서 현재 등급 색이 원형으로 번진다. */
+.cs2 .cs-tooltip[data-grade] .cs-tip-art::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle closest-side at center,
+    color-mix(in srgb, var(--grade) 57%, transparent),
+    color-mix(in srgb, var(--grade) 25%, transparent) 55%,
+    transparent);
 }
 /* 이름과 등급 배지도 같은 색 */
 .cs2 .cs-tooltip[data-grade] .cs-tip-name { color: color-mix(in srgb, var(--grade) 85%, #fff); text-shadow: 0 0 14px color-mix(in srgb, var(--grade) 45%, transparent); transition: color 0.45s ease; }
