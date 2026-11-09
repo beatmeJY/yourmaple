@@ -94,6 +94,12 @@ export function applyChaos(item, table, random = Math.random) {
   return { item: next, success, changes };
 }
 
+// 한 장으로 실제 변한 능력치의 합. HP·MP는 10당 1로 계산한다.
+export function chaosChangeTotal(changes) {
+  const tenths = changes.reduce((total, { key, before, after }) => total + (after - before) * (10 / statScale(key)), 0);
+  return tenths / 10;
+}
+
 // 시작 상태 대비 지금 능력치 차이(사라진 능력치는 0으로 본다).
 export function statDiff(start, now) {
   return CHAOS_STATS

@@ -1,4 +1,4 @@
-import { CHAOS_STATS, DEFAULT_CHAOS, HORNTAIL_EGG_BONUS, applyChaos, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
+import { CHAOS_STATS, DEFAULT_CHAOS, HORNTAIL_EGG_BONUS, applyChaos, chaosChangeTotal, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
 import { escapeHtml, formatCount, readBig } from "../format.js";
 import { burstAt, sfx } from "../effects.js";
 import { notify } from "../toast.js";
@@ -22,6 +22,13 @@ const CHAOS_TYPES = {
   Shoulder: "어깨장식",
 };
 const MAX_SLOTS = 99;
+const GREAT_SUCCESS_MIN = 5;
+
+function rollLabel(success, changeTotal) {
+  if (!success) return "실패";
+  if (changeTotal < 0) return "떨어짐";
+  return changeTotal >= GREAT_SUCCESS_MIN ? "대성공" : "성공";
+}
 // 자주 바르는 장비는 아이콘으로 바로 고른다(2026-11-01 사용자 지정). 나머지는 이름으로 찾는다.
 // 도감 이름과 띄어쓰기만 달라도 맞도록 띄어쓰기를 빼고 비교한다.
 const HORNTAIL_NECKLACE = "혼테일의 목걸이";
@@ -42,8 +49,9 @@ function loadStore() {
 function saveStore(value) {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(value));
+    return true;
   } catch {
-    // 저장이 막혀도 화면은 그대로 쓴다.
+    return false;
   }
 }
 
@@ -62,11 +70,14 @@ export function render(root) {
   let searchId = 0;
   let searchTimer = 0;
   let table = stored.table && checkChaosTable(stored.table).ok ? cloneTable(stored.table) : cloneTable(DEFAULT_CHAOS);
-  let start = null; // { name, slots, stats }
-  let current = null;
-  let replacedItems = 0;
-  let previousScrolls = 0;
-  let history = []; // [{ n, success, changes, before }]
+  const savedAttempt = stored.attempt?.version === 1 ? stored.attempt : null;
+  let start = savedAttempt?.start ?? null; // { name, slots, stats }
+  let current = savedAttempt?.current ?? null;
+  let replacedItems = savedAttempt?.replacedItems ?? 0;
+  let previousScrolls = savedAttempt?.previousScrolls ?? 0;
+  let history = savedAttempt?.history ?? []; // [{ n, success, changes, before }]
+  let archived = savedAttempt?.archived ?? [];
+  let storageWarning = false;
   let lastChanges = new Map();
   let autoTimer = 0;
   let lastGrade = ""; // 등급이 바뀌는 순간에만 테두리 빛을 한 번 퍼뜨린다.
@@ -153,6 +164,16 @@ export function render(root) {
           <ol class="cs-log-list" data-log></ol>
         </section>
       </div>
+      <section class="cs-panel cs-attempts" aria-labelledby="cs-attempts-title">
+        <div class="cs-attempts-head">
+          <h2 id="cs-attempts-title">장비 강화 이력</h2>
+          <label><span class="sr-only">강화 이력 정렬</span><select data-attempt-order>
+            <option value="recent">최신순</option><option value="score">강화 잘된 순</option>
+          </select></label>
+        </div>
+        <p class="cs-hint">장비를 펼치면 최종 옵션과 주문서별 결과를 볼 수 있어요. 강화 잘된 순은 장비의 등급 점수 기준이에요. 이 브라우저에 저장되며 시도 전체 초기화로 지울 수 있어요.</p>
+        <div data-attempts></div>
+      </section>
     </div>
   `;
 
@@ -167,6 +188,9 @@ export function render(root) {
   const resetButton = root.querySelector("[data-reset]");
   const log = root.querySelector("[data-log]");
   const diffBox = root.querySelector("[data-diff]");
+  const attempts = root.querySelector("[data-attempts]");
+  const attemptOrder = root.querySelector("[data-attempt-order]");
+  attemptOrder.value = stored.attemptOrder === "score" ? "score" : "recent";
 
   function readSetup() {
     const name = root.querySelector("[data-item-name]").value.trim();
@@ -189,7 +213,17 @@ export function render(root) {
   }
 
   function persist(extra = {}) {
-    saveStore({ ...loadStore(), ...extra });
+    return saveStore({ ...loadStore(), ...extra });
+  }
+
+  function saveAttempt(extra = {}) {
+    const saved = persist({ ...extra, attempt: { version: 1, start, current, history, archived, replacedItems, previousScrolls } });
+    if (!saved && !storageWarning) notify("강화 이력을 브라우저에 저장하지 못했어요.", "error");
+    storageWarning = !saved;
+  }
+
+  function archiveCurrent() {
+    if (history.length) archived.push({ start, current, history });
   }
 
   function statLine({ key, label }) {
@@ -203,8 +237,8 @@ export function render(root) {
     return `<li class="${change ? `is-changed ${tone}` : ""}"><span>${escapeHtml(label)}</span><b>+${escapeHtml(formatCount(now))}</b>${badge}</li>`;
   }
 
-  function gradeOf(state, wins) {
-    const tenths = chaosScoreTenths(start.base, state.stats);
+  function gradeOf(state, wins, setup = start) {
+    const tenths = chaosScoreTenths(setup.base, state.stats);
     return { tenths, grade: chaosGrade(tenths, wins) };
   }
 
@@ -238,13 +272,14 @@ export function render(root) {
     }
     const wins = history.filter((item) => item.success).length;
     // 바른 칸(성공 금색·실패 빨강)과 남은 칸(빈 테두리)을 차례로 보여 준다.
+    const image = start.imageUrl ? catalogImage(start.imageUrl, "cs-tip-image", 64) : "";
     const pips = [
       ...history.map((item) => `<i class="${item.success ? "is-ok" : "is-fail"}" title="${item.n}장째 ${item.success ? "성공" : "실패"}"></i>`),
       ...Array.from({ length: current.slots }, () => `<i title="남은 횟수"></i>`),
     ].join("");
     tooltip.innerHTML = `
       <div class="cs-tip-top">
-        ${start.image ? `<div class="cs-tip-art">${start.image}</div>` : ""}
+        ${image ? `<div class="cs-tip-art">${image}</div>` : ""}
         <div class="cs-tip-head"><span class="cs-grade" title="${escapeHtml(`${start.baseLabel} 대비 점수 · HP·MP는 10당 1점`)}"><i aria-hidden="true"></i>${escapeHtml(start.baseLabel)} 대비 <b>${escapeHtml(scoreText(graded.tenths))}</b><small>${escapeHtml(graded.grade.name)}</small></span><div class="cs-tip-name${wins ? " is-up" : ""}">${escapeHtml(start.name || "내 아이템")}${wins ? ` <small>(+${wins})</small>` : ""}</div>${start.label ? `<div class="cs-tip-meta">${escapeHtml(start.label)}</div>` : ""}</div>
       </div>
       <ul class="cs-tip-stats">${CHAOS_STATS.map(statLine).join("")}</ul>
@@ -267,19 +302,77 @@ export function render(root) {
       <div class="is-ok"><small>성공</small><b>${formatCount(wins)}</b></div>
       <div class="is-fail"><small>실패</small><b>${formatCount(history.length - wins)}</b></div>
       <div class="${net > 0 ? "is-up" : net < 0 ? "is-down" : ""}"><small>${start?.egg ? "혼줌 합계 변화" : "합계 변화"}</small><b>${escapeHtml(signed(Math.round(net)))}</b></div>`;
-    // 줄마다 그 장을 바른 뒤의 등급 색 점(정옵 대비 점수).
-    let winsSoFar = 0;
-    const gradeAfter = history.map((item, index) => {
-      if (item.success) winsSoFar += 1;
-      return gradeOf(history[index + 1]?.before ?? current, winsSoFar);
-    });
     log.innerHTML = history.length
-      ? history.slice().reverse().map((item) => `<li class="${item.success ? "is-success" : "is-fail"}"><div class="cs-log-row"><span class="cs-log-n">${item.n}장째</span><b>${item.success ? "성공" : "실패"}</b><span class="cs-log-grade" style="--grade:${gradeAfter[item.n - 1].grade.color}" title="${escapeHtml(`${gradeAfter[item.n - 1].grade.name} · ${scoreText(gradeAfter[item.n - 1].tenths)}`)}"><i aria-hidden="true"></i>${escapeHtml(scoreText(gradeAfter[item.n - 1].tenths))}</span></div><div class="cs-log-chips">${item.success ? item.changes.map(changeChip).join("") || `<span class="cs-chip">바뀐 능력치 없음</span>` : `<span class="cs-chip">능력치 변화 없음</span>`}</div></li>`).join("")
+      ? renderRolls(start, current, history)
       : `<li class="cs-log-empty">가운데 주문서를 눌러 바르기 시작해요</li>`;
     diffBox.innerHTML = current && (start.egg || history.length)
       ? `<p class="cs-field-label">${start.egg ? "알 적용 옵션 대비" : "시작 대비"}</p>${rows.map((row) => `<div class="cs-diff-row ${row.diff > 0 ? "is-up" : row.diff < 0 ? "is-down" : ""}"><span>${escapeHtml(row.label)}</span><small>${escapeHtml(formatCount(row.start))} → ${row.now ? escapeHtml(formatCount(row.now)) : "사라짐"}</small><b>${escapeHtml(signed(row.diff))}</b></div>`).join("")}`
       : "";
   }
+
+  function renderRolls(setup, final, rolls) {
+    // 각 주문서를 바른 직후의 등급을 같은 장비의 정옵으로 계산한다.
+    let wins = 0;
+    return rolls.map((roll, index) => {
+      if (roll.success) wins += 1;
+      const { tenths, grade } = gradeOf(rolls[index + 1]?.before ?? final, wins, setup);
+      const change = tenths - chaosScoreTenths(setup.base, roll.before.stats);
+      const changeClass = change > 0 ? " is-up" : change < 0 ? " is-down" : "";
+      const label = rollLabel(roll.success, chaosChangeTotal(roll.changes));
+      const labelClass = label === "대성공" ? "cs-log-great" : label === "떨어짐" ? "cs-log-down" : "";
+      const chips = roll.success ? roll.changes.map(changeChip).join("") || "바뀐 능력치 없음" : "능력치 변화 없음";
+      return `<li class="${roll.success ? "is-success" : "is-fail"}">
+        <div class="cs-log-row"><span class="cs-log-n">${escapeHtml(roll.n)}장째</span><b class="${labelClass}">${label}</b>
+          <div class="cs-log-scores">
+            <span class="cs-log-grade" style="--grade:${grade.color}" title="${escapeHtml(grade.name)}"><i aria-hidden="true"></i>누적 ${escapeHtml(scoreText(tenths))}점</span>
+            <span class="cs-log-change${changeClass}">이번 ${escapeHtml(change === 0 ? "±0" : scoreText(change))}점</span>
+          </div>
+        </div><div class="cs-log-chips">${chips}</div>
+      </li>`;
+    }).reverse().join("");
+  }
+
+  function paintAttempts() {
+    const expanded = new Set([...attempts.querySelectorAll("details[open]")].map((node) => node.dataset.attempt));
+    const entries = history.length ? [...archived, { start, current, history }] : archived;
+    const rows = entries.map((entry, index) => {
+      const wins = entry.history.filter((roll) => roll.success).length;
+      return { ...entry, index, ...gradeOf(entry.current, wins, entry.start) };
+    });
+    rows.sort((a, b) => (attemptOrder.value === "score" ? b.tenths - a.tenths : 0) || b.index - a.index);
+    attempts.innerHTML = rows.length ? rows.map((row) => {
+      const key = String(row.index);
+      const active = row.index === archived.length;
+      const open = expanded.has(key);
+      return `<details class="cs-attempt" data-attempt="${key}" ${open ? "open" : ""}>
+        <summary>
+          <span><strong>${escapeHtml(row.start.name || "내 아이템")}</strong><small>${row.index + 1}번째 결과 · ${active ? "현재 장비" : "보관됨"} · 혼줌 ${row.history.length}장</small></span>
+          <span class="cs-log-grade" style="--grade:${row.grade.color}"><i aria-hidden="true"></i>${escapeHtml(scoreText(row.tenths))} · ${escapeHtml(row.grade.name)}</span>
+        </summary>
+        <div data-attempt-detail>${open ? renderAttemptDetail(row) : ""}</div>
+      </details>`;
+    }).join("") : `<p class="cs-hint">혼줌을 바르면 여기에 장비 결과가 쌓여요.</p>`;
+  }
+
+  function renderAttemptDetail(entry) {
+    const stats = statDiff(entry.start, entry.current);
+    return `<p class="cs-hint">남은 강화 횟수 ${escapeHtml(entry.current.slots)}/${escapeHtml(entry.start.slots)} · ${entry.start.egg ? "알 적용" : "시작"} 옵션 대비</p>
+      <div class="cs-log-chips cs-attempt-stats">${stats.map(({ label, now, diff }) => `<span class="cs-chip ${diff > 0 ? "is-up" : diff < 0 ? "is-down" : ""}">${escapeHtml(label)} ${now ? escapeHtml(formatCount(now)) : "사라짐"} (${escapeHtml(signed(diff))})</span>`).join("")}</div>
+      <ol class="cs-log-list">${renderRolls(entry.start, entry.current, entry.history)}</ol>`;
+  }
+
+  attempts.addEventListener("toggle", (event) => {
+    const details = event.target;
+    if (!details.matches("[data-attempt][open]")) return;
+    const index = Number(details.dataset.attempt);
+    const entry = archived[index] ?? { start, current, history };
+    const body = details.querySelector("[data-attempt-detail]");
+    if (!body.firstChild) body.innerHTML = renderAttemptDetail(entry);
+  }, true);
+  attemptOrder.addEventListener("change", () => {
+    persist({ attemptOrder: attemptOrder.value });
+    paintAttempts();
+  });
 
   function paintCost() {
     const items = start ? replacedItems + 1 : 0;
@@ -304,7 +397,7 @@ export function render(root) {
     if (autoTimer) autoButton.disabled = false;
     undoButton.disabled = !history.length || Boolean(autoTimer);
     nextButton.disabled = !history.length || Boolean(autoTimer);
-    resetButton.disabled = (!history.length && !replacedItems) || Boolean(autoTimer);
+    resetButton.disabled = (!history.length && !archived.length && !replacedItems) || Boolean(autoTimer);
     root.querySelector("[data-stage]").classList.toggle("is-done", Boolean(current) && current.slots === 0);
   }
 
@@ -454,22 +547,23 @@ export function render(root) {
   function paint() {
     paintTooltip();
     paintLog();
+    paintAttempts();
     paintCost();
     paintButtons();
   }
 
-  function showResult(success, changes) {
+  function showResult(success, changes, label) {
     const ups = changes.filter((change) => change.delta > 0).length;
     const downs = changes.filter((change) => change.delta < 0 || change.gone).length;
     result.innerHTML = success
-      ? `성공! ${changes.length ? `오른 능력치 ${ups}개 · 내린 능력치 ${downs}개` : "바뀐 능력치가 없어요"}`
+      ? `${label}! ${changes.length ? `오른 능력치 ${ups}개 · 내린 능력치 ${downs}개` : "바뀐 능력치가 없어요"}`
       : "실패. 업그레이드 가능 횟수만 1 줄었어요";
   }
 
   // 성공·실패 연출: 바를 때마다 새 조각을 붙였다가 1.5초 뒤 지운다. 모션 축소면 건너뛴다.
   let fxTimer = 0;
   let fxCount = 0;
-  function playFx(success) {
+  function playFx(success, label) {
     const stage = root.querySelector("[data-stage]");
     stage.classList.remove("is-ok", "is-fail", "pop-a", "pop-b", "shake-a", "shake-b");
     void stage.offsetWidth;
@@ -481,8 +575,10 @@ export function render(root) {
     const layer = root.querySelector("[data-fx]");
     const piece = document.createElement("div");
     piece.className = `cs-fx-burst ${success ? "is-ok" : "is-fail"}`;
-    piece.innerHTML = success
-      ? `<i class="cs-fx-glow"></i><i class="cs-fx-rays"></i><i class="cs-fx-ring"></i><i class="cs-fx-ring is-late"></i>${Array.from({ length: 18 }, (_, i) => `<i class="cs-fx-spark${i % 3 ? "" : " is-big"}" style="--a:${i * 20 + (i % 2 ? 7 : -5)}deg;--d:${120 + (i % 4) * 16}px;--t:${0.75 + (i % 3) * 0.12}s;--w:${(i % 3) * 0.04}s"></i>`).join("")}${Array.from({ length: 8 }, (_, i) => `<i class="cs-fx-star" style="--a:${i * 45 + 22}deg;--d:82px;--w:${0.15 + i * 0.03}s"></i>`).join("")}<b class="cs-fx-word">성공</b>`
+    piece.innerHTML = label === "떨어짐"
+      ? `<b class="cs-fx-word is-down">떨어짐</b>`
+      : success
+      ? `<i class="cs-fx-glow"></i><i class="cs-fx-rays"></i><i class="cs-fx-ring"></i><i class="cs-fx-ring is-late"></i>${Array.from({ length: 18 }, (_, i) => `<i class="cs-fx-spark${i % 3 ? "" : " is-big"}" style="--a:${i * 20 + (i % 2 ? 7 : -5)}deg;--d:${120 + (i % 4) * 16}px;--t:${0.75 + (i % 3) * 0.12}s;--w:${(i % 3) * 0.04}s"></i>`).join("")}${Array.from({ length: 8 }, (_, i) => `<i class="cs-fx-star" style="--a:${i * 45 + 22}deg;--d:82px;--w:${0.15 + i * 0.03}s"></i>`).join("")}<b class="cs-fx-word">${label}</b>`
       : `<i class="cs-fx-dim"></i>${Array.from({ length: 8 }, (_, i) => `<i class="cs-fx-smoke" style="--l:${(i - 3.5) * 16}px;--s:${70 + (i % 3) * 18}px;--x:${(i - 3.5) * 10}px;--w:${i * 0.04}s"></i>`).join("")}${Array.from({ length: 7 }, (_, i) => `<i class="cs-fx-shard" style="--l:${(i - 3) * 14}px;--x:${(i - 3) * 18}px;--r:${(i % 2 ? 1 : -1) * (90 + i * 20)}deg;--w:${i * 0.03}s"></i>`).join("")}<span class="cs-fx-fail"><b>실패</b><small>업그레이드 횟수만 −1</small></span>`;
     layer.append(piece);
     window.setTimeout(() => piece.remove(), 1500);
@@ -506,11 +602,20 @@ export function render(root) {
     history.push({ n: history.length + 1, success: out.success, changes: out.changes, before: current });
     current = out.item;
     lastChanges = new Map(out.changes.map((change) => [change.key, change]));
+    saveAttempt();
     paint();
-    showResult(out.success, out.changes);
-    playFx(out.success);
-    sfx(out.success ? "chaosOk" : "chaosFail");
-    if (out.success && out.changes.some((change) => change.delta > 0)) burstAt(rollButton.querySelector(".cs-scroll-orb"), ["#ffe28a", "#fff6d0", "#c9a6ff", "#ffffff"], 14, 0.8);
+    const changeTotal = chaosChangeTotal(out.changes);
+    const label = rollLabel(out.success, changeTotal);
+    showResult(out.success, out.changes, label);
+    playFx(out.success, label);
+    if (!out.success) {
+      sfx("chaosFail");
+    } else if (label === "떨어짐") {
+      sfx("chaosDown");
+    } else {
+      sfx(label === "대성공" ? "chaosBonus" : "chaosOk");
+    }
+    if (out.success && label !== "떨어짐" && out.changes.some((change) => change.delta > 0)) burstAt(rollButton.querySelector(".cs-scroll-orb"), ["#ffe28a", "#fff6d0", "#c9a6ff", "#ffffff"], 14, 0.8);
     return true;
   }
 
@@ -527,6 +632,7 @@ export function render(root) {
       return;
     }
     stopAuto();
+    archiveCurrent();
     const fromPicked = Boolean(picked && picked.name === read.value.name);
     // 정옵은 고른 장비의 도감 옵션, 직접 적었거나 예전에 저장된 장비라 없으면 시작 옵션.
     const catalogBase = fromPicked ? picked.base : null;
@@ -537,11 +643,11 @@ export function render(root) {
       for (const [key, bonus] of Object.entries(HORNTAIL_EGG_BONUS)) base[key] -= bonus;
     }
     const baseLabel = egg ? "원본 정옵" : catalogBase ? "정옵" : "시작 옵션";
-    start = { ...read.value, base, baseLabel, egg, image: fromPicked && picked.image_url ? catalogImage(picked.image_url, "cs-tip-image", 64) : "", label: fromPicked ? picked.label : "" };
+    start = { ...read.value, base, baseLabel, egg, imageUrl: fromPicked ? picked.image_url : null, label: fromPicked ? picked.label : "" };
     replacedItems = 0;
     previousScrolls = 0;
     resetCurrentItem();
-    persist({ name: start.name, slots: String(start.slots), stats: read.raw });
+    saveAttempt({ name: start.name, slots: String(start.slots), stats: read.raw });
     if (!quiet) sfx("tick");
     paint();
   }
@@ -630,24 +736,29 @@ export function render(root) {
       const last = history.pop();
       current = last.before;
       lastChanges = new Map();
-      result.innerHTML = `${last.n}장째 이전 상태로 돌아왔어요`;
+      result.textContent = `${last.n}장째 이전 상태로 돌아왔어요`;
+      saveAttempt();
       sfx("uncheck");
       paint();
       return;
     }
     if (event.target.closest("[data-next-item]") && !nextButton.disabled) {
+      archiveCurrent();
       previousScrolls += history.length;
       replacedItems += 1;
       resetCurrentItem();
+      saveAttempt();
       result.textContent = `${replacedItems + 1}번째 장비를 가져왔어요.`;
       sfx("tick");
       paint();
       return;
     }
     if (event.target.closest("[data-reset]") && !resetButton.disabled) {
+      archived = [];
       replacedItems = 0;
       previousScrolls = 0;
       resetCurrentItem();
+      saveAttempt();
       sfx("uncheck");
       paint();
       return;
@@ -706,7 +817,7 @@ export function render(root) {
   paintPicked();
   paintRanges();
   // 다시 들어오면 적어 둔 옵션으로 바로 바를 수 있게(값이 모자라면 조용히 빈 상태).
-  startItem({ quiet: true });
+  if (!current) startItem({ quiet: true });
   paint();
   void searchItems("");
 }

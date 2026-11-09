@@ -15864,6 +15864,7 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-fx-spark.is-big { width: 6px; height: 18px; margin: -9px -3px; }
 .cs2 .cs-fx-star { left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px 2px #fff3c4; animation: cs-spark 1.1s ease-out var(--w) both; }
 .cs2 .cs-fx-word { position: absolute; left: 50%; top: 34px; font-size: 34px; font-weight: 900; letter-spacing: .06em; white-space: nowrap; background: linear-gradient(180deg, #fffbe8 10%, #ffd76a 55%, #c98a12); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 0 #6b3d00) drop-shadow(0 0 14px rgba(255,215,106,.7)); animation: cs-word 1.35s ease-out both; }
+.cs2 .cs-fx-word.is-down { background: none; color: var(--muted); filter: drop-shadow(0 2px 4px var(--bg)); }
 .cs2 .cs-fx-dim { inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(20,14,34,.85), rgba(40,30,60,.4) 35%, transparent 60%); animation: cs-dim 1.1s ease-out both; }
 .cs2 .cs-fx-smoke { left: calc(50% + var(--l)); top: 58%; width: var(--s); height: var(--s); margin: -40px; border-radius: 50%; background: radial-gradient(circle, rgba(150,138,170,.8), rgba(70,58,92,.45) 50%, transparent 70%); filter: blur(2px); animation: cs-smoke 1.3s ease-out var(--w) both; }
 .cs2 .cs-fx-shard { left: calc(50% + var(--l)); top: 55%; width: 7px; height: 10px; background: linear-gradient(135deg, #8a7fa3, #3c3352); clip-path: polygon(50% 0, 100% 60%, 40% 100%, 0 40%); animation: cs-shard 1s cubic-bezier(.3,.6,.5,1) var(--w) both; }
@@ -15894,6 +15895,17 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-cost-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
 .cs2 .cs-cost-total small { color: var(--text-soft); }
 .cs2 .cs-cost-total strong { color: var(--gold); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.cs2 .cs-attempts-head, .cs2 .cs-attempt summary { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.cs2 .cs-attempts-head select { background: var(--bg-raised); color: var(--text); border: 1px solid var(--glass-line); border-radius: 10px; padding: 6px 8px; }
+.cs2 [data-attempts] { display: grid; gap: 8px; }
+.cs2 .cs-attempt { min-width: 0; padding: 10px 12px; border: 1px solid var(--glass-line); border-radius: 12px; background: var(--glass); }
+.cs2 .cs-attempt summary { cursor: pointer; }
+.cs2 .cs-attempt summary small { display: block; margin-top: 3px; color: var(--muted); }
+.cs2 .cs-attempt summary strong { overflow-wrap: anywhere; }
+.cs2 .cs-attempt summary::after { content: "▾"; color: var(--muted); }
+.cs2 .cs-attempt[open] summary::after { content: "▴"; }
+.cs2 [data-attempt-detail] { margin-top: 10px; }
+.cs2 .cs-attempt-stats { margin-block: 6px 10px; }
 .cs2 .cs-log-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .cs2 .cs-log-head span { font-size: 12px; color: #8f87a8; }
 .cs2 .cs-log-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -15918,6 +15930,8 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-log-n { font-size: 12px; color: #8f87a8; }
 .cs2 .cs-log-row b { font-size: 13px; font-weight: 900; }
 .cs2 .is-success .cs-log-row b { color: var(--cs-up); }
+.cs2 .is-success .cs-log-row .cs-log-great { color: var(--gold); }
+.cs2 .is-success .cs-log-row .cs-log-down { color: var(--muted); }
 .cs2 .is-fail .cs-log-row b { color: var(--cs-down); }
 .cs2 .cs-log-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .cs2 .cs-chip { padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.06); color: #8f87a8; font-size: 11px; font-weight: 700; }
@@ -16574,9 +16588,13 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   z-index: -1;
   pointer-events: none;
   background: radial-gradient(circle closest-side at center,
-    color-mix(in srgb, var(--grade) 57%, transparent),
-    color-mix(in srgb, var(--grade) 25%, transparent) 55%,
+    color-mix(in srgb, var(--grade) var(--cs-glow-center, 57%), transparent),
+    color-mix(in srgb, var(--grade) var(--cs-glow-fade, 25%), transparent) 55%,
     transparent);
+}
+.cs2 .cs-tooltip[data-grade="orange"] .cs-tip-art {
+  --cs-glow-center: 31%;
+  --cs-glow-fade: 12%;
 }
 /* 이름과 등급 배지도 같은 색 */
 .cs2 .cs-tooltip[data-grade] .cs-tip-name { color: color-mix(in srgb, var(--grade) 85%, #fff); text-shadow: 0 0 14px color-mix(in srgb, var(--grade) 45%, transparent); transition: color 0.45s ease; }
@@ -16591,8 +16609,12 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-grade b { color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; }
 .cs2 .cs-grade small { color: color-mix(in srgb, var(--grade, #8b8798) 85%, #fff); font-size: 11px; font-weight: 800; }
 /* 바른 기록: 그 장 뒤의 등급 점 */
-.cs2 .cs-log-row { gap: 8px; }
+.cs2 .cs-log-row { flex-wrap: wrap; gap: 4px 8px; }
 .cs2 .cs-log-row b { margin-right: auto; }
+.cs2 .cs-log-scores { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.cs2 .cs-log-change { color: var(--muted); font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cs2 .cs-log-change.is-up { color: var(--cs-up); }
+.cs2 .cs-log-change.is-down { color: var(--cs-down); }
 .cs2 .cs-log-grade { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 800; color: color-mix(in srgb, var(--grade) 80%, #fff); font-variant-numeric: tabular-nums; }
 .cs2 .cs-log-grade i { width: 8px; height: 8px; border-radius: 50%; background: var(--grade); box-shadow: 0 0 8px var(--grade); }
 @keyframes cs-grade-spin { to { --cs-spin: 360deg; } }
