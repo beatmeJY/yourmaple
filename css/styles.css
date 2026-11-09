@@ -14580,7 +14580,7 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 @media (prefers-reduced-motion: reduce) { .monster-import-dialog[open] { animation: none; } }
 
 /* ===== 몬스터파크 계산(이벤트 화면, 2026-10-27) ===== */
-.mp-page { display: grid; gap: 16px; max-width: 1080px; }
+.mp-page { display: grid; gap: 16px; max-width: 1080px; margin-inline: auto; }
 .mp-event { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; min-height: 76px; padding: 14px 120px 14px 20px; overflow: hidden; }
 /* 몬스터파크 그림(Codex가 받은 사용자 그림, 숙제표와 같은 파일): 띠 오른쪽에서 살짝 흔들린다 */
 .mp-event-art { position: absolute; right: 14px; bottom: -6px; width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); animation: mo-bob 2.8s ease-in-out infinite; pointer-events: none; }
@@ -14635,20 +14635,71 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .mp-warning.is-today { border-color: color-mix(in oklch, var(--danger) 55%, transparent); background: color-mix(in oklch, var(--danger) 12%, transparent); color: var(--text); }
 .mp-warning.is-today > span:first-child { color: var(--danger); }
 .mp-warning b { color: var(--text); }
-.mp-timeline { padding: 18px 20px; }
-.mp-timeline h2 { margin: 0 0 12px; font-size: 15px; }
-.mp-days { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.mp-day { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; }
-.mp-day-date { color: var(--muted); font-size: 13px; font-weight: 800; }
-.mp-day.is-today .mp-day-date { color: var(--gold); }
-.mp-day-runs { display: flex; flex-wrap: wrap; gap: 6px; }
-.mp-run { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--glass-line); border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.05); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mp-run small { color: var(--muted); font-size: 11px; }
-.mp-run em { padding: 0 6px; border-radius: 6px; background: oklch(0.8 0.13 120 / 0.25); color: oklch(0.88 0.13 120); font-size: 10px; font-style: normal; font-weight: 900; }
-.mp-run.is-up { border-color: oklch(0.8 0.13 120 / 0.45); }
-.mp-run.is-warn { border-color: oklch(0.86 0.15 85 / 0.6); }
-.mp-run.is-lost { border-style: dashed; color: var(--danger); background: none; }
-.mp-run.is-idle, .mp-run.is-done { color: var(--muted); background: none; }
+.mp-growth, .mp-timeline { min-width: 0; padding: 18px 20px; }
+.mp-growth[hidden] { display: none; }
+.mp-growth-head { display: flex; align-items: flex-start; flex-wrap: wrap; justify-content: space-between; gap: 10px 16px; }
+.mp-marker-key { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0; padding: 4px 9px; border: 1px solid var(--glass-line); border-radius: var(--radius-pill); list-style: none; color: var(--text-soft); font-size: 11px; }
+.mp-marker-key li { display: inline-flex; align-items: center; gap: 5px; }
+.mp-marker-key li::before { content: ""; width: 7px; height: 7px; border: 1px solid var(--muted); border-radius: 50%; }
+.mp-marker-key li.is-up::before { border-color: var(--text); background: var(--text); }
+.mp-growth-head h2 { margin: 0; font-size: 18px; }
+.mp-growth-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.mp-level-chart { container-type: inline-size; margin-top: 12px; padding: 12px 16px; border: 1px solid var(--glass-line); border-radius: var(--radius-box); background: var(--glass), var(--bg-raised); }
+.mp-chart-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 0; list-style: none; }
+.mp-chart-legend li { display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; border: 1px solid var(--glass-line); border-radius: 8px; font-size: 12px; }
+.mp-chart-legend li.is-current { border-color: color-mix(in oklch, var(--series) 55%, var(--glass-line)); background: color-mix(in oklch, var(--series) 10%, transparent); }
+.mp-chart-legend strong::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: var(--series); }
+.mp-chart-legend small { padding-inline-start: 13px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.mp-chart-axes { --plot-height: clamp(250px, 48cqw, 360px); display: grid; grid-template-columns: 32px minmax(0, 1fr); padding-inline-end: 5px; }
+.mp-chart-axis-name { color: var(--muted); font-size: 11px; }
+.mp-date-axis { position: relative; height: 28px; }
+.mp-date-tick { position: absolute; left: var(--x); bottom: 0; height: 4px; border-left: 1px solid var(--glass-line); }
+.mp-date-tick b { display: none; position: absolute; bottom: 6px; left: 0; transform: translateX(-50%); color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mp-date-tick b::after { content: ""; position: absolute; top: calc(100% + 6px); left: 50%; height: var(--plot-height); border-left: 1px solid var(--glass-line); opacity: .45; pointer-events: none; }
+.mp-date-tick.is-edge b { display: block; color: var(--text-soft); }
+.mp-date-tick.is-today b { color: var(--gold); }
+@container (width < 520px) {
+  .mp-date-tick.is-narrow b { display: block; }
+}
+.mp-track-plot { grid-column: 2; position: relative; height: var(--plot-height); border-left: 1px solid var(--glass-line); }
+.mp-level-tick { position: absolute; inset-inline: 0; top: var(--y); border-top: 1px solid var(--glass-line); opacity: .4; }
+.mp-level-tick.is-major { opacity: 1; }
+.mp-level-tick b { position: absolute; right: calc(100% + 6px); top: 0; display: none; transform: translateY(-50%); color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.mp-level-tick.is-major b { display: block; }
+.mp-level-tick.is-target { border-top: 1px dashed var(--gold); }
+.mp-level-tick.is-target b { color: var(--gold); }
+.mp-track-line { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke-width: 1.75; pointer-events: none; overflow: visible; }
+.mp-track-start, .mp-level-point { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); border-radius: 50%; color: var(--series); }
+.mp-track-start { width: 6px; height: 6px; border-radius: 1px; transform: translate(-50%, -50%) rotate(45deg); border: 1px solid currentColor; background: var(--bg-raised); }
+.mp-level-point { display: grid; place-items: center; width: 12px; height: 16px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.mp-level-point::before { content: ""; width: 7px; height: 7px; border: 1px solid currentColor; border-radius: 50%; background: var(--bg-raised); transition: transform .22s var(--spring), background-color .2s; }
+.mp-level-point.is-up::before { width: 9px; height: 9px; background: currentColor; box-shadow: 0 0 8px color-mix(in oklch, currentColor 40%, transparent); }
+.mp-level-point.is-goal::before { box-shadow: 0 0 0 2px var(--gold); }
+.mp-level-point:hover, .mp-level-point:focus-visible, .mp-level-point[aria-pressed="true"] { z-index: 1; }
+.mp-level-point:hover::before, .mp-level-point:focus-visible::before, .mp-level-point[aria-pressed="true"]::before { transform: scale(1.55); }
+.mp-chart-readout, .mp-track-detail { color: var(--text-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mp-chart-readout { min-height: 2.6em; margin: 14px 0 0; padding: 7px 9px; border-radius: 8px; background: var(--well); }
+.mp-track-detail { display: none; }
+.mp-day-table { overflow-x: auto; }
+@container (520px <= width < 780px) {
+  .mp-date-tick.is-medium b { display: block; }
+}
+@container (min-width: 520px) {
+  .mp-track-detail:not([hidden]) { display: block; position: absolute; z-index: 2; left: clamp(0px, calc(var(--x) - 8.5rem), calc(100% - 17rem)); top: clamp(0px, calc(var(--y) - 48px), calc(100% - 48px)); width: 17rem; margin: 0; padding: 6px 9px; border: 1px solid var(--glass-line); border-radius: 8px; background: var(--bg-raised); pointer-events: none; }
+}
+@container (min-width: 780px) {
+  .mp-date-tick.is-wide b { display: block; }
+  .mp-level-tick b { display: block; }
+}
+.mp-timeline summary { cursor: pointer; font-weight: 800; }
+.mp-day-table { margin-top: 12px; }
+.mp-day-table table { width: 100%; min-width: 440px; border-collapse: collapse; text-align: left; font-size: 13px; font-variant-numeric: tabular-nums; }
+.mp-day-table th, .mp-day-table td { padding: 9px 12px; border-bottom: 1px solid var(--glass-line); white-space: nowrap; }
+.mp-day-table thead th { color: var(--text); background: var(--bg-raised); }
+.mp-day-table tbody th, .mp-day-table td:last-child { color: var(--muted); }
+.mp-day-table tbody tr:nth-child(even) { background: var(--glass); }
+.mp-day-table tbody tr.is-today th { color: var(--gold); }
+.mp-day-table td.is-up { color: var(--gain); font-weight: 800; }
 .mp-muted { margin: 0; color: var(--muted); }
 .mp-zones { padding: 14px 20px; }
 .mp-zone-open { justify-self: start; }
@@ -14665,18 +14716,11 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
   .mp-char-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mp-event { padding-right: 92px; }
   .mp-event-art { right: 8px; width: 76px; height: 76px; }
-  /* 35일을 한 줄씩: 날짜 좁게, 판 번호 숨기고 알약을 작게 */
-  .mp-timeline { padding: 16px 12px; }
-  .mp-day { grid-template-columns: 62px 1fr; gap: 6px; }
-  .mp-day-date { font-size: 11px; letter-spacing: -0.02em; white-space: nowrap; }
-  .mp-day-runs { flex-wrap: nowrap; gap: 4px; }
-  .mp-run { gap: 4px; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
-  .mp-run small { display: none; }
-  .mp-run em { padding: 0 4px; }
+  .mp-growth, .mp-timeline { padding: 16px 12px; }
   .mp-stepper button { min-width: 36px; padding: 0 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mp-char, .mp-stepper button, .mp-ticket { transition: none; }
+  .mp-char, .mp-stepper button, .mp-ticket, .mp-level-point::before { transition: none; }
   .mp-event-art { animation: none; }
   .mp-results.is-first .mp-result { animation: none; }
 }

@@ -5,7 +5,7 @@ import { homeworkState } from "../homework-calc.js";
 import { asBig } from "../hunt-calc.js";
 import { CYGNUS_MAX_LEVEL, findJob, isCygnusJob, jobStyle, maxLevelOf } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
-import { MONSTER_PARK, PARK_STORE_KEY, ZONES, addDays, daysLeft, expFromPercent, gainRun, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
+import { MONSTER_PARK, PARK_STORE_KEY, ZONES, addDays, daysLeft, expFromPercent, gainRun, parkDays, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
 import { translateDbError } from "../db-error.js";
 import { loadMainCharacter, mainCharacterId, paintProfileButton } from "../profile.js";
 import { isLoggedIn } from "../session.js";
@@ -129,7 +129,11 @@ export async function render(root) {
       </section>
       <section class="mp-results" data-results></section>
       <section class="mp-warnings" data-warnings></section>
-      <section class="mp-timeline ym-glass" data-timeline></section>
+      <section class="mp-growth ym-glass" data-growth aria-label="캐릭터별 성장 경로"></section>
+      <details class="mp-timeline ym-glass" data-timeline>
+        <summary>날짜별 상세 표</summary>
+        <div data-day-table></div>
+      </details>
       <details class="mp-zones ym-glass">
         <summary>구역별 한 판 경험치</summary>
         <p>값이 다르면 고쳐 적어 주세요. 이 기기에 기억해요.</p>
@@ -150,13 +154,15 @@ export async function render(root) {
     return homeworkReady && Boolean(picked);
   }
 
-  function doneToday(key) {
-    return homeworkState("daily", parkChecks.get(`${picked}:${key}`) ?? null, Date.now()).done;
+  function doneToday(key, characterId = picked) {
+    return homeworkState("daily", parkChecks.get(`${characterId}:${key}`) ?? null, Date.now()).done;
   }
 
-  function ticketsToday() {
-    if (syncsHomework()) return MONSTER_PARK.perDay - PARK_KEYS.filter(doneToday).length;
-    const saved = todayLeft[picked || "manual"];
+  function ticketsToday(characterId = picked) {
+    if (homeworkReady && characterId) {
+      return MONSTER_PARK.perDay - PARK_KEYS.filter((key) => doneToday(key, characterId)).length;
+    }
+    const saved = todayLeft[characterId || "manual"];
     return Number.isInteger(saved) ? Math.min(MONSTER_PARK.perDay, Math.max(0, saved)) : MONSTER_PARK.perDay;
   }
 
@@ -322,6 +328,7 @@ export async function render(root) {
     loadMainCharacter(true).then(paintProfileButton);
     paintPick();
     paintApply();
+    paintComparison();
   }
 
   // 한 판 경험치를 더하고 오늘 입장을 하나 줄인다. 구역이 바뀌면 오늘 남은 입장은 못 쓰니 0.
@@ -413,8 +420,8 @@ export async function render(root) {
     }
     box.innerHTML = `
       <article class="mp-result ${reach ? "is-reach" : ""} ym-glass">
-        <span class="mp-result-label">${endLabel} 마감 때</span>
-        <strong data-final-level>${reach ? `Lv.${top} 달성!` : levelText(event.final, top)}</strong>
+        <span class="mp-result-label">${reach ? `마감 전 Lv.${top} 달성 가능` : event.stop === "days" ? `${endLabel} 마감 예상` : "현재 계산 가능한 결과"}</span>
+        <strong data-final-level>${reach ? shortDate(addDays(today, event.runs.at(-1).day), today) : levelText(event.final, top)}</strong>
         <div class="ym-gauge"><i style="--value:${reach ? 100 : finalRatio}%"></i></div>
         <p>${event.runs.length}판 · ${gainedLevels > 0 ? `+${gainedLevels}레벨` : "레벨 그대로"}${event.stop === "unknown" || event.stop === "low" ? ` · ${escapeHtml(stopNote(event))}` : ""}</p>
       </article>
@@ -462,27 +469,138 @@ export async function render(root) {
       .join("");
   }
 
-  function paintTimeline(event) {
-    const box = root.querySelector("[data-timeline]");
-    if (!eventDays) {
+  function paintComparison() {
+    const box = root.querySelector("[data-growth]");
+    const eligible = characters.filter(usable);
+    const entries = eligible.map((character) => {
+      const top = parkMaxLevel(character.job);
+      const current = character.id === picked ? level : character.level;
+      const raw = character.id === picked ? exp : asBig(character.exp ?? 0);
+      const need = curve.get(current);
+      const safe = raw < 0n ? 0n : need && raw >= need ? need - 1n : raw;
+      return { name: character.name, level: current, exp: safe, top, tickets: ticketsToday(character.id), selected: character.id === picked };
+    });
+    // 손님과 등록 캐릭터가 없는 경우에도 직접 입력 결과를 볼 수 있다.
+    if (!entries.length && level >= MONSTER_PARK.minLevel && level < cap()) {
+      entries.push({ name: "직접 입력", level, exp, top: cap(), tickets: ticketsToday(), selected: true });
+    }
+    box.hidden = !eventDays || !entries.length;
+    if (box.hidden) {
+      box.innerHTML = "";
+      return;
+    }
+    const min = MONSTER_PARK.minLevel;
+    const max = MONSTER_PARK.maxLevel;
+    const y = (value) => Math.min(100, Math.max(0, (max - value) / (max - min) * 100));
+    const x = (day) => eventDays === 1 ? 50 : day / (eventDays - 1) * 100;
+    const position = (state, top) => y(state.level + (state.level < top ? Number(percentOf(state.exp, curve.get(state.level))) / 100 : 0));
+    const colors = ["accent", "gain", "tier-low", "violet", "gold", "danger"];
+    const tracks = entries.map((entry, index) => {
+      const start = { level: entry.level, exp: entry.exp };
+      const result = simulate({ ...start, curve, zoneExp, todayLeft: entry.tickets, maxLevel: entry.top, days: eventDays });
+      const last = result.runs.at(-1);
+      const summary = result.stop === "max"
+        ? `Lv.${entry.top} 달성${last ? ` · ${shortDate(addDays(today, last.day), today)}` : ""}`
+        : result.stop === "days" ? `마감 ${levelText(result.final, entry.top)}` : `계산 중단 · ${levelText(result.final, entry.top)}`;
+      const from = position(start, entry.top);
+      const days = parkDays(start, result, eventDays, entry.tickets).filter(({ runs }) => runs.length);
+      const line = [`${x(0)},${from}`];
+      const color = `var(--${colors[index % colors.length]})`;
+      const points = days.map(({ day, runs, after, reached }) => {
+        const dateX = x(day);
+        const levelY = position(after, entry.top);
+        line.push(`${dateX},${levelY}`);
+        const before = runs[0].before.level;
+        const gainedLevels = after.level - before;
+        const gained = gainedLevels > 0 ? `${before} → ${after.level} (+${gainedLevels}레벨)` : `Lv.${after.level} 유지`;
+        const detail = `${entry.name} · ${shortDate(addDays(today, day), today)} · ${gained} · ${levelText(after, entry.top)} · ${runs.length}판`;
+        return `<button type="button" class="mp-level-point${gainedLevels > 0 ? " is-up" : ""}${reached ? " is-goal" : ""}" data-growth-point="${escapeHtml(detail)}"
+          aria-label="${escapeHtml(detail)}" aria-pressed="false" style="--x:${dateX}%;--y:${levelY}%;--series:${color}"></button>`;
+      });
+      return {
+        legend: `<li${entry.selected ? ' class="is-current"' : ""} style="--series:${color}"><strong>${escapeHtml(entry.name)}</strong><small>${escapeHtml(summary)}</small></li>`,
+        line: `<polyline points="${line.join(" ")}" stroke="${color}" vector-effect="non-scaling-stroke"/>`,
+        start: `<span class="mp-track-start" style="--x:${x(0)}%;--y:${from}%;--series:${color}" title="${escapeHtml(entry.name + " · 현재 " + levelText(start, entry.top))}"></span>`,
+        points: points.join(""),
+      };
+    });
+
+    const lastDay = eventDays - 1;
+    const dateMarks = Array.from({ length: eventDays }, (_, day) => {
+      const edge = day === 0 || day === lastDay;
+      const showEvery = (limit) => {
+        const step = Math.ceil(eventDays / limit);
+        return day % step === 0 && day <= lastDay - step;
+      };
+      const date = shortDate(addDays(today, day), today).split(" ")[0];
+      return `<span class="mp-date-tick${edge ? " is-edge" : ""}${day === 0 ? " is-today" : ""}${showEvery(6) ? " is-narrow" : ""}${showEvery(13) ? " is-medium" : ""}${showEvery(26) ? " is-wide" : ""}" style="--x:${x(day)}%"><b>${escapeHtml(date)}</b></span>`;
+    });
+    const levelMarks = Array.from({ length: (max - min) / 5 + 1 }, (_, index) => {
+      const value = max - index * 5;
+      const major = value % 10 === 0;
+      const goal = entries.some(({ top }) => top === value);
+      return `<span class="mp-level-tick${major ? " is-major" : ""}${goal ? " is-target" : ""}" style="--y:${y(value)}%"><b>${value}</b></span>`;
+    });
+    box.innerHTML = `
+      <div class="mp-growth-head">
+        <div><h2>캐릭터별 성장 경로</h2><p>날짜별 원에 마우스를 올리거나 눌러 상세 결과를 확인하세요.</p></div>
+        <ul class="mp-marker-key" aria-label="날짜 점 범례">
+          <li class="is-up">레벨업</li><li>레벨 유지</li>
+        </ul>
+      </div>
+      <div class="mp-level-chart">
+        <ul class="mp-chart-legend" aria-label="캐릭터별 마감 결과">${tracks.map(({ legend }) => legend).join("")}</ul>
+        <div class="mp-chart-axes">
+          <span class="mp-chart-axis-name">레벨</span>
+          <div class="mp-date-axis" aria-label="입장 날짜">${dateMarks.join("")}</div>
+          <div class="mp-track-plot" aria-label="날짜별 예상 레벨">
+            ${levelMarks.join("")}
+            <svg class="mp-track-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              ${tracks.map(({ line }) => line).join("")}
+            </svg>
+            ${tracks.map(({ start, points }) => start + points).join("")}
+            <p class="mp-track-detail" data-growth-tooltip hidden aria-hidden="true"></p>
+          </div>
+        </div>
+        <p class="mp-chart-readout" data-growth-detail aria-live="polite">날짜별 원을 선택하면 상세 결과가 표시됩니다.</p>
+      </div>`;
+  }
+
+  function selectGrowthPoint(point) {
+    if (!point) return;
+    const chart = point.closest(".mp-level-chart");
+    const previous = chart.querySelector('[data-growth-point][aria-pressed="true"]');
+    if (previous === point) return;
+    previous?.setAttribute("aria-pressed", "false");
+    point.setAttribute("aria-pressed", "true");
+    chart.querySelector("[data-growth-detail]").textContent = point.dataset.growthPoint;
+    const tooltip = chart.querySelector("[data-growth-tooltip]");
+    tooltip.textContent = point.dataset.growthPoint;
+    tooltip.style.setProperty("--x", point.style.getPropertyValue("--x"));
+    tooltip.style.setProperty("--y", point.style.getPropertyValue("--y"));
+    tooltip.hidden = false;
+  }
+
+  function paintTimeline(days, event) {
+    const box = root.querySelector("[data-day-table]");
+    if (!days.length) {
       box.innerHTML = `<p class="mp-muted">이벤트 기간이 끝났어요.</p>`;
       return;
     }
-    const rows = [];
-    for (let day = 0; day < eventDays; day += 1) {
-      const date = addDays(today, day);
-      const runs = event.runs.filter((run) => run.day === day);
-      const tickets = day === 0 ? ticketsToday() : MONSTER_PARK.perDay;
+    const rows = days.map(({ day, tickets, runs, reached }) => {
       const lost = runs.reduce((sum, run) => sum + run.lostAfter, 0);
-      const pills = runs.map((run) => `<span class="mp-run${run.after.level > run.before.level ? " is-up" : ""}${run.wasted > 0n || run.lostAfter ? " is-warn" : ""}">
-          <small>${run.slot + 1}판</small>${escapeHtml(levelText(run.after, cap()))}${run.after.level > run.before.level ? `<em>UP</em>` : ""}
-        </span>`);
-      for (let index = 0; index < lost; index += 1) pills.push(`<span class="mp-run is-lost"><small>${runs.length + index + 1}판</small>못 씀</span>`);
-      if (!tickets) pills.push(`<span class="mp-run is-done">오늘은 다 했어요</span>`);
-      else if (tickets > runs.length + lost) pills.push(`<span class="mp-run is-idle">${{ max: cap() < realMaxLevel() ? "몬파 졸업" : `${cap()} 달성`, unknown: "구역 경험치 모름", low: "50레벨부터 입장" }[event.stop] ?? "계산 멈춤"}</span>`);
-      rows.push(`<li class="mp-day${day === 0 ? " is-today" : ""}"><span class="mp-day-date">${shortDate(date, today)}</span><span class="mp-day-runs">${pills.join("")}</span></li>`);
-    }
-    box.innerHTML = `<h2>날짜별 진행</h2><ol class="mp-days">${rows.join("")}</ol>`;
+      const cells = Array.from({ length: MONSTER_PARK.perDay }, (_, slot) => {
+        const run = runs[slot];
+        if (!run) return `<td>${slot < runs.length + lost ? "구역 변경" : "—"}</td>`;
+        return `<td class="${run.after.level > run.before.level ? "is-up" : ""}">${escapeHtml(levelText(run.after, cap()))}</td>`;
+      }).join("");
+      const note = !tickets ? "오늘 입장 완료" : reached ? `Lv.${cap()} 달성` : lost ? `입장 ${lost}회 못 씀`
+        : tickets > runs.length ? ({ max: `Lv.${cap()} 달성`, unknown: "경험치 미입력", low: "입장 불가" }[event.stop] ?? "—") : "—";
+      return `<tr${day === 0 ? ' class="is-today"' : ""}><th scope="row">${shortDate(addDays(today, day), today)}</th>${cells}<td>${note}</td></tr>`;
+    });
+    box.innerHTML = `<div class="mp-day-table" role="region" aria-label="날짜별 입장 결과" tabindex="0"><table>
+      <thead><tr><th scope="col">날짜</th><th scope="col">첫 판</th><th scope="col">둘째 판</th><th scope="col">비고</th></tr></thead>
+      <tbody>${rows.join("")}</tbody></table></div>`;
   }
 
   function paint() {
@@ -493,10 +611,21 @@ export async function render(root) {
     const goal = simulate({ ...start, days: 400 });
     paintResults(event, goal);
     paintWarnings(event);
-    paintTimeline(event);
+    const days = parkDays(start, event, eventDays, start.todayLeft);
+    paintComparison();
+    paintTimeline(days, event);
+  }
+
+  for (const type of ["pointerover", "focusin"]) {
+    root.addEventListener(type, (event) => selectGrowthPoint(event.target.closest("[data-growth-point]")));
   }
 
   root.addEventListener("click", (event) => {
+    const point = event.target.closest("[data-growth-point]");
+    if (point) {
+      selectGrowthPoint(point);
+      return;
+    }
     if (event.target.closest("[data-run-done]")) {
       finishRun();
       return;

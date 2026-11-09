@@ -88,6 +88,22 @@ export function simulate({ level, exp, curve, zoneExp, todayLeft = MONSTER_PARK.
   }
 }
 
+// 그래프와 상세 표가 같은 날짜별 판 기록을 사용한다. 계산이 멈춘 뒤에는 예측 점을 만들지 않는다.
+export function parkDays(start, result, days, todayLeft) {
+  const byDay = new Map();
+  for (const run of result.runs) {
+    if (!byDay.has(run.day)) byDay.set(run.day, []);
+    byDay.get(run.day).push(run);
+  }
+  const lastDay = result.runs.at(-1)?.day ?? -1;
+  return Array.from({ length: days }, (_, day) => {
+    const runs = byDay.get(day) ?? [];
+    const tickets = day === 0 ? todayLeft : MONSTER_PARK.perDay;
+    const after = runs.at(-1)?.after ?? (day === 0 && !tickets ? start : null);
+    return { day, runs, tickets, after, reached: result.stop === "max" && day === lastDay && runs.length > 0 };
+  });
+}
+
 /** 0.01% 단위로 내림한 진행률. 예: 6342/10000 → "63.42" */
 export function percentOf(exp, need) {
   if (!need || need <= 0n) return "0.00";

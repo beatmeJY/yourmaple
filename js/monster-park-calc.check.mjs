@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { levelExpSeed } from "./level-exp-seed.js";
-import { ZONES, addDays, parkRun, savedZoneExp, daysLeft, expFromPercent, gainRun, percentOf, simulate, zoneOf } from "./monster-park-calc.js";
+import { ZONES, addDays, parkDays, parkRun, savedZoneExp, daysLeft, expFromPercent, gainRun, percentOf, simulate, zoneOf } from "./monster-park-calc.js";
 
 const curve = new Map(levelExpSeed.map(([level, exp]) => [level, BigInt(exp)]));
 const MID = 2_898_000n;
@@ -108,3 +108,22 @@ assert.equal(savedZoneExp(fakeStorage(JSON.stringify({ zoneExp: { low: "500000" 
 assert.equal(savedZoneExp(fakeStorage("{oops")).mid, MID);
 assert.equal(savedZoneExp(fakeStorage(JSON.stringify({ zoneExp: { high: "abc" } }))).high, 6_289_333n);
 console.log("숙제표 몬파 한 판 경험치 검증 통과");
+
+
+// 오늘 0회여도 오늘의 점은 유지하고, 내일 마지막 판을 그날의 예상값으로 사용한다.
+const start = { level: 80, exp: 0n };
+const tomorrow = simulate({ ...start, curve, zoneExp: real, todayLeft: 0, days: 2 });
+const daily = parkDays(start, tomorrow, 2, 0);
+assert.deepEqual(daily[0].after, start);
+assert.equal(daily[0].runs.length, 0);
+assert.equal(daily[1].runs.length, 2);
+assert.deepEqual(daily[1].after, tomorrow.final);
+// 경험치를 모르는 구역과 목표 달성 이후에는 예측선을 더 그리지 않는다.
+const stopped = parkDays({ level: 100, exp: curve.get(100) - 1000n }, unknown, 2, 2);
+assert.equal(stopped[0].after.level, 101);
+assert.equal(stopped[1].after, null);
+const reached = parkDays({ level: 125, exp: 0n }, all, 5, 2);
+assert.equal(reached.filter((day) => day.reached).length, 1);
+assert.deepEqual(reached[2].after, { level: 130, exp: 0n });
+assert.equal(reached[3].after, null);
+console.log("몬스터파크 일별 진행: 0회 입장·당일 마지막 판·계산 중단·목표 달성 검증 통과");
