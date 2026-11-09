@@ -31,8 +31,8 @@ const curve = new Map(levelExpSeed.map(([level, exp]) => [level, asBig(exp)]));
 // 구역 문 이름(디자인: 50~70 얼룩말, 71~100 표범, 101~129 호랑이)
 const GATE_NAME = { low: "얼룩말 문", mid: "표범 문", high: "호랑이 문" };
 const SPAN = MONSTER_PARK.maxLevel - MONSTER_PARK.minLevel; // 50 → 130, 80칸
-// 달력에서 레벨이 오르는 판(입장권 칸)마다 붙이는 그림(사용자 제공 LEVEL UP 그림, 2026-11-09)
-const LEVEL_UP_ICON = `<img class="mp-day-up" src="img/level-up.png" alt="" width="188" height="240" loading="lazy" />`;
+// 달력에서 레벨이 오르는 판(입장권 칸)마다 붙이는 그림(사용자 제공 Lv↑ 그림, 2026-11-09)
+const LEVEL_UP_ICON = `<img class="mp-day-up" src="img/lv-up.png" alt="" width="160" height="123" loading="lazy" />`;
 
 function readStore() {
   try {

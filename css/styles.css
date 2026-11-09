@@ -17030,10 +17030,10 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .mp-day.is-sat.is-today, .mp-day.is-sun.is-today { border: 2px solid #fbe7cf; }
 .mp-day.is-sat .mp-day-top b, .mp-day.is-sun .mp-day-top b { font-size: 14px; font-weight: 900; }
 /* 입장권 칸마다: 레벨이 오른 판은 막대 위에 작은 LEVEL UP 그림. 그림이 없는 칸도 같은 높이를 잡아 막대 줄이 맞게 */
-.mp-day-pips { align-items: flex-end; min-height: 28px; }
+.mp-day-pips { align-items: flex-end; min-height: 30px; }
 .mp-pip { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .mp-pip > i { align-self: stretch; }
-.mp-day-up { width: 18px; height: auto; filter: drop-shadow(0 0 4px rgba(140, 255, 80, 0.5)); animation: mp-up-bob 2.2s ease-in-out infinite; pointer-events: none; }
+.mp-day-up { width: 26px; height: auto; filter: drop-shadow(0 0 4px rgba(140, 255, 80, 0.5)); animation: mp-up-bob 2.2s ease-in-out infinite; pointer-events: none; }
 .mp-pip + .mp-pip .mp-day-up { animation-delay: 0.3s; }
 /* 평일 칸은 연하게 해서 주말이 더 눈에 띄게 */
 .mp-day.is-weekday { background: rgba(255, 255, 255, 0.018); border-color: rgba(255, 255, 255, 0.06); }
