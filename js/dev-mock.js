@@ -4,6 +4,7 @@
 // supabase-js 중 이 앱이 쓰는 만큼만 흉내 낸다: from().select/insert/update/upsert/delete + eq/neq/in/gte/lte/is/order/limit/single/maybeSingle,
 // 조인은 select 의 accounts(...)·jobs(...) 처럼 "표이름(칸)"을 그 표의 단수형_id 로 붙인다. rpc·storage·auth 도 최소한만.
 
+import { ZONES } from "./monster-park-calc.js";
 import { nameMatchRank, normalizeSearch } from "./search-match.js";
 const DB_KEY = "ym-mock-db";
 const AUTH_KEY = "ym-mock-auth"; // "in" | "out"
@@ -111,7 +112,9 @@ function save() {
 }
 function rowsOf(table) {
   const all = tables();
-  all[table] ??= [];
+  all[table] ??= table === "monster_park_settings"
+    ? [{ singleton: true, ...Object.fromEntries(ZONES.map(({ id, exp }) => [id, Number(exp)])) }]
+    : [];
   return all[table];
 }
 
@@ -255,6 +258,9 @@ class Query {
   }
 
   run() {
+    if (this.table === "monster_park_settings" && this.action !== "select" && (this.action !== "update" || !reviewAllowed())) {
+      return { data: null, error: { message: "permission denied for monster park settings", code: "42501" } };
+    }
     if ((["catalog_monsters", "catalog_items", "catalog_monster_drops", "catalog_changes", "catalog_revision", "catalog_item_stats", "catalog_item_requirements", "catalog_item_jobs", "catalog_item_source_attributes"].includes(this.table) && this.action !== "select") || this.table === "catalog_monster_reviews") return { data: null, error: { message: "permission denied for shared catalog", code: "42501" } };
     const rows = rowsOf(this.table);
     let result = [];

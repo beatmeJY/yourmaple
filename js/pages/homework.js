@@ -7,7 +7,8 @@ import { DOJO_DAILY_GOAL, DOJO_RESET_POINTS, homeworkJobBlocked, homeworkLevelAl
 import { asBig } from "../hunt-calc.js";
 import { jobRecord, maxLevelOf } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
-import { MONSTER_PARK, parkRun, percentOf, savedZoneExp } from "../monster-park-calc.js";
+import { MONSTER_PARK, parkRun, percentOf } from "../monster-park-calc.js";
+import { loadParkSettings } from "../monster-park-settings.js";
 import { loadMainCharacter, paintProfileButton } from "../profile.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
@@ -766,10 +767,16 @@ export async function render(root) {
   }
 
   async function addParkRun(character, key) {
+    const { zoneExp, error } = await loadParkSettings();
+    if (!root.isConnected) return;
+    if (error) {
+      notify("몬스터파크 기준 경험치를 불러오지 못해 경험치를 더하지 못했어요.", "error");
+      return;
+    }
     const level = Number(character.level);
     const exp = asBig(character.exp);
     const maxLevel = maxLevelOf(character.job);
-    const run = parkRun({ level, exp, curve: PARK_CURVE, zoneExp: savedZoneExp(), parkMax: Math.min(maxLevel, MONSTER_PARK.maxLevel), maxLevel });
+    const run = parkRun({ level, exp, curve: PARK_CURVE, zoneExp, parkMax: Math.min(maxLevel, MONSTER_PARK.maxLevel), maxLevel });
     if (!run) return;
     if (!(await saveLevel(character, run.level, run.exp))) return;
     parkUndo.set(`${character.id}:${key}`, { before: { level, exp }, after: { level: run.level, exp: run.exp } });

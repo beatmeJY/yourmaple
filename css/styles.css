@@ -14610,16 +14610,17 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .mp-lv input { width: 3.2ch; border: 0; background: none; color: var(--gold); font: inherit; font-size: 24px; font-weight: 900; text-align: center; outline: none; }
 .mp-zone { color: var(--gain); font-size: 12px; font-weight: 700; }
 .mp-zone.is-unknown { color: var(--gold); }
-.mp-percent { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.mp-percent-input { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 10px; border: 1px solid var(--glass-line); border-radius: 12px; background: rgba(0, 0, 0, 0.18); }
-.mp-percent-input input { width: 6ch; border: 0; background: none; color: var(--text); font: inherit; font-size: 17px; font-weight: 800; text-align: right; outline: none; }
-.mp-percent-input span { color: var(--muted); }
-.mp-percent .ym-chip { height: 34px; padding: 0 11px; }
+.mp-exp-input { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 10px; border: 1px solid var(--glass-line); border-radius: 12px; background: rgba(0, 0, 0, 0.18); }
+.mp-exp-input input { width: 13ch; min-width: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 17px; font-weight: 800; text-align: right; outline: none; }
+.mp-exp-input span { color: var(--muted); font-size: 12px; }
+.mp-exp-input:has([aria-invalid="true"]) { border-color: var(--danger); }
+.mp-exp-input:has([aria-invalid="true"]) + .mp-exp-exact { color: var(--danger); }
+.mp-input:has([data-current-exp][aria-invalid="true"]) ~ :is([data-results], [data-warnings], [data-growth], [data-timeline]) { display: none; }
 .mp-exp-exact { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .mp-tickets { display: inline-flex; gap: 6px; }
 .mp-ticket { min-width: 58px; height: 46px; font-size: 16px; }
 .mp-ticket.is-on { border-color: oklch(0.8 0.13 120 / 0.8); background: oklch(0.8 0.13 120 / 0.2); box-shadow: 0 0 16px oklch(0.8 0.13 120 / 0.3); }
-.mp-lv:focus-within, .mp-percent-input:focus-within { border-color: var(--accent); }
+.mp-lv:focus-within, .mp-exp-input:focus-within { border-color: var(--accent); }
 .mp-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .mp-result { display: grid; align-content: start; gap: 8px; padding: 18px 20px; }
 .mp-results.is-first .mp-result { animation: ym-pop-in 0.45s var(--spring) both; }
@@ -14702,7 +14703,7 @@ button.ym-feature-main { padding: 0; font: inherit; text-align: left; background
 .mp-day-table td.is-up { color: var(--gain); font-weight: 800; }
 .mp-muted { margin: 0; color: var(--muted); }
 .mp-zones { padding: 14px 20px; }
-.mp-zone-open { justify-self: start; }
+.mp-zones .mp-save { margin-top: 12px; }
 .mp-zones summary { font-weight: 800; cursor: pointer; }
 .mp-zones p { margin: 8px 0 12px; color: var(--muted); font-size: 13px; }
 .mp-zone-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }

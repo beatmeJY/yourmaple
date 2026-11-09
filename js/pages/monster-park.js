@@ -1,11 +1,13 @@
+import { canReviewCatalog } from "../catalog-review.js";
 import { sfx, burstAt } from "../effects.js";
 import { attachFaceUrls, faceMarkup } from "../character-face.js";
-import { escapeHtml, formatCount } from "../format.js";
+import { escapeHtml, formatCount, readBig } from "../format.js";
 import { homeworkState } from "../homework-calc.js";
 import { asBig } from "../hunt-calc.js";
 import { CYGNUS_MAX_LEVEL, findJob, isCygnusJob, jobStyle, maxLevelOf } from "../job-label.js";
 import { levelExpSeed } from "../level-exp-seed.js";
-import { MONSTER_PARK, PARK_STORE_KEY, ZONES, addDays, daysLeft, expFromPercent, gainRun, parkDays, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
+import { MONSTER_PARK, PARK_STORE_KEY, ZONES, addDays, daysLeft, gainRun, parkDays, percentOf, seoulDate, simulate, zoneLabel, zoneOf } from "../monster-park-calc.js";
+import { loadParkSettings, saveParkSettings, zoneExpValues } from "../monster-park-settings.js";
 import { translateDbError } from "../db-error.js";
 import { loadMainCharacter, mainCharacterId, paintProfileButton } from "../profile.js";
 import { isLoggedIn } from "../session.js";
@@ -17,12 +19,11 @@ import { notify } from "../toast.js";
 // 몬파 레벨(50~129)이 아닌 캐릭터는 접어 둔다. "한 판 끝" 은 한 판 경험치를 더하고 오늘 입장을 줄이며,
 // 고른 캐릭터면 레벨·경험치를 캐릭터에 바로 저장한다(2026-10-28 사용자 요청). 손으로 고친 값은 저장 버튼으로.
 // 고른 캐릭터의 "오늘 남은 입장"은 숙제표 몬스터파크 1회·2회 체크(homework_checks)와 같은 값이다. 표가 없으면 이 기기에만 기억.
-// 이 기기에만 기억: 구역 경험치(모르는 구역을 사용자가 적은 값), 오늘 남은 입장(날짜가 바뀌면 2회로).
+// 이 기기에만 기억: 직접 입력 시 오늘 남은 입장(날짜가 바뀌면 2회로).
 
 const STORE_KEY = PARK_STORE_KEY;
 const PARK_KEYS = ["monster-park", "monster-park-2"]; // 숙제표 1회·2회 칸(homework-calc.js RAIDS)
 const curve = new Map(levelExpSeed.map(([level, exp]) => [level, asBig(exp)]));
-const PERCENT_CHIPS = ["0", "25", "50", "75", "99.99"];
 
 function readStore() {
   try {
@@ -65,17 +66,20 @@ function levelText(state, top = MONSTER_PARK.maxLevel) {
 export async function render(root) {
   const today = seoulDate();
   const store = readStore();
-  const zoneExp = Object.fromEntries(ZONES.map((zone) => {
-    const saved = store.zoneExp?.[zone.id];
-    return [zone.id, saved ? asBig(saved) : zone.exp];
-  }));
+  const [settings, operator] = await Promise.all([
+    loadParkSettings(),
+    isLoggedIn() && canReviewCatalog(),
+  ]);
+  if (!root.isConnected) return;
+  let zoneExp = settings.zoneExp ?? {};
+  const canEditZones = settings.editable && operator;
   const todayLeft = store.today?.date === today ? store.today.left ?? {} : {};
   let characters = [];
   let jobs = [];
   let picked = ""; // 캐릭터 id, "" = 직접 입력
   let level = 71;
   let exp = 0n;
-  let percentInput = "0";
+  let expError = "";
   let lastReach = false;
   let painted = false;
   let saving = false;
@@ -112,12 +116,12 @@ export async function render(root) {
           <button type="button" class="ym-chip mp-cygnus-toggle" data-cygnus hidden aria-pressed="false">시그너스 · 만렙 ${CYGNUS_MAX_LEVEL}</button>
         </div>
         <div class="mp-field">
-          <span class="mp-label">현재 경험치</span>
-          <span class="mp-percent">
-            <label class="mp-percent-input"><input data-percent inputmode="decimal" aria-label="현재 경험치 퍼센트" /><span>%</span></label>
-            ${PERCENT_CHIPS.map((value) => `<button type="button" class="ym-chip" data-percent-chip="${value}">${value}%</button>`).join("")}
+          <label class="mp-label" for="mp-current-exp">현재 경험치</label>
+          <span class="mp-exp-input">
+            <input id="mp-current-exp" data-current-exp inputmode="numeric" aria-describedby="mp-exp-hint" />
+            <span>EXP</span>
           </span>
-          <span class="mp-exp-exact" data-exp-exact></span>
+          <span class="mp-exp-exact" id="mp-exp-hint" data-exp-exact aria-live="polite"></span>
         </div>
         <div class="mp-field">
           <span class="mp-label">오늘 남은 입장 <small class="mp-hw-link" data-hw-link hidden>숙제표와 같이 바뀌어요</small></span>
@@ -136,19 +140,22 @@ export async function render(root) {
       </details>
       <details class="mp-zones ym-glass">
         <summary>구역별 한 판 경험치</summary>
-        <p>값이 다르면 고쳐 적어 주세요. 이 기기에 기억해요.</p>
-        <div class="mp-zone-grid">
-          ${ZONES.map((zone) => `
-            <label class="mp-zone-field">
-              <span>Lv.${zoneLabel(zone)}</span>
-              <input data-zone-exp="${zone.id}" inputmode="numeric" placeholder="${zone.exp ? formatCount(zone.exp) : "모름"}" value="${zoneExp[zone.id] != null ? formatCount(zoneExp[zone.id]) : ""}" />
-            </label>`).join("")}
-        </div>
+        <p>${settings.error ? "기준 경험치를 불러오지 못했어요. 새로고침한 뒤 다시 확인해 주세요." : "모든 사용자에게 적용되는 구역별 기준이에요."}</p>
+        <form data-zone-form>
+          <div class="mp-zone-grid">
+            ${ZONES.map((zone) => `
+              <label class="mp-zone-field">
+                <span>Lv.${zoneLabel(zone)}</span>
+                <input name="${zone.id}" inputmode="numeric" value="${escapeHtml(formatCount(zoneExp[zone.id]))}" ${canEditZones ? "" : "readonly"} />
+              </label>`).join("")}
+          </div>
+          ${canEditZones ? '<button type="submit" class="mp-save">구역 경험치 저장</button>' : ""}
+        </form>
       </details>
     </div>`;
 
   const levelInput = root.querySelector("[data-level]");
-  const percentField = root.querySelector("[data-percent]");
+  const expField = root.querySelector("[data-current-exp]");
 
   function syncsHomework() {
     return homeworkReady && Boolean(picked);
@@ -211,11 +218,38 @@ export async function render(root) {
     }
   }
 
-  function saveZones() {
-    const saved = {};
-    for (const zone of ZONES) if (zoneExp[zone.id] != null && zoneExp[zone.id] !== zone.exp) saved[zone.id] = zoneExp[zone.id].toString();
-    writeStore({ ...readStore(), zoneExp: saved });
-  }
+  const zoneForm = root.querySelector("[data-zone-form]");
+  zoneForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!canEditZones) return;
+    const button = zoneForm.querySelector("button");
+    if (button.disabled) return;
+    const values = {};
+    for (const { id } of ZONES) {
+      const field = zoneForm.elements.namedItem(id);
+      const { value, error } = readBig(field.value, "한 판 경험치", 1n);
+      if (error || value == null || value > BigInt(Number.MAX_SAFE_INTEGER)) {
+        notify(error || "한 판 경험치를 올바른 양의 정수로 입력해 주세요.", "error");
+        field.focus();
+        return;
+      }
+      values[id] = Number(value);
+    }
+    for (const field of zoneForm.elements) field.disabled = true;
+    try {
+      const { data, error } = await saveParkSettings(values);
+      if (error) throw error;
+      if (!root.isConnected) return;
+      zoneExp = zoneExpValues(data);
+      for (const { id } of ZONES) zoneForm.elements.namedItem(id).value = formatCount(zoneExp[id]);
+      paint();
+      notify("구역별 한 판 경험치를 저장했습니다.", "success");
+    } catch (error) {
+      if (root.isConnected) notify(translateDbError(error), "error");
+    } finally {
+      for (const field of zoneForm.elements) field.disabled = false;
+    }
+  });
 
   // 지금 계산하는 캐릭터의 만렙
   function cap() {
@@ -235,9 +269,25 @@ export async function render(root) {
     return Math.min(realMaxLevel(), Math.max(1, Math.round(value) || 1));
   }
 
-  function setLevel(value, { keepPercent = true } = {}) {
+  function setExperience(raw) {
+    const parsed = readBig(raw, "현재 경험치");
+    const amount = parsed.value ?? 0n;
+    const need = curve.get(level);
+    expError = parsed.error ?? "";
+    if (!expError && need && amount >= need) {
+      expError = `현재 경험치는 ${formatCount(need - 1n)} 이하로 입력해 주세요.`;
+    }
+    if (!expError) exp = amount;
+  }
+
+  function setLevel(value) {
     level = clampLevel(value);
-    if (keepPercent) exp = level >= realMaxLevel() ? 0n : expFromPercent(percentInput, curve.get(level));
+    if (level >= realMaxLevel()) {
+      exp = 0n;
+      expError = "";
+    } else {
+      setExperience(expField.value);
+    }
   }
 
   function paintPick() {
@@ -279,9 +329,8 @@ export async function render(root) {
     return character.level !== level || asBig(character.exp ?? 0) !== exp;
   }
 
-  // 저장 문구는 입력칸에 보이는 % 그대로(경험치를 %에서 거꾸로 구하면 0.01% 내림이 생겨서)
   function savedText() {
-    return level >= realMaxLevel() ? `Lv.${level}` : `Lv.${level} · ${percentInput}%`;
+    return level >= realMaxLevel() ? `Lv.${level}` : `Lv.${level} · ${formatCount(exp)} EXP`;
   }
 
   function paintApply() {
@@ -289,14 +338,14 @@ export async function render(root) {
     const zone = level < cap() ? zoneOf(level) : null;
     const gain = zone ? zoneExp[zone.id] : null;
     const left = ticketsToday();
-    const canRun = Boolean(zone) && gain != null && left > 0;
+    const canRun = !expError && Boolean(zone) && gain != null && left > 0;
     const runNote = !zone ? (level < MONSTER_PARK.minLevel ? "50레벨부터" : cap() < realMaxLevel() ? "몬파 졸업" : `${cap()} 달성`) : gain == null ? "구역 경험치 모름" : left <= 0 ? "오늘 입장 끝" : `+${formatCount(gain)}`;
     const character = pickedCharacter();
     const dirty = isDirty(character);
     const saveHtml = !character
       ? `<span class="mp-apply-note">${isLoggedIn() ? "캐릭터를 고르면 레벨을 바로 저장할 수 있어요" : ""}</span>`
       : dirty
-        ? `<button type="button" class="mp-save" data-save ${saving ? "disabled" : ""}>${saving ? "저장 중…" : `${escapeHtml(character.name)}에 ${escapeHtml(savedText())} 저장`}</button>`
+        ? `<button type="button" class="mp-save" data-save ${saving || expError ? "disabled" : ""}>${saving ? "저장 중…" : `${escapeHtml(character.name)}에 ${escapeHtml(savedText())} 저장`}</button>`
         : `<span class="mp-apply-note is-saved">✓ ${escapeHtml(character.name)} 저장된 값과 같아요</span>`;
     box.innerHTML = `
       <button type="button" class="mp-run-done" data-run-done ${canRun && !saving ? "" : "disabled"}>
@@ -307,10 +356,11 @@ export async function render(root) {
 
   async function saveCharacter({ silent = false } = {}) {
     const character = pickedCharacter();
-    if (!character || saving || !isDirty(character)) return;
+    if (!character || saving || expError || !isDirty(character)) return;
     saving = true;
     paintApply();
     const values = { level, exp: exp.toString() };
+    const summary = savedText();
     const supabase = await getSupabase();
     const { error } = await supabase.from("characters").update(values).eq("id", character.id);
     saving = false;
@@ -324,7 +374,7 @@ export async function render(root) {
     character.level = values.level;
     character.exp = values.exp;
     if (!silent) sfx("tick");
-    notify(`${character.name} ${savedText()} 저장했습니다.`, "success");
+    notify(`${character.name} ${summary} 저장했습니다.`, "success");
     loadMainCharacter(true).then(paintProfileButton);
     paintPick();
     paintApply();
@@ -336,14 +386,13 @@ export async function render(root) {
     const zone = level < cap() ? zoneOf(level) : null;
     const gain = zone ? zoneExp[zone.id] : null;
     const left = ticketsToday();
-    if (!zone || gain == null || left <= 0) return;
+    if (expError || !zone || gain == null || left <= 0) return;
     const top = cap();
     // 실제 경험치는 직업 만렙 기준(배틀메이지는 130이 돼도 넘친 경험치가 남는다)
     const after = gainRun(level, exp, gain, curve, realMaxLevel());
     const changed = after.level < top && zoneOf(after.level)?.id !== zone.id;
     level = after.level;
     exp = after.exp;
-    percentInput = level >= realMaxLevel() ? "0" : percentOf(exp, curve.get(level));
     saveTickets(changed || after.level >= top ? 0 : left - 1);
     if (after.leveled) {
       sfx(level >= top ? "fanfare" : "check");
@@ -362,7 +411,7 @@ export async function render(root) {
       exp = character.exp != null && level < realMaxLevel() ? asBig(character.exp) : 0n;
       const need = curve.get(level);
       if (need && exp >= need) exp = need - 1n;
-      percentInput = need ? percentOf(exp, need) : "0";
+      expError = "";
     }
     paintPick();
     paint();
@@ -370,7 +419,9 @@ export async function render(root) {
 
   function paintInputs() {
     if (document.activeElement !== levelInput) levelInput.value = String(level);
-    if (document.activeElement !== percentField) percentField.value = percentInput;
+    expField.disabled = level >= realMaxLevel();
+    expField.setAttribute("aria-invalid", String(Boolean(expError)));
+    if (!expError && document.activeElement !== expField) expField.value = formatCount(exp);
     const cygnusToggle = root.querySelector("[data-cygnus]");
     cygnusToggle.hidden = picked !== "";
     cygnusToggle.setAttribute("aria-pressed", String(manualCygnus));
@@ -379,8 +430,9 @@ export async function render(root) {
     zoneBox.textContent = zone ? `${zoneLabel(zone)} 구역 · 한 판 ${zoneExp[zone.id] != null ? formatCount(zoneExp[zone.id]) : "경험치 모름"}` : level < MONSTER_PARK.minLevel ? "50레벨부터 들어갈 수 있어요" : cap() < realMaxLevel() ? `${cap()}레벨부터는 못 들어가요` : `이미 ${cap()}이에요`;
     zoneBox.classList.toggle("is-unknown", Boolean(zone) && zoneExp[zone.id] == null);
     const need = curve.get(level);
-    root.querySelector("[data-exp-exact]").textContent = need && level < realMaxLevel() ? `${formatCount(exp)} / ${formatCount(need)}` : "";
-    for (const chip of root.querySelectorAll("[data-percent-chip]")) chip.setAttribute("aria-pressed", String(chip.dataset.percentChip === percentInput));
+    root.querySelector("[data-exp-exact]").textContent = expError || (need && !expField.disabled
+      ? `다음 레벨까지 ${formatCount(need - exp)} EXP · 현재 ${percentOf(exp, need)}%`
+      : "");
     root.querySelector("[data-hw-link]").hidden = !syncsHomework();
     const left = ticketsToday();
     for (const button of root.querySelectorAll("[data-ticket]")) {
@@ -416,7 +468,7 @@ export async function render(root) {
       const date = addDays(today, last.day);
       goalHtml = `<strong>${goal.runs.length}판 · ${last.day + 1}일</strong><p>${shortDate(date, today)}에 ${top}${reach ? "" : ` — 이벤트 마감보다 ${last.day + 1 - eventDays}일 더 걸려요`}</p>`;
     } else {
-      goalHtml = `<strong>계산 대기</strong><p>${escapeHtml(stopNote(goal))}${goal.runs.length ? ` · 그때까지 ${goal.runs.length}판, ${levelText(goal.final, top)}` : ""}</p>${goal.stop === "unknown" ? `<button type="button" class="ym-chip mp-zone-open" data-zone-open="${goal.stopZone.id}">Lv.${zoneLabel(goal.stopZone)} 경험치 적기</button>` : ""}`;
+      goalHtml = `<strong>계산 대기</strong><p>${escapeHtml(stopNote(goal))}${goal.runs.length ? ` · 그때까지 ${goal.runs.length}판, ${levelText(goal.final, top)}` : ""}</p>`;
     }
     box.innerHTML = `
       <article class="mp-result ${reach ? "is-reach" : ""} ym-glass">
@@ -606,6 +658,7 @@ export async function render(root) {
   function paint() {
     paintInputs();
     paintApply();
+    if (expError) return;
     const start = { level, exp, curve, zoneExp, todayLeft: ticketsToday(), maxLevel: cap() };
     const event = simulate({ ...start, days: eventDays });
     const goal = simulate({ ...start, days: 400 });
@@ -654,23 +707,6 @@ export async function render(root) {
       paint();
       return;
     }
-    const chip = event.target.closest("[data-percent-chip]");
-    if (chip) {
-      sfx("tick");
-      percentInput = chip.dataset.percentChip;
-      setLevel(level);
-      paint();
-      return;
-    }
-    const zoneOpen = event.target.closest("[data-zone-open]");
-    if (zoneOpen) {
-      const details = root.querySelector(".mp-zones");
-      details.open = true;
-      const input = details.querySelector(`[data-zone-exp="${zoneOpen.dataset.zoneOpen}"]`);
-      input.scrollIntoView({ block: "center", behavior: "smooth" });
-      input.focus({ preventScroll: true });
-      return;
-    }
     const ticket = event.target.closest("[data-ticket]");
     if (ticket) {
       sfx("tick");
@@ -688,18 +724,10 @@ export async function render(root) {
       }
       return;
     }
-    if (event.target === percentField) {
-      percentInput = percentField.value.replace(/[^\d.]/g, "") || "0";
-      setLevel(level);
+    if (event.target === expField) {
+      setExperience(expField.value);
       paint();
       return;
-    }
-    const zoneInput = event.target.closest("[data-zone-exp]");
-    if (zoneInput) {
-      const digits = zoneInput.value.replace(/[^\d]/g, "");
-      zoneExp[zoneInput.dataset.zoneExp] = digits ? BigInt(digits) : (ZONES.find((zone) => zone.id === zoneInput.dataset.zoneExp)?.exp ?? null);
-      saveZones();
-      paint();
     }
   });
 
@@ -707,13 +735,12 @@ export async function render(root) {
     if (event.target.matches?.("[data-char-more]")) outOpen = event.target.open;
   }, true);
 
+  root.addEventListener("focusout", (event) => {
+    if (event.target === expField && !expError) expField.value = formatCount(exp);
+  });
+
   root.addEventListener("change", (event) => {
-    if (event.target === levelInput || event.target === percentField) paintInputs();
-    const zoneInput = event.target.closest("[data-zone-exp]");
-    if (zoneInput) {
-      const value = zoneExp[zoneInput.dataset.zoneExp];
-      zoneInput.value = value != null ? formatCount(value) : "";
-    }
+    if (event.target === levelInput) paintInputs();
   });
 
   setLevel(level);

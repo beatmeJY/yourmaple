@@ -20,6 +20,8 @@
 
 - 2026-11-01 (Codex) 비공개 도감 검토 추가: `sql/057`의 `can_review_catalog`, `catalog_review_list/detail/save`, `catalog_review_private.reviewer/items/edits` → Spring 운영자 권한·검토 API와 트랜잭션으로 이전. 검증된 Google identity 연결·729개 비공개 범위·revision 충돌·비공개 수정 이력을 유지하고 공개 도감 반영은 별도 승인으로 둡니다. 호출은 `js/catalog-review.js`, `js/pages/catalog-review.js`입니다. [실측]
 
+- 2026-11-09 (Codex) 몬스터파크 공통 구역 경험치(`sql/067`) → 공개 조회와 운영자 전용 수정 API로 이전. 기존 검증된 운영자 권한 및 세 구역 일괄 저장 유지. [문서]
+
 ## 2. 조회 API (옮기면 좋은 것)
 
 | 기능 | 지금 위치 | 메모 |

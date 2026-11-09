@@ -133,20 +133,5 @@ export function parkRun({ level, exp, curve, zoneExp, parkMax = MONSTER_PARK.max
   return { ...gainRun(level, exp, gain, curve, maxLevel), gain };
 }
 
-/** 몬파 화면에서 사용자가 고친 구역 경험치(이 기기 localStorage)까지 반영한 구역별 한 판 경험치 */
+// 이 기기의 입장 횟수를 기억하는 키
 export const PARK_STORE_KEY = "maple-note-monster-park";
-export function savedZoneExp(storage = globalThis.localStorage) {
-  let saved = {};
-  try {
-    saved = JSON.parse(storage?.getItem(PARK_STORE_KEY) || "{}")?.zoneExp ?? {};
-  } catch {
-    saved = {};
-  }
-  return Object.fromEntries(ZONES.map((zone) => {
-    try {
-      return [zone.id, saved[zone.id] ? BigInt(saved[zone.id]) : zone.exp];
-    } catch {
-      return [zone.id, zone.exp];
-    }
-  }));
-}
