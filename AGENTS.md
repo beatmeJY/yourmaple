@@ -22,7 +22,7 @@
 
 - 빌드 도구 없는 순수 HTML/CSS/JavaScript(ES 모듈) SPA. GitHub Pages로 배포(`.github/workflows/pages.yml`). 배포 때만 `tools/stamp_version.py`가 JS·CSS 주소와 상대 import에 커밋 번호(`?v=`)를 붙여 캐시를 깬다. 그래서 상대 import는 `./x.js`·`../x.js` 문자열 그대로 쓰고, 경로를 변수로 조립하지 않는다.
 - 배포 전 검증: `pages.yml`의 `check` 작업이 `node tools/run-checks.mjs`(js/*.check.mjs 전부 + 브라우저 없는 tools 검사 + PGlite DB 검사)를 돌리고, 실패하면 `deploy`가 실행되지 않는다. 새 계산 검사는 `js/xxx.check.mjs`로 두면 자동 포함. Playwright 화면 검사(`tools/*-ui.check.mjs`)는 로컬 전용. 2026-11-08 (Claude)
-- 배포 주소는 `https://yourmaple.kr`(가비아 DNS → GitHub Pages 커스텀 도메인, Enforce HTTPS). 예전 `beatmejy.github.io/yourmaple/`은 새 주소로 이동한다. DNS 레코드와 설정 위치는 README "도메인" 절에 있다. 코드에 배포 경로를 고정하지 않는다(상대 경로 유지).
+- 배포 주소는 `https://yourmaple.kr`(가비아 DNS → GitHub Pages 커스텀 도메인, Enforce HTTPS). 예전 `beatmejy.github.io/yourmaple/`은 새 주소로 이동한다. DNS 레코드와 설정 위치는 비공개 운영 기록에 있다. 코드에 배포 경로를 고정하지 않는다(상대 경로 유지).
 - 데이터·로그인: Supabase(Postgres + RLS). 설정은 `js/config.js`(커밋 안 함, `config.example.js` 참고).
 - 로컬 가짜 DB: 127.0.0.1·localhost 에서 `?mock`(로그인됨)·`?mock=guest`·`?mock=reset`·`?mock=0`. `js/supabase-client.js` 가 이때만 `js/dev-mock.js`(supabase-js 흉내, localStorage `ym-mock-db`)를 불러온다. 쿼리 흉내가 부족하면 그 파일에 추가한다. 사용법 README "로컬에서 로그인 없이 확인하기". 2026-10-20 (Claude) [실측]
 - 맥 로컬 실행: `python3 -m http.server 5500` → http://127.0.0.1:5500. Windows에서는 `py -3 -m http.server 5500`을 사용한다. `.claude/launch.json`은 현재 저장소에 없다(2026-10-02 Codex 확인 [실측]).
@@ -53,10 +53,10 @@
 
 ## 5. 데이터베이스(SQL) 규칙
 
-- 변경은 `sql/NNN_설명.sql` 새 파일로 추가하고, 사용자가 Supabase SQL Editor 또는 DBeaver 쓰기 연결(README "DBeaver로 운영 DB 보기")에서 직접 실행한다. 에이전트는 운영 DB에 접속하지 않는다. 새 파일을 만들면 사용자에게 실행해 달라고 꼭 알린다.
+- 변경은 `sql/NNN_설명.sql` 새 파일로 추가하고, 사용자가 Supabase SQL Editor 또는 DBeaver 쓰기 연결(비공개 운영 기록의 "DBeaver로 운영 DB 보기")에서 직접 실행한다. 에이전트는 운영 DB에 접속하지 않는다. 새 파일을 만들면 사용자에게 실행해 달라고 꼭 알린다.
 - **같은 파일을 다시 실행해도 안전하게** 작성한다: `create table if not exists`, `drop constraint/policy/trigger if exists` 후 다시 생성.
 - 개인 데이터 표는 `user_id` + `assign_user_id` 트리거 + RLS(본인 행만 select/insert/update/delete)를 갖는다. 2026-10-21 사용자 결정에 따라 `catalog_monsters`·`catalog_items`는 공용 기준 정보 예외로 `user_id` 없이 비로그인 포함 SELECT만 허용하며, 쓰기는 SQL Editor 운영자만 한다. 예외: SQL058 설치 후 검증된 Google 검토 운영자는 권한 검사 RPC로 선택한 검토 아이템을 공개 반영할 수 있다(일반 사용자의 직접 쓰기는 불가). `catalog_monster_reviews`는 운영자 전용 비공개 검토 표다. `sql/016_dojo.sql`, `sql/027_maker.sql`을 본보기로 쓴다.
-- 새 SQL 파일은 README의 "데이터베이스 만들기" 목록에도 한 줄 추가한다.
+- 새 SQL 파일은 비공개 운영 기록(공용 agent-context의 `projects/yourmaple/operations.md`)에도 적용 조건과 함께 한 줄 추가한다.
 
 ## 6. 기능별 도메인 메모
 
@@ -67,6 +67,8 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-11 (Codex) 공개 README를 서비스 소개·기술 구성·로컬 실행·검증으로 정리하고 운영 절차와 SQL 적용 기록은 비공개 운영 기록으로 이동. [문서]
 
 - 2026-11-09 (Codex) 혼줌 떨어짐은 과거 실패음 두 음, 주문서 실패는 현재 하강음으로 분리. Git 원본의 음원 설정과 일치 및 효과음 네 분기 검증. [실측·진술]
 
