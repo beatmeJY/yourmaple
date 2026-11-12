@@ -166,7 +166,7 @@ function actionsBlock() {
 
 function paintMenu(menu) {
   if (!state.characters.length) {
-    menu.innerHTML = `${accountBlock()}<p class="profile-menu-empty">캐릭터가 없습니다.</p><a class="profile-menu-link" href="#/characters" data-profile-close>캐릭터 추가하러 가기</a>${actionsBlock()}`;
+    menu.innerHTML = `${accountBlock()}<p class="profile-menu-empty">캐릭터가 없습니다.</p><a class="profile-menu-link" href="/characters/" data-profile-close>캐릭터 추가하러 가기</a>${actionsBlock()}`;
     return;
   }
   const items = state.characters

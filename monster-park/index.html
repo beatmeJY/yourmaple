@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <base href="/" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>메이플랜드 몬스터파크 계산기 — 11월 이벤트 마감까지 레벨·남은 판수 | Your Maple</title>
   <meta name="description" content="메이플랜드 몬스터파크 이벤트(2026년 11월 30일까지)에서 하루 2판씩 돌면 마감 날 몇 레벨이 되는지, 130레벨까지 몇 판·며칠 남았는지 구역별 한 판 경험치로 계산합니다." />
@@ -16,28 +17,33 @@
   <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/css/public.css" />
-  <link rel="stylesheet" href="/css/feature.css" />
+  <link rel="stylesheet" href="./css/public.css" data-feature-style />
+  <link rel="stylesheet" href="./css/feature.css" data-feature-style />
+  <link rel="stylesheet" href="./css/styles.css" data-app-style disabled />
+  <link rel="stylesheet" href="./css/catalog-review.css" data-app-style disabled />
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "몬스터파크 계산기", "url": "https://yourmaple.kr/monster-park/", "applicationCategory": "GameApplication", "operatingSystem": "Web", "inLanguage": "ko", "description": "메이플랜드 몬스터파크 이벤트(2026년 11월 30일까지)에서 하루 2판씩 돌면 마감 날 몇 레벨이 되는지, 130레벨까지 몇 판·며칠 남았는지 구역별 한 판 경험치로 계산합니다.", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "KRW"}, "publisher": {"@type": "Organization", "name": "Your Maple", "url": "https://yourmaple.kr/"}}</script>
 </head>
 <body class="feature-page">
+  <div id="app">
   <!-- 기능 소개(검색 색인용, 2026-11-04). tools/build_feature_pages.py 로 만든다. 문구를 고치면 그 파일을 고치고 다시 실행한다. -->
-  <a class="skip-link" href="#content">본문으로 건너뛰기</a>
-  <header class="site-header"><a class="brand" href="/"><img src="/apple-touch-icon.png" width="36" height="36" alt="" />Your Maple</a><a class="back-link" href="/#/monster-park">바로 쓰기 <span aria-hidden="true">↗</span></a></header>
+  <a class="skip-link" href="/monster-park/#content">본문으로 건너뛰기</a>
+  <header class="site-header"><a class="brand" href="/"><img src="/apple-touch-icon.png" width="36" height="36" alt="" />Your Maple</a></header>
   <main id="content" tabindex="-1">
     <div class="feature-hero">
       <div class="hero"><p class="eyebrow">MAPLELAND · 몬스터파크 이벤트</p><h1>몬스터파크 계산기</h1><p class="lead">지금 레벨과 경험치만 넣으면 이벤트 마감 날 몇 레벨이 되는지, 날짜별로 언제 레벨이 오르는지 보여 줘요.</p>
-        <div class="ended-notice" data-ended-notice hidden><strong>종료된 이벤트예요</strong><p>2026년 11월 30일에 끝난 몬스터파크 이벤트의 계산기였어요. 다음 이벤트가 열리면 다시 안내할게요.</p><a class="ghost-cta" href="/">다른 기능 보기</a></div><div class="cta-row"><a class="cta" href="/#/monster-park">무료로 바로 쓰기</a></div>
+<div class="ended-notice" data-ended-notice hidden><strong>종료된 이벤트예요</strong><p>2026년 11월 30일에 끝난 몬스터파크 이벤트의 계산기였어요. 다음 이벤트가 열리면 다시 안내할게요.</p><a class="ghost-cta" href="/">다른 기능 보기</a></div>
         <p class="version">로그인 없이 계산할 수 있어요 · 저장할 때만 Google·Discord 로그인</p></div>
       <div class="feature-art is-smooth"><img src="/img/feature/monster-park.png" width="280" height="280" alt="몬스터파크" loading="eager" /></div>
     </div>
     <section aria-labelledby="t-what"><p class="section-number">01</p><h2 id="t-what">이런 걸 계산해요</h2><ul class="feature-cards"><li class="feature-card" style="--i:0"><h3>마감 날 레벨</h3><p>오늘 남은 입장(0·1·2회)과 하루 2판 기준으로 11월 30일 마감 날 도달하는 레벨을 계산해요.</p></li><li class="feature-card" style="--i:1"><h3>130까지 남은 판수</h3><p>130레벨(시그너스 기사단은 120)까지 몇 판, 며칠이 남았는지 알려 줘요.</p></li><li class="feature-card" style="--i:2"><h3>날짜별 진행</h3><p>날마다 몇 레벨 몇 %가 되는지 표로 보여 줘요. 구역이 바뀌는 날도 표시해요.</p></li><li class="feature-card" style="--i:3"><h3>놓치는 판 경고</h3><p>한 판에 1레벨만 오르는 제한이나 구역이 바뀌어 그날 남은 입장을 못 쓰는 경우를 미리 알려 줘요.</p></li></ul></section>
     <section aria-labelledby="t-rules"><p class="section-number">02</p><h2 id="t-rules">계산 기준</h2><ul><li>구역별 한 판 경험치: 50~70레벨 418,840 · 71~100레벨 2,898,000 · 101~129레벨 6,289,333 (화면에서 고쳐 적을 수 있어요)</li><li>하루 2회 입장, 마지막 입장일은 2026년 11월 30일로 계산해요.</li><li>한 판에 1레벨만 올라요. 넘친 경험치는 다음 레벨 99.99%까지만 남아요.</li><li>몬스터파크 경험치만 계산해요(사냥 경험치는 넣지 않아요).</li></ul><p class="hint">계산 결과는 입력한 값과 위 기준으로 낸 참고값이에요. 실제 게임 결과를 보장하지 않아요.</p></section>
-    <section aria-labelledby="t-how"><p class="section-number">03</p><h2 id="t-how">이렇게 써요</h2><ol class="steps"><li>몬스터파크 계산 화면에서 레벨·경험치와 오늘 남은 입장을 적어요.</li><li>마감 날 레벨과 날짜별 진행을 확인해요.</li><li>로그인하면 캐릭터를 골라 &#x27;한 판 끝!&#x27;으로 경험치를 바로 저장하고, 숙제표 몬파 칸과도 이어져요.</li></ol><a class="cta" href="/#/monster-park">몬스터파크 계산기 열기</a></section>
+    <section aria-labelledby="t-how"><p class="section-number">03</p><h2 id="t-how">이렇게 써요</h2><ol class="steps"><li>몬스터파크 계산 화면에서 레벨·경험치와 오늘 남은 입장을 적어요.</li><li>마감 날 레벨과 날짜별 진행을 확인해요.</li><li>로그인하면 캐릭터를 골라 &#x27;한 판 끝!&#x27;으로 경험치를 바로 저장하고, 숙제표 몬파 칸과도 이어져요.</li></ol></section>
     <section aria-labelledby="t-faq"><p class="section-number">04</p><h2 id="t-faq">자주 묻는 질문</h2><div class="faq"><details><summary>로그인해야 쓸 수 있나요?</summary><p>아니요. 레벨과 경험치를 직접 적으면 로그인 없이 계산돼요. 캐릭터에 저장할 때만 로그인해요.</p></details><details><summary>이벤트가 끝나면 어떻게 되나요?</summary><p>2026년 11월 30일이 마지막 입장일이에요. 그 뒤에는 계산 화면이 메뉴에서 사라지고 이 페이지에 종료 안내가 보여요.</p></details></div></section>
     <nav class="feature-nav" aria-label="다른 기능"><a href="/dojo/">무릉도장</a><a href="/maker/">메이커</a><a href="/chaos-scroll/">혼돈의 주문서</a><a href="/level-up/">레벨업</a><a href="/monster-park/" aria-current="page">몬스터파크</a><a href="/monsters/">몬스터 도감</a><a href="/items/">아이템 도감</a><a href="/transport/">배 시간표·헬리오스탑</a></nav>
   </main>
-  <script>(function(){var d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date());if(d>'2026-11-30'){document.documentElement.classList.add('is-ended');var n=document.querySelector('[data-ended-notice]');if(n)n.hidden=false;}})();</script>
   <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>
+  </div>
+  <script>(function(){var d=new Date(Date.now()+9*3600000).toISOString().slice(0,10);if(d>'2026-11-30'){document.documentElement.classList.add('is-ended');var n=document.querySelector('[data-ended-notice]');if(n)n.hidden=false;}})();</script>
+  <script type="module">if (!document.documentElement.classList.contains("is-ended")) import("./js/main.js");</script>
 </body>
 </html>

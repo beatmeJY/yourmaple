@@ -1,3 +1,5 @@
+import { routeFromPath } from "./route-url.js";
+
 // 로그인 없이도 앱을 연다(2026-10-19 사용자 결정). 계정에 저장해야 하는 순간에만 로그인 화면으로 보내고,
 // 로그인하고 돌아오면 그 화면으로 가서 아까 입력한 값을 되살린다(구글·디스코드는 다른 사이트로 갔다 오므로 sessionStorage 에 둔다).
 
@@ -44,7 +46,7 @@ function write(key, value) {
 }
 
 function routeNow() {
-  return location.hash.replace(/^#\/?/, "").split("?")[0] || "dashboard";
+  return routeFromPath(location.pathname);
 }
 
 /**

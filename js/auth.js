@@ -18,9 +18,9 @@ export const OAUTH_PROVIDERS = [
   { id: "discord", label: "Discord" },
 ];
 
-// 돌아올 주소: 지금 페이지(쿼리·# 없이). Supabase URL Configuration 의 Redirect URLs 에 등록돼 있어야 한다.
+// 돌아올 주소: 지금 페이지와 상세 조회 조건. Supabase URL Configuration 의 Redirect URLs 에 등록돼 있어야 한다.
 function returnUrl() {
-  return `${location.origin}${location.pathname}`;
+  return `${location.origin}${location.pathname}${location.search}`;
 }
 
 /** 화면에 보일 계정 이름: 이메일 → 이름 (2026-10-19부터 로그인은 Google·Discord만, 비밀번호는 받지 않는다) */
@@ -45,7 +45,9 @@ function takeOAuthError() {
   const params = new URLSearchParams(location.search);
   const error = params.get("error_description") || params.get("error");
   if (params.has("code") || params.has("error")) {
-    history.replaceState(null, "", `${location.pathname}${location.hash}`);
+    for (const key of ["code", "error", "error_description", "error_code"]) params.delete(key);
+    const query = params.toString();
+    history.replaceState(history.state, "", location.pathname + (query ? `?${query}` : "") + location.hash);
   }
   return error ? translateAuthError({ message: error }) : "";
 }

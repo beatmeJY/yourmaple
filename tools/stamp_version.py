@@ -2,7 +2,7 @@
 
 브라우저가 예전 JS/CSS를 캐시하면 새 main.js와 옛 router.js가 섞여 화면이 안 뜰 수 있다.
 배포마다 바뀌는 버전(커밋 번호)을 index.html의 CSS·JS 주소와 JS 안의 상대 import 경로에 붙여
-새로 배포하면 브라우저가 반드시 새 파일을 받게 한다. 사용자가 보는 주소창(#/화면)은 바뀌지 않는다.
+새로 배포하면 브라우저가 반드시 새 파일을 받게 한다. 사용자가 보는 주소창은 바뀌지 않는다.
 저장소 원본은 고치지 않고 GitHub Actions가 배포 폴더에서만 실행한다.
 
 사용: python3 tools/stamp_version.py <배포 폴더> <버전>
@@ -19,10 +19,13 @@ HTML_ASSET = re.compile(r"""((?:src|href)=["'])(\./(?:js|css)/[^"'?#]+\.(?:js|cs
 
 
 def stamp(site: pathlib.Path, version: str) -> tuple[int, int]:
-    index = site / "index.html"
-    html = index.read_text(encoding="utf-8")
-    html, html_count = HTML_ASSET.subn(rf"\1\2?v={version}\3", html)
-    index.write_text(html, encoding="utf-8")
+    html_count = 0
+    for index in sorted(site.rglob("index.html")):
+        html = index.read_text(encoding="utf-8")
+        html, asset_count = HTML_ASSET.subn(rf"\1\2?v={version}\3", html)
+        html, module_count = IMPORT.subn(rf"\1\2?v={version}\3", html)
+        index.write_text(html, encoding="utf-8")
+        html_count += asset_count + module_count
 
     import_count = 0
     for path in sorted((site / "js").rglob("*.js")):

@@ -134,7 +134,7 @@ export function render(root) {
       const width = value == null ? 0 : Math.max(4, Math.min(100, ((Math.log10(Math.max(value, 0.0001)) + 2) / 4) * 100));
       const label = value == null ? "확률 미상" : `${escapeHtml(drop.rate_percent)}%`;
       const name = drop.item?.name ?? "아이템 정보 없음";
-      return `<a class="mo-drop-row ${dropTier(value)}" href="#/item-catalog?id=${encodeURIComponent(drop.item_id)}" style="--i:${Math.min(index, 14)}" title="${escapeHtml(name)} · ${label}">
+      return `<a class="mo-drop-row ${dropTier(value)}" href="/items/?id=${encodeURIComponent(drop.item_id)}" style="--i:${Math.min(index, 14)}" title="${escapeHtml(name)} · ${label}">
         <span class="mo-drop-icon">${catalogImage(drop.item?.image_url, "catalog-drop-image", 36) || `<i aria-hidden="true">${escapeHtml(initial(drop.item?.name))}</i>`}</span>
         <span class="mo-drop-copy"><strong>${escapeHtml(name)}</strong><span class="mo-drop-bar" aria-hidden="true"><i style="--w:${width}%"></i></span></span>
         <b class="mo-drop-rate">${label}</b>
@@ -259,7 +259,7 @@ export function render(root) {
     order: "level",
     ascending: true,
     emptyText: "아직 공용 몬스터 정보가 없습니다. 운영자가 도감 데이터를 준비하고 있습니다.",
-    initialQuery: (new URLSearchParams(location.hash.split("?")[1] || "").get("q") || "").slice(0,100),
+    initialQuery: (new URLSearchParams(location.search).get("q") || "").slice(0,100),
     searchLabel: "몬스터명",
     searchPlaceholder: "이름·몬스터 번호",
     searchFields: ["name"],

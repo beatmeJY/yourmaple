@@ -351,7 +351,7 @@ export async function render(root) {
     const items = homeworkStatus ? homeworkStatus(row.id) : [];
     if (!items.length) return "";
     const now = Date.now();
-    return `<a class="char-hw" href="#/homework" aria-label="${escapeHtml(row.name)} 숙제: ${escapeHtml(items.map((item) => `${item.name} ${item.done ? "완료" : "가능"}`).join(", "))}">${items
+    return `<a class="char-hw" href="/homework/" aria-label="${escapeHtml(row.name)} 숙제: ${escapeHtml(items.map((item) => `${item.name} ${item.done ? "완료" : "가능"}`).join(", "))}">${items
       .map((item) => `<span class="char-hw-chip${item.custom ? " is-custom" : ` is-${item.key}`}${item.done ? " is-done" : ""}" title="${escapeHtml(item.done ? `${item.name} 완료 · ${availableLabel(item.next, now)}부터 다시 가능` : `${item.name} 지금 가능`)}">${item.done ? "✓ " : ""}${escapeHtml(item.short)}</span>`)
       .join("")}</a>`;
   }

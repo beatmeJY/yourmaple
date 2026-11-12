@@ -81,10 +81,11 @@ function applyGrouped(input) {
 }
 
 function consumePendingAdd() {
-  const [, queryString] = location.hash.split("?");
-  if (!queryString) return false;
-  history.replaceState(null, "", `${location.pathname}${location.search}#/hunts`);
-  return new URLSearchParams(queryString).get("add") === "1";
+  const url = new URL(location.href);
+  if (url.searchParams.get("add") !== "1") return false;
+  url.searchParams.delete("add");
+  history.replaceState(history.state, "", url);
+  return true;
 }
 
 // 사냥 타이머: 다른 화면에 갔다 오거나 새로고침해도 이어지도록 시작 시각을 브라우저에 기억한다.

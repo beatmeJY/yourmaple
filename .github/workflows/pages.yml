@@ -78,7 +78,7 @@ jobs:
           cp index.html privacy.html terms.html robots.txt sitemap.xml .nojekyll favicon.ico favicon-32x32.png apple-touch-icon.png _site/
           cp -r css js img _site/
           # 기능 소개 페이지(검색 색인용, /dojo/ 등)
-          cp -r dojo maker chaos-scroll level-up monster-park monsters items transport _site/
+          python3 tools/build_feature_pages.py _site
 
       - name: 파일 주소에 버전 붙이기
         # 배포마다 커밋 번호를 JS·CSS 주소에 붙여 브라우저가 옛 파일과 새 파일을 섞지 않게 한다.

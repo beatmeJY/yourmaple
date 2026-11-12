@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <base href="/" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>메이플랜드 몬스터 도감 — 몬스터 드랍 아이템·확률·경험치·HP | Your Maple</title>
   <meta name="description" content="메이플랜드 몬스터 800여 종의 레벨·HP·경험치·1 HP당 경험치·필요 명중과 드랍 아이템·드랍 확률을 검색해 보세요. 로그인 없이 볼 수 있어요." />
@@ -16,27 +17,32 @@
   <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/css/public.css" />
-  <link rel="stylesheet" href="/css/feature.css" />
+  <link rel="stylesheet" href="./css/public.css" data-feature-style />
+  <link rel="stylesheet" href="./css/feature.css" data-feature-style />
+  <link rel="stylesheet" href="./css/styles.css" data-app-style disabled />
+  <link rel="stylesheet" href="./css/catalog-review.css" data-app-style disabled />
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "몬스터 도감", "url": "https://yourmaple.kr/monsters/", "applicationCategory": "GameApplication", "operatingSystem": "Web", "inLanguage": "ko", "description": "메이플랜드 몬스터 800여 종의 레벨·HP·경험치·1 HP당 경험치·필요 명중과 드랍 아이템·드랍 확률을 검색해 보세요. 로그인 없이 볼 수 있어요.", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "KRW"}, "publisher": {"@type": "Organization", "name": "Your Maple", "url": "https://yourmaple.kr/"}}</script>
 </head>
 <body class="feature-page">
+  <div id="app">
   <!-- 기능 소개(검색 색인용, 2026-11-04). tools/build_feature_pages.py 로 만든다. 문구를 고치면 그 파일을 고치고 다시 실행한다. -->
-  <a class="skip-link" href="#content">본문으로 건너뛰기</a>
-  <header class="site-header"><a class="brand" href="/"><img src="/apple-touch-icon.png" width="36" height="36" alt="" />Your Maple</a><a class="back-link" href="/#/monsters">바로 쓰기 <span aria-hidden="true">↗</span></a></header>
+  <a class="skip-link" href="/monsters/#content">본문으로 건너뛰기</a>
+  <header class="site-header"><a class="brand" href="/"><img src="/apple-touch-icon.png" width="36" height="36" alt="" />Your Maple</a></header>
   <main id="content" tabindex="-1">
     <div class="feature-hero">
       <div class="hero"><p class="eyebrow">MAPLELAND · 몬스터 도감</p><h1>몬스터 도감</h1><p class="lead">몬스터 이름으로 찾으면 레벨·HP·경험치 같은 기본 정보와 전투 수치, 드랍하는 아이템과 확률을 한 카드에서 보여 줘요.</p>
-        <div class="cta-row"><a class="cta" href="/#/monsters">도감 바로 보기</a></div>
+
         <p class="version">로그인 없이 누구나 볼 수 있어요</p></div>
       <div class="feature-art is-smooth"><img src="/img/feature/monster-icon.png" width="280" height="280" alt="몬스터 도감" loading="eager" /><img src="/img/horntail.png" width="300" height="300" alt="혼테일" loading="eager" /></div>
     </div>
     <section aria-labelledby="t-what"><p class="section-number">01</p><h2 id="t-what">이런 걸 볼 수 있어요</h2><ul class="feature-cards"><li class="feature-card" style="--i:0"><h3>기본 정보</h3><p>레벨·HP·MP·경험치와 사냥 효율을 비교하기 좋은 &#x27;1 HP당 경험치&#x27;를 보여 줘요. 레벨순·효율순으로 정렬할 수 있어요.</p></li><li class="feature-card" style="--i:1"><h3>전투 수치</h3><p>기준 명중, 물리·마법 공격과 방어, 이동 속도 같은 전투 수치를 확인해요.</p></li><li class="feature-card" style="--i:2"><h3>드랍 아이템·확률</h3><p>드랍 아이템을 확률 높은 순으로, 확률 크기에 따라 색으로 구분해 보여 줘요. 아이템을 누르면 아이템 정보로 이어져요.</p></li><li class="feature-card" style="--i:3"><h3>바로 검색</h3><p>이름 일부만 적어도 찾고, 로그인 없이 누구나 볼 수 있어요.</p></li></ul></section>
     <section aria-labelledby="t-rules"><p class="section-number">02</p><h2 id="t-rules">이용 안내</h2><ul><li>도감 수치는 공개된 자료와 운영자 확인을 바탕으로 정리한 참고 정보예요. 실제 게임과 다를 수 있어요.</li><li>자료가 없는 값은 &#x27;미제공&#x27;으로 따로 표시하고, 0과 구분해요.</li><li>몬스터마다 변경 이력을 볼 수 있어요.</li></ul></section>
-    <section aria-labelledby="t-how"><p class="section-number">03</p><h2 id="t-how">이렇게 써요</h2><ol class="steps"><li>몬스터 도감을 열고 이름으로 검색해요.</li><li>카드를 누르면 상세 정보와 드랍 아이템이 펼쳐져요.</li><li>드랍 아이템을 누르면 그 아이템의 옵션과 다른 드랍 몬스터를 볼 수 있어요.</li></ol><a class="cta" href="/#/monsters">몬스터 도감 열기</a></section>
+    <section aria-labelledby="t-how"><p class="section-number">03</p><h2 id="t-how">이렇게 써요</h2><ol class="steps"><li>몬스터 도감을 열고 이름으로 검색해요.</li><li>카드를 누르면 상세 정보와 드랍 아이템이 펼쳐져요.</li><li>드랍 아이템을 누르면 그 아이템의 옵션과 다른 드랍 몬스터를 볼 수 있어요.</li></ol></section>
     <section aria-labelledby="t-faq"><p class="section-number">04</p><h2 id="t-faq">자주 묻는 질문</h2><div class="faq"><details><summary>틀린 정보는 어떻게 알리나요?</summary><p>yourmaplekr@gmail.com으로 몬스터 이름과 틀린 내용을 보내 주세요. 확인해서 고쳐요.</p></details><details><summary>로그인해야 볼 수 있나요?</summary><p>아니요. 몬스터 도감은 로그인 없이 볼 수 있어요.</p></details></div></section>
     <nav class="feature-nav" aria-label="다른 기능"><a href="/dojo/">무릉도장</a><a href="/maker/">메이커</a><a href="/chaos-scroll/">혼돈의 주문서</a><a href="/level-up/">레벨업</a><a href="/monster-park/">몬스터파크</a><a href="/monsters/" aria-current="page">몬스터 도감</a><a href="/items/">아이템 도감</a><a href="/transport/">배 시간표·헬리오스탑</a></nav>
   </main>
   <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>
+  </div>
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>

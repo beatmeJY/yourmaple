@@ -100,7 +100,11 @@ export async function getSupabase() {
     if (mock === "guest") setMockAuth(false);
     else if (mock !== "keep") setMockAuth(true);
     // 주소의 ?mock=… 은 한 번 읽었으니 지운다(새로 고쳐도 상태 바꾸기가 반복되지 않게).
-    if (mock !== "keep") history.replaceState(null, "", `${location.pathname}${location.hash}`);
+    if (mock !== "keep") {
+      const url = new URL(location.href);
+      url.searchParams.delete("mock");
+      history.replaceState(history.state, "", url);
+    }
     client = createMockClient();
     if (document.body) mountMockBadge();
     else document.addEventListener("DOMContentLoaded", mountMockBadge, { once: true });
@@ -113,7 +117,7 @@ export async function getSupabase() {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      // 구글·디스코드에서 돌아올 때 토큰을 # 대신 ?code= 로 받는다(# 은 화면 주소로 쓰기 때문).
+      // 구글·디스코드에서 돌아올 때 토큰을 # 대신 ?code= 로 받는다(서버에서 교환하는 PKCE 방식).
       flowType: "pkce",
     },
   });

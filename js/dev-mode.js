@@ -1,5 +1,5 @@
 // 개발 중인 기능 감추기: 운영 주소에서는 숨기고, 주소에 dev 를 붙이면 보인다.
-// 예: https://yourmaple.kr/?dev  또는  https://yourmaple.kr/#/enhance?dev
+// 예: https://yourmaple.kr/?dev  또는  https://yourmaple.kr/enhance/?dev
 // 한 번 dev 로 열면 이 탭을 닫을 때까지 유지한다. ?dev=0 이면 끈다. 로컬(127.0.0.1·localhost)에서는 늘 보인다.
 const KEY = "maple-note-dev";
 

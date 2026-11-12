@@ -1,3 +1,4 @@
+import { legacyRoute, routeFromPath, routePath } from "./route-url.js";
 import { categories, categoryOf, glyphInner, homeRoute, isHiddenRoute, routes } from "./routes.js";
 
 const pages = {
@@ -20,16 +21,40 @@ const pages = {
   quests: () => import("./pages/quests.js"),
   notes: () => import("./pages/notes.js"),
   links: () => import("./pages/links.js"),
+  transport: () => import("./pages/transport.js"),
 };
 
 export function getRouteId() {
-  const id = location.hash.replace(/^#\/?/, "").split("?")[0];
-  if (id === "items") return "trades";
-  return pages[id] && !isHiddenRoute(id) ? id : "dashboard";
+  const id = routeFromPath(location.pathname);
+  return Object.hasOwn(pages, id) && !isHiddenRoute(id) ? id : "dashboard";
+}
+
+export function normalizeRoute() {
+  const legacy = legacyRoute(location);
+  if (legacy && Object.hasOwn(pages, legacy.id)) {
+    history.replaceState(history.state, "", legacy.href);
+  }
 }
 
 export function navigate(id) {
-  location.hash = `#/${id}`;
+  navigatePath(routePath(id));
+}
+
+export function navigatePath(href) {
+  if (href === location.pathname + location.search + location.hash) return;
+  history.pushState(null, "", href);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+export function followRoute(event) {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest("a[href]");
+  if (!link || link.target || link.hasAttribute("download")) return;
+  const url = new URL(link.href);
+  if (url.origin !== location.origin || url.hash || !Object.hasOwn(pages, routeFromPath(url.pathname))) return;
+  if (url.pathname === "/monster-park/" && isHiddenRoute("monster-park")) return;
+  event.preventDefault();
+  navigatePath(url.pathname + url.search);
 }
 
 // 화면마다 빈 새 영역에 그린다. 화면 모듈이 root 에 단 클릭·입력 처리가 같은 #main 에 쌓이면
@@ -37,16 +62,17 @@ export function navigate(id) {
 // 늦게 도착한 응답은 각 화면의 isConnected 검사로 버려진다. 바뀐 요소는 document.querySelector("#main")로 찾는다.
 export async function renderRoute(root) {
   const id = getRouteId();
+  const address = location.href;
   const page = await pages[id]();
-  // 불러오는 사이 주소가 바뀌었으면 그리지 않는다(늦게 온 앞 화면이 새 화면을 덮지 않게). 새 주소는 hashchange 가 그린다.
-  if (getRouteId() !== id) return null;
+  // 불러오는 사이 주소가 바뀌었으면 그리지 않는다(늦게 온 앞 화면이 새 화면을 덮지 않게). 새 주소는 popstate가 그린다.
+  if (location.href !== address || getRouteId() !== id) return null;
   // 화면 모듈을 불러오는 사이 다른 이동이 #main 을 이미 바꿨을 수 있으므로 지금 문서에 있는 것을 다시 찾는다.
   const current = document.querySelector("#main") ?? root;
   const fresh = current.cloneNode(false);
   fresh.dataset.page = id;
   current.replaceWith(fresh);
   await page.render(fresh);
-  return id;
+  return fresh.isConnected && getRouteId() === id ? id : null;
 }
 
 // 메뉴 분류는 기본으로 모두 펼친다(2026-10-21 사용자 요청: 메뉴가 적어 한 번에 누를 수 있게).
@@ -79,7 +105,7 @@ function hueColor(hue, alpha = 1) {
 
 function subLink(route, activeId) {
   const active = route.id === activeId;
-  const attrs = route.quick ? `type="button" data-quick-nav="${route.id}"` : `href="#/${route.id}" data-route="${route.id}"`;
+  const attrs = route.quick ? `type="button" data-quick-nav="${route.id}"` : `href="${routePath(route.id)}" data-route="${route.id}"`;
   const tag = route.quick ? "button" : "a";
   return `<${tag} class="nav-sub${active ? " is-active" : ""}" ${attrs}${active ? ` aria-current="page"` : ""}><i class="nav-dot" aria-hidden="true"></i><span>${route.label}</span></${tag}>`;
 }
@@ -106,7 +132,7 @@ export function renderNav(nav, activeId) {
     if (category.routes.length === 1) {
       const attrs = only.quick
         ? `type="button" data-quick-nav="${only.id}"`
-        : `href="#/${only.id}" data-route="${only.id}"${active ? ` aria-current="page"` : ""}`;
+        : `href="${routePath(only.id)}" data-route="${only.id}"${active ? ` aria-current="page"` : ""}`;
       const tag = only.quick ? "button" : "a";
       return `<section class="nav-group is-single${active ? " is-active" : ""}" style="--hue:${category.hue};--cat:${hueColor(category.hue)};--i:${index}">
       <${tag} class="nav-cat nav-single" ${attrs} title="${only.label}">

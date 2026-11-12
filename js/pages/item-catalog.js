@@ -12,12 +12,12 @@ const labels = Object.fromEntries(itemOptionFields.map(f => [f.key, f.label]));
 const text = v => escapeHtml(v == null || v === "" ? "미제공" : String(v));
 export async function render(root) {
   mountCatalogImageFallback(root);
-  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const params = new URLSearchParams(location.search);
   const id = params.get("id");
   if (id) return renderDetail(root, id);
   root.innerHTML = `<section class="catalog-page"><header class="ym-page-head"><div><h1>아이템 도감</h1><p>장비 옵션과 착용 조건을 확인하고, 몬스터의 드랍과 연결해 보세요.</p></div></header><div class="catalog-tools"><label class="field catalog-search"><span>아이템 검색</span><input data-catalog-search placeholder="이름 일부·별명도 돼요 (예: 혼주문, 혼줌)" maxlength="100" /></label><button type="button" class="mo-ghost" data-catalog-refresh>새로 확인</button></div><p class="hint" data-catalog-count aria-live="polite"></p><div class="catalog-grid" data-catalog-list></div><nav class="catalog-pager" aria-label="아이템 페이지"><button type="button" data-prev>이전</button><span data-page></span><button type="button" data-next>다음</button></nav></section>`;
   void canReviewCatalog().then(allowed => {
-    if (allowed && root.isConnected) root.querySelector(".ym-page-head").insertAdjacentHTML("beforeend", `<a class="mo-ghost" href="#/catalog-review">비공개 검토 보관함</a>`);
+    if (allowed && root.isConnected) root.querySelector(".ym-page-head").insertAdjacentHTML("beforeend", `<a class="mo-ghost" href="/catalog-review/">비공개 검토 보관함</a>`);
   });
   let page = 0, loadId = 0, timer;
   async function load() {
@@ -33,7 +33,7 @@ export async function render(root) {
     root.querySelector("[data-page]").textContent = `${page+1} / ${Math.max(1,Math.ceil(total/24))}`;
     root.querySelector("[data-prev]").disabled = page === 0;
     root.querySelector("[data-next]").disabled = (page+1)*24 >= total;
-    list.innerHTML = rows.length ? rows.map((item,index)=>`<a class="catalog-item ym-glass" href="#/item-catalog?id=${encodeURIComponent(item.id)}" style="--i:${Math.min(index,16)}"><div class="catalog-item-art">${catalogImage(item.image_url) || `<span aria-hidden="true">${text([...item.name][0])}</span>`}</div><div class="catalog-item-copy"><h2 title="${text(item.name)}">${text(item.name)}</h2><p class="catalog-item-meta"><small class="ym-chip">${text(itemKind(item))}</small>${levelBadge(item)}</p></div></a>`).join("") : `<p class="empty">검색 결과가 없습니다.</p>`;
+    list.innerHTML = rows.length ? rows.map((item,index)=>`<a class="catalog-item ym-glass" href="/items/?id=${encodeURIComponent(item.id)}" style="--i:${Math.min(index,16)}"><div class="catalog-item-art">${catalogImage(item.image_url) || `<span aria-hidden="true">${text([...item.name][0])}</span>`}</div><div class="catalog-item-copy"><h2 title="${text(item.name)}">${text(item.name)}</h2><p class="catalog-item-meta"><small class="ym-chip">${text(itemKind(item))}</small>${levelBadge(item)}</p></div></a>`).join("") : `<p class="empty">검색 결과가 없습니다.</p>`;
   }
   root.querySelector("input").addEventListener("input",()=>{clearTimeout(timer);++loadId;page=0;root.querySelectorAll(".catalog-pager button").forEach(b=>b.disabled=true);timer=setTimeout(()=>{if(root.isConnected)void load();},300);});
   root.addEventListener("click",e=>{if(e.target.closest("[data-prev]"))page=Math.max(0,page-1);else if(e.target.closest("[data-next]"))page++;else if(e.target.closest("[data-catalog-refresh]")){clearCatalogCache();page=0;}else return;clearTimeout(timer);void load();});
@@ -52,7 +52,7 @@ function levelBadge(item) {
   return isEquipment(item) ? `<span class="catalog-item-lv is-free">Lv 제한 없음</span>` : "";
 }
 async function renderDetail(root,id) {
-  root.innerHTML = `<section class="catalog-page item-detail-page"><div class="catalog-detail-actions"><a class="catalog-back-link" href="#/item-catalog">← 아이템 목록</a><span class="catalog-detail-actions-gap"></span></div><div data-item-detail><p class="empty">아이템 정보를 불러오는 중입니다.</p></div></section>`;
+  root.innerHTML = `<section class="catalog-page item-detail-page"><div class="catalog-detail-actions"><a class="catalog-back-link" href="/items/">← 아이템 목록</a><span class="catalog-detail-actions-gap"></span></div><div data-item-detail><p class="empty">아이템 정보를 불러오는 중입니다.</p></div></section>`;
   const result = await catalogRpc("catalog_item_detail", {p_id:id});
   if (!root.isConnected) return;
   const slot = root.querySelector("[data-item-detail]");
@@ -117,7 +117,7 @@ async function mountItemDrops(slot, id) {
       const unknown = drop.rate_percent == null ? " is-unknown" : "";
       if (!monster) return `<div class="catalog-dropper${unknown}"><div class="catalog-dropper-art"><span aria-hidden="true">?</span></div><span><span class="catalog-dropper-name"><b>몬스터 정보 미제공</b></span>${bar}</span><strong>${rateText}</strong></div>`;
       const query = monster.source_id || monster.name;
-      return `<a class="catalog-dropper${unknown}" href="#/monsters?q=${encodeURIComponent(query)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><span class="catalog-dropper-name"><b>${text(monster.name)}</b><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small></span>${bar}</span><strong>${rateText}</strong></a>`;
+      return `<a class="catalog-dropper${unknown}" href="/monsters/?q=${encodeURIComponent(query)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><span class="catalog-dropper-name"><b>${text(monster.name)}</b><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small></span>${bar}</span><strong>${rateText}</strong></a>`;
     }).join(""));
     paintRateBars(rowsSlot);
     count += rows.length;

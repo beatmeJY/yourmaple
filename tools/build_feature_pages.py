@@ -3,7 +3,8 @@
 빌드 도구 없이 정적 HTML을 저장소에 그대로 둔다. 문구·기준을 바꾸면 이 파일을 고친 뒤 다시 실행한다.
 게임 기준값은 docs/domain.md 와 계산 모듈(js/*-calc.js)을 따른다.
 """
-import datetime, html, json, pathlib, sys
+import datetime, html, json, pathlib, re, sys
+from zoneinfo import ZoneInfo
 
 root = pathlib.Path(sys.argv[1])
 SITE = "https://yourmaple.kr"
@@ -11,7 +12,7 @@ e = html.escape
 
 PAGES = [
   {
-    "slug": "dojo", "app": "/#/dojo", "eyebrow": "MAPLELAND · 무릉도장",
+    "slug": "dojo", "app": "/dojo/", "eyebrow": "MAPLELAND · 무릉도장",
     "title": "메이플랜드 무릉도장 계산기 — 검은 허리띠까지 루트·시간 | Your Maple",
     "h1": "무릉도장 루트 계산기",
     "desc": "메이플랜드 무릉도장 층별 구간 기록으로 쉬는 층 조합별 시간을 비교하고, 검은 허리띠까지 총 플레이 시간과 남은 시간, 허리띠 시세 기준 시간당 메소를 계산합니다.",
@@ -37,7 +38,7 @@ PAGES = [
     ],
   },
   {
-    "slug": "maker", "app": "/#/maker", "eyebrow": "MAPLELAND · 메이커",
+    "slug": "maker", "app": "/maker/", "eyebrow": "MAPLELAND · 메이커",
     "title": "메이플랜드 메이커 계산기 — 보석·크리스탈 제련 적정가, 리버스 제작 | Your Maple",
     "h1": "메이커 보석 제작·리버스 제작 계산기",
     "desc": "메이플랜드 메이커 보석 8종·크리스탈 4종의 하급·중급·상급 적정가와 상급을 얻는 가장 싼 방법, 리버스 무기 제작의 공격력별 적정 판매가와 기대 손익을 계산합니다.",
@@ -57,14 +58,14 @@ PAGES = [
       "리버스 제작은 촉진제를 쓰면 정옵 54.09% · +1 15.84% · +2 10.89% · +3 5.76% · +4 2.43% · +5 0.99% · 파괴 10%로 계산해요.",
     ],
     "steps": ["메이커 화면에서 원석과 보석 시세를 적어요.", "카드의 하급·중급·상급을 누르면 계산 과정과 확률이 펼쳐져요.", "로그인하면 시세 기록이 쌓여 이전 값과 비교할 수 있어요."],
-    "links": [("/#/maker", "보석 제작 열기"), ("/#/maker-craft", "리버스 제작 열기"), ("/#/maker-enchant", "장비 옵션 부여 열기")],
+    "links": [("/maker-craft/", "리버스 제작 열기"), ("/maker-enchant/", "장비 옵션 부여 열기")],
     "faq": [
       ("확률은 정확한 값인가요?", "일반 제련 결과 확률은 알려진 대략값이에요. 실제 결과는 운에 따라 달라지고, 계산 결과는 참고용이에요."),
       ("로그인해야 쓸 수 있나요?", "아니요. 계산은 로그인 없이 할 수 있고, 시세를 저장할 때만 로그인해요."),
     ],
   },
   {
-    "slug": "chaos-scroll", "app": "/#/chaos-scroll", "eyebrow": "MAPLELAND · 강화",
+    "slug": "chaos-scroll", "app": "/chaos-scroll/", "eyebrow": "MAPLELAND · 강화",
     "title": "메이플랜드 혼돈의 주문서 시뮬레이터 — 혼줌 한 장씩 바르기 | Your Maple",
     "h1": "혼돈의 주문서 시뮬레이터",
     "desc": "메이플랜드 혼돈의 주문서(혼줌)를 도감 장비에 한 장씩 발라 보는 시뮬레이터. 성공 60%, 능력치 변화 확률을 바꿔 보며 검은색 허리띠·혼테일의 목걸이 등 장비 결과를 미리 확인하세요.",
@@ -89,7 +90,7 @@ PAGES = [
     ],
   },
   {
-    "slug": "level-up", "app": "/#/level-plan", "eyebrow": "MAPLELAND · 경험치",
+    "slug": "level-up", "app": "/level-up/", "eyebrow": "MAPLELAND · 경험치",
     "title": "메이플랜드 레벨업 계산기 — 목표 레벨까지 경험치·시간·경험치 쿠폰 | Your Maple",
     "h1": "레벨업 계산기",
     "desc": "메이플랜드 목표 레벨까지 필요한 경험치와 사냥 효율(분당 경험치)로 걸리는 시간·일수를 계산합니다. 2배·3배 경험치 쿠폰과 하루 사냥 시간도 반영해요.",
@@ -114,7 +115,7 @@ PAGES = [
     ],
   },
   {
-    "slug": "monster-park", "app": "/#/monster-park", "eyebrow": "MAPLELAND · 몬스터파크 이벤트",
+    "slug": "monster-park", "app": "/monster-park/", "eyebrow": "MAPLELAND · 몬스터파크 이벤트",
     "until": "2026-11-30", "smooth": True,
     "title": "메이플랜드 몬스터파크 계산기 — 11월 이벤트 마감까지 레벨·남은 판수 | Your Maple",
     "h1": "몬스터파크 계산기",
@@ -145,7 +146,7 @@ PAGES = [
     },
   },
   {
-    "slug": "monsters", "app": "/#/monsters", "eyebrow": "MAPLELAND · 몬스터 도감", "smooth": True, "note": "로그인 없이 누구나 볼 수 있어요", "what": "이런 걸 볼 수 있어요",
+    "slug": "monsters", "app": "/monsters/", "eyebrow": "MAPLELAND · 몬스터 도감", "smooth": True, "note": "로그인 없이 누구나 볼 수 있어요", "what": "이런 걸 볼 수 있어요",
     "title": "메이플랜드 몬스터 도감 — 몬스터 드랍 아이템·확률·경험치·HP | Your Maple",
     "h1": "몬스터 도감",
     "desc": "메이플랜드 몬스터 800여 종의 레벨·HP·경험치·1 HP당 경험치·필요 명중과 드랍 아이템·드랍 확률을 검색해 보세요. 로그인 없이 볼 수 있어요.",
@@ -170,7 +171,7 @@ PAGES = [
     ],
   },
   {
-    "slug": "items", "app": "/#/item-catalog", "eyebrow": "MAPLELAND · 아이템 도감", "smooth": True, "note": "로그인 없이 누구나 볼 수 있어요", "what": "이런 걸 볼 수 있어요",
+    "slug": "items", "app": "/items/", "eyebrow": "MAPLELAND · 아이템 도감", "smooth": True, "note": "로그인 없이 누구나 볼 수 있어요", "what": "이런 걸 볼 수 있어요",
     "title": "메이플랜드 아이템 도감 — 장비 옵션 범위·착용 조건·드랍 몬스터 | Your Maple",
     "h1": "아이템 도감",
     "desc": "메이플랜드 아이템 3,500여 종의 장비 기본 옵션과 옵션 범위, 착용 레벨·직업, 공격속도, 업그레이드 가능 횟수, 드랍 몬스터를 검색해 보세요. 혼줌처럼 줄임말로도 찾아요.",
@@ -196,14 +197,13 @@ PAGES = [
     ],
   },
   {
-    "slug": "transport", "app": "/#/dashboard", "eyebrow": "MAPLELAND · 교통",
+    "slug": "transport", "app": "/transport/", "eyebrow": "MAPLELAND · 교통",
     "title": "메이플랜드 배 시간표·헬리오스탑 엘리베이터 | Your Maple",
     "h1": "메이플랜드 배 시간표와 헬리오스탑",
     "desc": "메랜 배 탑승 시작·마감·출발 시간과 헬리오스탑 엘리베이터 상행·하행 주기를 확인하세요. 실시간 남은 시간은 Your Maple 상단 교통 위젯에서 볼 수 있어요.",
     "lead": "메랜 배는 10분 간격으로 출발해요. 출발 5분 전부터 탈 수 있고, 1분 전에는 탑승이 마감돼요.",
     "art": [("/img/ship-icon.png", 120, 120, "배"), ("/img/helios-icon.png", 72, 72, "헬리오스탑 엘리베이터")],
     "what": "탑승과 출발 시간",
-    "cta": "실시간 시간표 열기",
     "note": "로그인 없이 확인할 수 있어요",
     "cards": [
       ("배 탑승 시작", "매시 05·15·25·35·45·55분부터 탑승할 수 있어요."),
@@ -216,7 +216,7 @@ PAGES = [
       "한국 시각 기준이에요. 실시간 위젯은 사이트 서버 시각에 맞추고, 동기화에 실패하면 기기 시각 기준으로 표시해요.",
       "앱에서 계산한 시간표이므로 게임 내 실제 탑승 상태도 확인해 주세요.",
     ],
-    "steps": ["아래 버튼으로 Your Maple을 열어요.", "화면 상단에서 배와 엘리베이터의 상태, 다음 전환까지 남은 시간을 봐요.", "교통 위젯을 누르면 다음 출발과 탑승 마감 시각이 보여요."],
+    "steps": ["화면 상단에서 배와 엘리베이터의 상태, 다음 전환까지 남은 시간을 봐요.", "교통 위젯을 누르면 다음 출발과 탑승 마감 시각이 보여요."],
     "faq": [
       ("10시 20분 배는 언제부터 탈 수 있나요?", "10시 15분부터 10시 19분 직전까지 탈 수 있어요."),
       ("엘리베이터는 몇 분마다 출발하나요?", "상행과 하행은 각각 4분 간격으로 출발하고, 두 방향의 출발은 2분씩 번갈아 와요."),
@@ -230,7 +230,7 @@ NAV = [("dojo", "무릉도장"), ("maker", "메이커"), ("chaos-scroll", "혼�
 def page(p):
     url = f"{SITE}/{p['slug']}/"
     # 기간이 끝난 이벤트는 만들 때 종료 안내로 바꾼다. 다시 만들기 전에도 브라우저에서 날짜를 보고 바꾼다(아래 스크립트).
-    ended = bool(p.get("until")) and datetime.date.today().isoformat() > p["until"]
+    ended = bool(p.get("until")) and datetime.datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat() > p["until"]
     if ended:
         p = {**p, "title": p["ended"]["title"], "lead": p["ended"]["lead"]}
     art = "".join(f'<img src="{src}" width="{w}" height="{h}" alt="{e(alt)}" loading="eager" />' for src, w, h, alt in p["art"])
@@ -241,13 +241,18 @@ def page(p):
                       '<a class="ghost-cta" href="/">다른 기능 보기</a></div>')
     ended_script = ""
     if until and not ended:
-        ended_script = ("  <script>(function(){var d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date());"
+        ended_script = ("  <script>(function(){var d=new Date(Date.now()+9*3600000).toISOString().slice(0,10);"
                         f"if(d>'{until}'){{document.documentElement.classList.add('is-ended');var n=document.querySelector('[data-ended-notice]');if(n)n.hidden=false;}}}})();</script>\n")
     cards = "".join(f'<li class="feature-card" style="--i:{i}"><h3>{e(t)}</h3><p>{e(d)}</p></li>' for i, (t, d) in enumerate(p["cards"]))
     rules = "".join(f"<li>{e(r)}</li>" for r in p["rules"])
     steps = "".join(f"<li>{e(s)}</li>" for s in p["steps"])
     faq = "".join(f"<details><summary>{e(q)}</summary><p>{e(a)}</p></details>" for q, a in p["faq"])
+    app_script = '<script type="module" src="./js/main.js"></script>'
+    if until:
+        app_script = ('<script type="module">if (!document.documentElement.classList.contains("is-ended")) import("./js/main.js");</script>'
+                      if not ended else "")
     extra = "".join(f'<a class="ghost-cta" href="{href}">{e(label)}</a>' for href, label in p.get("links", []))
+    other_tools = f'<div class="cta-row">{extra}</div>' if extra else ""
     others = "".join(f'<a href="/{slug}/"{" aria-current=\"page\"" if slug == p["slug"] else ""}>{e(label)}</a>' for slug, label in NAV)
     ld = {
         "@context": "https://schema.org", "@type": "WebApplication", "name": p["h1"], "url": url,
@@ -260,6 +265,7 @@ def page(p):
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <base href="/" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{e(p['title'])}</title>
   <meta name="description" content="{e(p['desc'])}" />
@@ -274,28 +280,33 @@ def page(p):
   <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/css/public.css" />
-  <link rel="stylesheet" href="/css/feature.css" />
+  <link rel="stylesheet" href="./css/public.css" data-feature-style />
+  <link rel="stylesheet" href="./css/feature.css" data-feature-style />
+  <link rel="stylesheet" href="./css/styles.css" data-app-style disabled />
+  <link rel="stylesheet" href="./css/catalog-review.css" data-app-style disabled />
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="feature-page">
+  <div id="app">
   <!-- 기능 소개(검색 색인용, 2026-11-04). tools/build_feature_pages.py 로 만든다. 문구를 고치면 그 파일을 고치고 다시 실행한다. -->
-  <a class="skip-link" href="#content">본문으로 건너뛰기</a>
-  <header class="site-header"><a class="brand" href="/"><img src="/apple-touch-icon.png" width="36" height="36" alt="" />Your Maple</a><a class="back-link" href="{p['app']}">바로 쓰기 <span aria-hidden="true">↗</span></a></header>
+  <a class="skip-link" href="{p['app']}#content">본문으로 건너뛰기</a>
+  <header class="site-header"><a class="brand" href="/"><img src="/apple-touch-icon.png" width="36" height="36" alt="" />Your Maple</a></header>
   <main id="content" tabindex="-1">
     <div class="feature-hero">
       <div class="hero"><p class="eyebrow">{e(p['eyebrow'])}</p><h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>
-        {ended_html}<div class="cta-row"{' hidden' if ended else ''}><a class="cta" href="{p['app']}">{e(p.get("cta", "도감 바로 보기" if p.get("what") else "무료로 바로 쓰기"))}</a>{extra}</div>
+{ended_html}{other_tools}
         <p class="version">{e(p.get("note", "로그인 없이 계산할 수 있어요 · 저장할 때만 Google·Discord 로그인"))}</p></div>
       <div class="feature-art{' is-smooth' if p.get('smooth') else ''}">{art}</div>
     </div>
     <section aria-labelledby="t-what"><p class="section-number">01</p><h2 id="t-what">{e(p.get("what", "이런 걸 계산해요"))}</h2><ul class="feature-cards">{cards}</ul></section>
     <section aria-labelledby="t-rules"><p class="section-number">02</p><h2 id="t-rules">{e(p['rules_title'])}</h2><ul>{rules}</ul>{'' if p.get('what') else '<p class="hint">계산 결과는 입력한 값과 위 기준으로 낸 참고값이에요. 실제 게임 결과를 보장하지 않아요.</p>'}</section>
-    <section aria-labelledby="t-how"><p class="section-number">03</p><h2 id="t-how">이렇게 써요</h2><ol class="steps">{steps}</ol><a class="cta" href="{p['app']}">{e(p['h1'])} 열기</a></section>
+    <section aria-labelledby="t-how"><p class="section-number">03</p><h2 id="t-how">이렇게 써요</h2><ol class="steps">{steps}</ol></section>
     <section aria-labelledby="t-faq"><p class="section-number">04</p><h2 id="t-faq">자주 묻는 질문</h2><div class="faq">{faq}</div></section>
     <nav class="feature-nav" aria-label="다른 기능">{others}</nav>
   </main>
-{ended_script}  <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>
+  <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>
+  </div>
+{ended_script}  {app_script}
 </body>
 </html>
 """
@@ -305,4 +316,18 @@ for p in PAGES:
     out = root / p["slug"] / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page(p), encoding="utf-8")
+    print("wrote", out.relative_to(root))
+
+
+# 각 경로에서 공통 앱을 직접 열 수 있게 GitHub Pages용 index.html을 생성한다.
+shell = (root / "index.html").read_text(encoding="utf-8")
+shell = shell.replace("<head>", '<head>\n    <meta name="robots" content="noindex" />')
+shell = re.sub(r'^.*(?:rel="canonical"|property="og:url").*\n', "", shell, flags=re.MULTILINE)
+router = (root / "js/router.js").read_text(encoding="utf-8")
+route_ids = set(re.findall(r'^  "?([a-z-]+)"?: \(\) => import', router, flags=re.MULTILINE))
+route_ids -= {"dashboard", "level-plan", "item-catalog", *(p["slug"] for p in PAGES)}
+for route_id in sorted(route_ids):
+    out = root / route_id / "index.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(shell, encoding="utf-8")
     print("wrote", out.relative_to(root))

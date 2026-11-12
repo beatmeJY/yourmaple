@@ -1,3 +1,4 @@
+import { navigate } from "./router.js";
 import { sfx } from "./effects.js";
 import { escapeHtml } from "./format.js";
 import { categories, glyphInner, homeRoute } from "./routes.js";
@@ -83,7 +84,7 @@ function go(button) {
     document.querySelector(`[data-quick-nav="${button.dataset.featureGo}"]`)?.click();
     return;
   }
-  location.hash = `#/${button.dataset.featureGo}`;
+  navigate(button.dataset.featureGo);
 }
 
 let wired = false;

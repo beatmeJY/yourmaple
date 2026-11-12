@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta name="robots" content="noindex" />
+    <meta charset="UTF-8" />
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="메이플랜드(메랜) 이용자를 위한 도구입니다. 무릉도장·메이커·레벨업 계산기, 아이템·몬스터 도감, 배 시간표를 확인하고 숙제와 거래를 기록하세요." />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:site_name" content="Your Maple" />
+    <meta property="og:title" content="Your Maple | 메이플랜드 계산기·도감·시간표" />
+    <meta property="og:description" content="메이플랜드(메랜) 이용자를 위한 도구입니다. 무릉도장·메이커·레벨업 계산기, 아이템·몬스터 도감, 배 시간표를 확인하고 숙제와 거래를 기록하세요." />
+    <meta property="og:image" content="https://yourmaple.kr/apple-touch-icon.png" />
+    <meta property="og:image:width" content="180" />
+    <meta property="og:image:height" content="180" />
+    <meta property="og:image:alt" content="Your Maple 로고" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Your Maple | 메이플랜드 계산기·도감·시간표" />
+    <meta name="twitter:description" content="메이플랜드(메랜) 이용자를 위한 도구입니다. 무릉도장·메이커·레벨업 계산기, 아이템·몬스터 도감, 배 시간표를 확인하고 숙제와 거래를 기록하세요." />
+    <meta name="twitter:image" content="https://yourmaple.kr/apple-touch-icon.png" />
+    <meta name="twitter:image:alt" content="Your Maple 로고" />
+    <title>Your Maple | 메이플랜드 계산기·도감·시간표</title>
+    <link rel="icon" href="./favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <!-- 무릉도장 제목 글꼴(시안). 무릉 화면에서만 쓴다. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&display=swap" />
+    <link rel="stylesheet" href="./css/styles.css" />
+    <link rel="stylesheet" href="./css/catalog-review.css" />
+  </head>
+  <body>
+    <!-- 앱이 뜨기 전 기본 화면. JavaScript 없이 읽는 검색·심사 도구도 서비스 이름·설명·정책 링크를 볼 수 있게 둔다(main.js 가 바로 바꿔 그린다). -->
+    <div id="app">
+      <section class="boot-intro">
+        <img src="./apple-touch-icon.png" width="64" height="64" alt="" />
+        <h1>Your Maple — 메이플랜드 도우미</h1>
+        <p>메이플랜드(메랜)의 무릉도장·메이커·레벨업 계산기, 아이템·몬스터 도감과 배 시간표를 한곳에서 확인하세요. 숙제와 거래 기록도 관리할 수 있는 비공식 이용자 도구입니다.</p>
+        <noscript><p>Your Maple은 JavaScript를 켜야 사용할 수 있어요.</p></noscript>
+        <nav aria-label="기능 안내">
+          <a href="./dojo/">무릉도장 계산기</a>
+          <a href="./maker/">메이커 계산기</a>
+          <a href="./chaos-scroll/">혼돈의 주문서 시뮬레이터</a>
+          <a href="./level-up/">레벨업 계산기</a>
+          <a href="./monster-park/">몬스터파크 계산기</a>
+          <a href="./monsters/">몬스터 도감</a>
+          <a href="./items/">아이템 도감</a>
+          <a href="./transport/">배 시간표·헬리오스탑</a>
+        </nav>
+        <nav aria-label="정책">
+          <a href="./privacy.html">개인정보 처리방침</a>
+          <a href="./terms.html">이용약관</a>
+          <a href="mailto:yourmaplekr@gmail.com">문의</a>
+        </nav>
+      </section>
+    </div>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

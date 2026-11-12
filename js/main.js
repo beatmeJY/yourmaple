@@ -2,7 +2,7 @@ import { cancelPendingDeletion, loadPendingDeletion, openAccountDialog, renderDe
 import { signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
-import { getRouteId, renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
+import { followRoute, getRouteId, navigate, normalizeRoute, renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
 import { needsLogin, routes } from "./routes.js";
 import { cancelLogin, currentSession, isLoggedIn, onLoginRequest, pendingReason, rememberNext, setSession, takeNext } from "./session.js";
 import { isSoundOn, setSoundOn, sfx } from "./effects.js";
@@ -12,6 +12,12 @@ import { clearToasts, notify } from "./toast.js";
 import { applyDarkTheme, applyNavPreference, isDesktopNav, mountAmbient, renderShell, setNavCollapsed, setNavOpen } from "./ui.js";
 import { mountTransportWidget } from "./transport-widget.js";
 
+normalizeRoute();
+if (document.body.classList.contains("feature-page")) {
+  document.body.classList.remove("feature-page");
+  for (const style of document.querySelectorAll("[data-feature-style]")) style.remove();
+  for (const style of document.querySelectorAll("[data-app-style]")) style.disabled = false;
+}
 applyDarkTheme();
 mountAmbient();
 mountTransportWidget();
@@ -43,6 +49,9 @@ async function showPage() {
   // renderRoute 가 #main 을 새 요소로 바꾸므로(이전 화면의 처리기 정리) 화면 이름은 그 안에서 적는다.
   const activeId = await renderRoute(main);
   if (!activeId) return;
+  const label = routes.find((route) => route.id === activeId)?.label ?? ({ transport: "배 시간표·헬리오스탑", "catalog-review": "비공개 검토" })[activeId];
+  document.title = activeId === "dashboard" ? "Your Maple | 메이플랜드 계산기·도감·시간표"
+    : `${activeId === "dojo" ? "무릉도장 계산기" : label ?? "Your Maple"} | Your Maple`;
   renderNav(nav, activeId);
   renderCrumb(document.querySelector("[data-crumb]"), activeId);
   setNavOpen(false);
@@ -90,7 +99,7 @@ async function showApp(session) {
   if (!entered) return;
   // 로그인하고 돌아왔으면 저장하려던 화면으로 간다(그 화면이 맡겨 둔 입력값을 되살린다).
   const next = userId ? takeNext() : null;
-  if (next?.route && `#/${next.route}` !== location.hash.split("?")[0]) location.hash = `#/${next.route}`;
+  if (next?.route && next.route !== getRouteId()) navigate(next.route);
   else showPage();
 }
 
@@ -185,7 +194,7 @@ document.body.addEventListener("click", async (event) => {
   if (event.target.closest("[data-login-cancel]")) {
     sfx("tick");
     cancelLogin();
-    if (needsLogin(getRouteId())) history.replaceState(null, "", `${location.pathname}${location.search}#/dashboard`);
+    if (needsLogin(getRouteId())) history.replaceState(null, "", "/");
     mode = "loading";
     showApp(currentSession());
     return;
@@ -227,8 +236,19 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && isLinkPanelOpen()) closeLinkPanel();
 });
 
-window.addEventListener("hashchange", () => {
+document.body.addEventListener("click", followRoute);
+window.addEventListener("popstate", () => {
+  normalizeRoute();
   if (mode === "app") showPage();
+  else if (mode === "login") {
+    cancelLogin();
+    showApp(currentSession());
+  }
+});
+window.addEventListener("hashchange", () => {
+  const before = location.pathname + location.search;
+  normalizeRoute();
+  if (mode === "app" && before !== location.pathname + location.search) showPage();
 });
 
 renderLoading();

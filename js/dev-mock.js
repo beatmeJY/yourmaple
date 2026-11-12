@@ -519,8 +519,14 @@ export function mountMockBadge() {
   const badge = document.createElement("div");
   badge.className = "mock-badge";
   badge.dataset.mockBadge = "";
-  badge.innerHTML = `<b>MOCK</b><span>${loggedIn() ? "로그인됨" : "로그인 전"}</span><button type="button" data-mock-toggle>${loggedIn() ? "로그아웃 상태로" : "로그인 상태로"}</button><button type="button" data-mock-reset>샘플로 되돌리기</button><a href="?mock=0">끄기</a>`;
+  badge.innerHTML = `<b>MOCK</b><span>${loggedIn() ? "로그인됨" : "로그인 전"}</span><button type="button" data-mock-toggle>${loggedIn() ? "로그아웃 상태로" : "로그인 상태로"}</button><button type="button" data-mock-reset>샘플로 되돌리기</button><a href="?mock=0" data-mock-off>끄기</a>`;
   badge.addEventListener("click", (event) => {
+    if (event.target.closest("[data-mock-off]")) {
+      event.preventDefault();
+      const url = new URL(location.href);
+      url.searchParams.set("mock", "0");
+      location.assign(url);
+    }
     if (event.target.closest("[data-mock-toggle]")) {
       setLoggedIn(!loggedIn());
       location.reload();

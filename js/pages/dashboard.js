@@ -1,3 +1,4 @@
+import { routePath } from "../route-url.js";
 import { mountGoogleButton, signInWithProvider, translateAuthError } from "../auth.js";
 import { providerButtons } from "./login.js";
 import { notify } from "../toast.js";
@@ -98,7 +99,7 @@ function renderGuest(root) {
         <section class="ym-home-panel ym-glass ym-guest-tools">
           <header class="ym-home-head"><h2>로그인 없이 쓰는 계산기</h2></header>
           <div class="ym-guest-tool-list">${tools
-            .map((tool, index) => `<a class="ym-guest-tool" href="#/${tool.id}" style="--hue:${tool.hue};--i:${index}">
+            .map((tool, index) => `<a class="ym-guest-tool" href="${routePath(tool.id)}" style="--hue:${tool.hue};--i:${index}">
               <span class="ym-feature-glyph${tool.icon ? " is-icon" : tool.glyph.length > 1 ? " is-small" : ""}" aria-hidden="true">${tool.icon ? glyphInner(tool) : escapeHtml(tool.glyph)}</span>
               <span><strong>${escapeHtml(tool.title)}</strong><small>${escapeHtml(tool.text)}</small></span>
               <i aria-hidden="true">›</i>
@@ -182,7 +183,7 @@ export async function render(root) {
           </div>
         </section>
         <section class="ym-home-panel ym-glass ym-home-memo">
-          <header class="ym-home-head"><h2>메모</h2><a class="ym-home-more" href="#/notes">메모 관리</a></header>
+          <header class="ym-home-head"><h2>메모</h2><a class="ym-home-more" href="/notes/">메모 관리</a></header>
           <div data-notes>
             <p class="home-empty">메모를 불러오는 중입니다.</p>
           </div>
@@ -301,17 +302,17 @@ function expHtml(main, progress) {
     mainHuntId: main.main_hunt_id,
   });
   if (result.state === "no-exp") {
-    return `<a class="ym-hero-exp-hint" href="#/characters">경험치를 입력하면 다음 레벨까지 남은 양과 사냥 시간이 보입니다 ›</a>`;
+    return `<a class="ym-hero-exp-hint" href="/characters/">경험치를 입력하면 다음 레벨까지 남은 양과 사냥 시간이 보입니다 ›</a>`;
   }
   if (result.state === "no-curve") {
-    return `<a class="ym-hero-exp-hint" href="#/level-plan">레벨업 계산에 ${escapeHtml(formatCount(main.level))}레벨 경험치 표를 넣으면 진행률이 보입니다 ›</a>`;
+    return `<a class="ym-hero-exp-hint" href="/level-up/">레벨업 계산에 ${escapeHtml(formatCount(main.level))}레벨 경험치 표를 넣으면 진행률이 보입니다 ›</a>`;
   }
   if (result.state === "over") {
-    return `<a class="ym-hero-exp-hint" href="#/characters">입력한 경험치가 이 레벨의 필요 경험치보다 큽니다. 레벨을 확인해 주세요 ›</a>`;
+    return `<a class="ym-hero-exp-hint" href="/characters/">입력한 경험치가 이 레벨의 필요 경험치보다 큽니다. 레벨을 확인해 주세요 ›</a>`;
   }
   const hunt = result.hunt
     ? `<span class="ym-hero-exp-time">사냥 약 <strong>${escapeHtml(formatMinutes(result.minutes))}</strong> · ${escapeHtml(result.hunt.title || "이름 없는 기록")} ${result.mainHunt ? "(대표 사냥터)" : "(가장 좋은 기록)"}</span>`
-    : `<a class="ym-hero-exp-time" href="#/hunts">사냥 기록을 남기면 남은 시간이 보입니다 ›</a>`;
+    : `<a class="ym-hero-exp-time" href="/hunts/">사냥 기록을 남기면 남은 시간이 보입니다 ›</a>`;
   return `
     <div class="ym-hero-exp">
       <div class="ym-hero-exp-head">
@@ -332,7 +333,7 @@ function paintHero(hero, rows, heroId, progress) {
       <div class="ym-hero-empty">
         <strong>아직 캐릭터가 없습니다</strong>
         <p>캐릭터를 넣으면 대표 캐릭터와 오늘의 보스가 여기에 보입니다.</p>
-        <a class="ym-add" href="#/characters">캐릭터 추가하러 가기</a>
+        <a class="ym-add" href="/characters/">캐릭터 추가하러 가기</a>
       </div>
     `;
     return;
@@ -380,13 +381,13 @@ function featureTile(category, index) {
     .map((route) =>
       route.quick
         ? `<button type="button" class="ym-feature-sub" data-quick-nav="${route.id}">${escapeHtml(route.label)}${lock(route)}</button>`
-        : `<a class="ym-feature-sub" href="#/${route.id}">${escapeHtml(route.label)}${lock(route)}</a>`,
+        : `<a class="ym-feature-sub" href="${routePath(route.id)}">${escapeHtml(route.label)}${lock(route)}</a>`,
     )
     .join("");
   const first = category.routes.find((route) => !route.quick) ?? category.routes[0];
   const glyph = String(category.glyph);
   // 링크처럼 화면이 없는(quick) 분류는 타일을 눌러도 패널을 연다.
-  const mainAttrs = first.quick ? `type="button" data-quick-nav="${first.id}"` : `href="#/${first.id}"`;
+  const mainAttrs = first.quick ? `type="button" data-quick-nav="${first.id}"` : `href="${routePath(first.id)}"`;
   const mainTag = first.quick ? "button" : "a";
   return `
     <div class="ym-feature-tile" style="--hue:${category.hue};--i:${index}">
@@ -497,5 +498,5 @@ function noteCard(row) {
   const content = String(row.content ?? "").trim();
   const body = content ? `<p>${escapeHtml(content)}</p>` : "";
   const hue = paletteHue(String(row.category ?? "").trim());
-  return `<a class="home-note" href="#/notes" style="--hue:${hue}"><h3>${escapeHtml(row.title)}</h3>${body}</a>`;
+  return `<a class="home-note" href="/notes/" style="--hue:${hue}"><h3>${escapeHtml(row.title)}</h3>${body}</a>`;
 }

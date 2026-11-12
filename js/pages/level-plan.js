@@ -1,3 +1,4 @@
+import { navigatePath } from "../router.js";
 import { sfx } from "../effects.js";
 import { attachFaceUrls, faceMarkup } from "../character-face.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
@@ -641,7 +642,7 @@ export async function render(root) {
     if (!rows.length) {
       label.textContent = "기록 없음";
       const who = character.job || character.name;
-      list.innerHTML = `<p class="lp-muted">${escapeHtml(who)} 사냥 기록이 없습니다. <a href="#/hunts?add=1">사냥 기록 추가</a>에서 만들어 보세요.</p>`;
+      list.innerHTML = `<p class="lp-muted">${escapeHtml(who)} 사냥 기록이 없습니다. <a href="/hunts/?add=1">사냥 기록 추가</a>에서 만들어 보세요.</p>`;
       return;
     }
     label.textContent = `${rows.length}개 · 레벨 높은 순 · 누르면 효율을 가져와요`;
@@ -902,7 +903,7 @@ export async function render(root) {
       return;
     }
     if (event.target.closest("[data-goto-hunt-add]")) {
-      location.hash = "#/hunts?add=1";
+      navigatePath("/hunts/?add=1");
     }
     const pickButton = event.target.closest("[data-pick-hunt]");
     if (pickButton) {

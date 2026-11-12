@@ -437,7 +437,7 @@ export async function render(root) {
       </div></div>`;
     let body;
     if (blocked) body = `<p class="hw-muted">sql/030_homework.sql을 실행하면 쓸 수 있어요.</p>`;
-    else if (!characters.length) body = `<p class="hw-muted">캐릭터를 추가하면 숙제표가 생겨요. <a href="#/characters">캐릭터 추가하러 가기</a></p>`;
+    else if (!characters.length) body = `<p class="hw-muted">캐릭터를 추가하면 숙제표가 생겨요. <a href="/characters/">캐릭터 추가하러 가기</a></p>`;
     else if (isManaging) {
       body = `<p class="hw-muted hw-manage-note">이 숙제표에 보일 캐릭터를 켜고 끄세요.${task.boss ? " 레벨과 퀘스트를 맞춘 캐릭터만 켜 주세요." : ""} 다 고르면 ✓를 누르세요.</p>`
         + table(orderedCharacters().filter(character => homeworkLevelAllowed(task, character.level, character.job)), (character) => personHead(task, character, null, now, true), (character) => switchCell(task, character));
@@ -456,7 +456,7 @@ export async function render(root) {
       <header class="hw-card-head">
         <span class="hw-card-icon">${icon}</span>
         <span class="hw-card-title"><strong>${escapeHtml(task.name)} 숙제표</strong><small>${escapeHtml(task.sub)}</small>${task.note ? `<small class="hw-card-note">${escapeHtml(task.note)}</small>` : ""}</span>
-        ${task.key === "dojo" ? `<a class="hw-mini hw-link" href="#/dojo?log">자세한 기록</a>` : ""}
+        ${task.key === "dojo" ? `<a class="hw-mini hw-link" href="/dojo/?log">자세한 기록</a>` : ""}
         ${sortUnit && !isManaging && people.length > 1
           ? `<span class="hw-sortby" role="group" aria-label="${escapeHtml(task.name)} 정렬 기준"><small>정렬</small>${task.modes
               .filter((mode) => !mode.disabled)

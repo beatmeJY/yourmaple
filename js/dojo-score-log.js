@@ -30,7 +30,7 @@ export function mountDojoScoreLog(section) {
     <div class="dj-panel-head">
       <h2><i aria-hidden="true">◆</i>통합 점수 기록</h2>
       <span class="dj-sub">수련 점수·숙제 체크리스트에서 적은 점수 · 어제보다 ${formatCount(DOJO_DAILY_GOAL)}점 오르면 그날 숙제 완료</span>
-      <a class="dj-log-link" href="#/homework">숙제에서 적기</a>
+      <a class="dj-log-link" href="/homework/">숙제에서 적기</a>
       <button class="text-button" type="button" data-log-close aria-label="닫기">닫기</button>
     </div>
     <div class="dj-log-chips" data-log-chips></div>

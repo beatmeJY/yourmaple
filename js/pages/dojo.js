@@ -2177,7 +2177,7 @@ export async function render(root) {
   }
   hideBeltTip();
 
-  // 통합 점수 기록 창(수련 점수 옆 버튼). #/dojo?log 로 오면 바로 연다.
+  // 통합 점수 기록 창(수련 점수 옆 버튼). /dojo/?log 로 오면 바로 연다.
   const scoreLog = mountDojoScoreLog(root.querySelector("[data-score-log]"));
   root.querySelector("[data-score-log-open]").addEventListener("click", () => {
     sfx("tick");
@@ -2202,5 +2202,5 @@ export async function render(root) {
       : "로그인했어요. 적어 둔 기록을 채워 뒀어요. 캐릭터 이름만 적어 만든 뒤 저장을 눌러 주세요.";
     notify(draft.belt ? "로그인했어요. 적어 둔 허리띠 시세를 채워 뒀으니 저장을 눌러 주세요." : sheetNote, "info");
   }
-  if (/[?&]log\b/.test(location.hash) && root.isConnected && isLoggedIn()) scoreLog.open(form.dataset.openCharacter || "");
+  if (new URLSearchParams(location.search).has("log") && root.isConnected && isLoggedIn()) scoreLog.open(form.dataset.openCharacter || "");
 }

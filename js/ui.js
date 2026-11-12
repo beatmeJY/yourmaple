@@ -70,7 +70,7 @@ export function renderShell() {
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-panel">
         <div class="brand">
-          <a class="brand-home" href="#/dashboard" data-brand-home aria-label="Your Maple 홈으로">
+          <a class="brand-home" href="/" data-brand-home aria-label="Your Maple 홈으로">
             <img class="brand-logo" src="./apple-touch-icon.png" alt="" width="40" height="40" />
             <strong>Your Maple</strong>
             <span>메이플 도우미</span>
@@ -130,7 +130,7 @@ export function renderShell() {
           <div class="link-panel-handle"></div>
           <div class="link-panel-head">
             <p class="link-panel-title">바로가기</p>
-            <a class="text-button" href="#/links" data-link-panel-manage>링크 관리</a>
+            <a class="text-button" href="/links/" data-link-panel-manage>링크 관리</a>
           </div>
           <div class="link-panel-body" data-link-panel-body></div>
         </div>

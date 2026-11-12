@@ -26,12 +26,12 @@
 - 데이터·로그인: Supabase(Postgres + RLS). 설정은 `js/config.js`(커밋 안 함, `config.example.js` 참고).
 - 로컬 가짜 DB: 127.0.0.1·localhost 에서 `?mock`(로그인됨)·`?mock=guest`·`?mock=reset`·`?mock=0`. `js/supabase-client.js` 가 이때만 `js/dev-mock.js`(supabase-js 흉내, localStorage `ym-mock-db`)를 불러온다. 쿼리 흉내가 부족하면 그 파일에 추가한다. 사용법 README "로컬에서 로그인 없이 확인하기". 2026-10-20 (Claude) [실측]
 - 맥 로컬 실행: `python3 -m http.server 5500` → http://127.0.0.1:5500. Windows에서는 `py -3 -m http.server 5500`을 사용한다. `.claude/launch.json`은 현재 저장소에 없다(2026-10-02 Codex 확인 [실측]).
-- 라우팅: 해시 기반(`#/characters`).
+- 라우팅: `/characters/` 같은 일반 경로를 쓴다. `js/route-url.js`가 화면 ID와 공개 주소를 연결하며, 예전 해시 링크는 조회 조건을 유지한 채 새 주소로 바꾼다.
   - `js/routes.js`: `homeRoute`와 7개 분류 `categories`(id·이름·아이콘 글자·hue·routes). 평평한 `routes`는 여기서 만든다. `quick: true`는 페이지 이동 대신 버튼으로 동작(예: 링크 패널).
-  - 개발 중인 화면·탭 숨기기: `routes.js`의 route에 `dev: true`(메이커 탭은 `TABS`의 `dev: true`)를 붙이면 운영 주소에서는 메뉴·검색·홈 타일에서 빠지고 주소로 열어도 홈으로 간다. 주소에 `?dev`(또는 `#/화면?dev`)를 붙이면 그 탭을 닫을 때까지 보이고 `?dev=0`이면 끈다. 로컬(127.0.0.1·localhost)에서는 늘 보인다(`js/dev-mode.js`). 2026-10-11 강화 계산·리버스 제작을 숨김 [실측]
+  - 개발 중인 화면·탭 숨기기: `routes.js`의 route에 `dev: true`(메이커 탭은 `TABS`의 `dev: true`)를 붙이면 운영 주소에서는 메뉴·검색·홈 타일에서 빠지고 주소로 열어도 홈으로 간다. 주소에 `?dev`를 붙이면 그 탭을 닫을 때까지 보이고 `?dev=0`이면 끈다. 로컬(127.0.0.1·localhost)에서는 늘 보인다(`js/dev-mode.js`). 2026-10-11 강화 계산·리버스 제작을 숨김 [실측]
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
 - 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
-- 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`·`/transport/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML(`css/public.css`+`css/feature.css`, 앱 스크립트 없음). 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`pages.yml` 복사 목록·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
+- 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`·`/transport/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML이다. 앱 스크립트가 같은 경로에서 실제 화면을 그리며, GitHub Pages에 필요한 나머지 메뉴의 index.html도 생성기가 만든다. 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
 - 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
 
 ## 4. 코드 규칙
@@ -67,6 +67,8 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-13 (Codex) 모든 앱 메뉴를 일반 경로로 전환. 공개 소개 HTML과 실제 화면을 같은 주소로 연결하고 예전 해시 조회 조건을 보존. Chrome 무릉 직접 열기·새로고침·뒤로가기·375px, 도감 상세·모의 로그인 복귀 확인. 미배포. [실측]
 
 - 2026-11-11 (Codex) 공개 README를 서비스 소개·기술 구성·로컬 실행·검증으로 정리하고 운영 절차와 SQL 적용 기록은 비공개 운영 기록으로 이동. [문서]
 
