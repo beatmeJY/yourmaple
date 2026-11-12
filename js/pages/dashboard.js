@@ -376,12 +376,11 @@ function paintHero(hero, rows, heroId, progress) {
 // ── 모든 기능 ────────────────────────────────────────────────────────────
 
 function featureTile(category, index) {
-  const lock = (route) => (route.auth && !isLoggedIn() ? `<i class="ym-feature-lock" aria-label="로그인 필요">🔒</i>` : "");
   const subs = category.routes
     .map((route) =>
       route.quick
-        ? `<button type="button" class="ym-feature-sub" data-quick-nav="${route.id}">${escapeHtml(route.label)}${lock(route)}</button>`
-        : `<a class="ym-feature-sub" href="${routePath(route.id)}">${escapeHtml(route.label)}${lock(route)}</a>`,
+        ? `<button type="button" class="ym-feature-sub" data-quick-nav="${route.id}">${escapeHtml(route.label)}</button>`
+        : `<a class="ym-feature-sub" href="${routePath(route.id)}">${escapeHtml(route.label)}</a>`,
     )
     .join("");
   const first = category.routes.find((route) => !route.quick) ?? category.routes[0];

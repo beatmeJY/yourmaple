@@ -1,3 +1,4 @@
+import { showGuestPreview } from "../guest-preview.js";
 import { catalogError } from "../catalog.js";
 import { catalogRpc } from "../catalog-api.js";
 import { equipmentTypeName, isEquipment } from "../catalog-equipment.js";
@@ -122,6 +123,8 @@ export async function render(root) {
       <dialog class="tr2-link-dialog" data-link-dialog aria-labelledby="trade-link-title"></dialog>
     </div>
   `;
+  if (showGuestPreview(root, "로그인하고 거래 기록하기")) return;
+
   mountCatalogImageFallback(root);
 
   const list = root.querySelector("[data-list]");

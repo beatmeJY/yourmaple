@@ -1,3 +1,4 @@
+import { showGuestPreview } from "../guest-preview.js";
 import { translateDbError } from "../db-error.js";
 import { burstAt, paletteHue, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
@@ -78,6 +79,8 @@ export async function render(root) {
       </div>
     </div>
   `;
+  if (showGuestPreview(root, "로그인하고 링크 추가하기")) return;
+
 
   const list = root.querySelector("[data-list]");
   const count = root.querySelector("[data-count]");

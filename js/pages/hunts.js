@@ -1,3 +1,4 @@
+import { showGuestPreview } from "../guest-preview.js";
 import { translateDbError } from "../db-error.js";
 import { escapeHtml, formatCount, readBig, readCount, sortByName } from "../format.js";
 import { matchesPointLevel, matchesText, readLevelFilter } from "../filters.js";
@@ -254,6 +255,8 @@ export async function render(root) {
       </dialog>
     </div>
   `;
+  if (showGuestPreview(root, "로그인하고 사냥 기록하기")) return;
+
 
   const huntList = root.querySelector("[data-hunt-list]");
 

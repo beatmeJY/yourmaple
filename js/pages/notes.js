@@ -1,3 +1,4 @@
+import { showGuestPreview } from "../guest-preview.js";
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, paletteHue as hueOf, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount } from "../format.js";
@@ -78,6 +79,8 @@ export async function render(root) {
       </div>
     </div>
   `;
+  if (showGuestPreview(root, "로그인하고 메모 쓰기")) return;
+
 
   const list = root.querySelector("[data-list]");
   const count = root.querySelector("[data-count]");

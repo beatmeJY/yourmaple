@@ -2,8 +2,8 @@ import { cancelPendingDeletion, loadPendingDeletion, openAccountDialog, renderDe
 import { signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
-import { followRoute, getRouteId, navigate, normalizeRoute, renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
-import { needsLogin, routes } from "./routes.js";
+import { followRoute, getRouteId, navigate, navigatePath, normalizeRoute, renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
+import { routes } from "./routes.js";
 import { cancelLogin, currentSession, isLoggedIn, onLoginRequest, pendingReason, rememberNext, setSession, takeNext } from "./session.js";
 import { isSoundOn, setSoundOn, sfx } from "./effects.js";
 import { mountFeatureSearch } from "./feature-search.js";
@@ -38,14 +38,6 @@ async function showPage() {
   const main = document.querySelector("#main");
   const nav = document.querySelector("#nav");
   if (!main || !nav) return;
-  // 내 기록 화면(캐릭터·숙제·사냥 등)은 로그인해야 연다. 로그인하면 이 화면으로 돌아온다.
-  const routeId = getRouteId();
-  if (needsLogin(routeId) && !isLoggedIn()) {
-    const label = routes.find((route) => route.id === routeId)?.label ?? "이 화면";
-    rememberNext(routeId, `${label} 화면은 내 계정의 기록을 보여 줘서 로그인해야 열려요.`);
-    showLogin({ reason: pendingReason() });
-    return;
-  }
   // renderRoute 가 #main 을 새 요소로 바꾸므로(이전 화면의 처리기 정리) 화면 이름은 그 안에서 적는다.
   const activeId = await renderRoute(main);
   if (!activeId) return;
@@ -168,8 +160,7 @@ document.body.addEventListener("click", async (event) => {
   if (event.target.closest("[data-quick-nav='links']")) {
     if (!isDesktopNav()) setNavOpen(false);
     if (!isLoggedIn()) {
-      rememberNext(getRouteId(), "링크는 로그인한 계정에 저장돼요.");
-      showLogin({ reason: pendingReason() });
+      navigatePath("/links/");
       return;
     }
     openLinkPanel();
@@ -190,11 +181,10 @@ document.body.addEventListener("click", async (event) => {
     showLogin();
     return;
   }
-  // 로그인 화면에서 "돌아가기": 저장하려던 값은 버리고, 내 기록 화면이었으면 홈으로 간다.
+  // 로그인 화면에서 돌아오면 지금 화면을 다시 그린다.
   if (event.target.closest("[data-login-cancel]")) {
     sfx("tick");
     cancelLogin();
-    if (needsLogin(getRouteId())) history.replaceState(null, "", "/");
     mode = "loading";
     showApp(currentSession());
     return;

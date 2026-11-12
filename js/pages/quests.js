@@ -1,3 +1,4 @@
+import { showGuestPreview } from "../guest-preview.js";
 import { translateDbError } from "../db-error.js";
 import { BURST_COLORS, burstAt, celebrate, sfx } from "../effects.js";
 import { compareName, escapeHtml, formatCount, readCount } from "../format.js";
@@ -93,6 +94,8 @@ export async function render(root) {
       </div>
     </div>
   `;
+  if (showGuestPreview(root, "로그인하고 퀘스트 관리하기")) return;
+
 
   const list = root.querySelector("[data-list]");
   const detail = root.querySelector("[data-detail]");

@@ -1,3 +1,4 @@
+import { showGuestPreview } from "../guest-preview.js";
 import {
   attachFaceUrls,
   faceMarkup,
@@ -133,6 +134,8 @@ export async function render(root) {
     </div>
     </div>
   `;
+  if (showGuestPreview(root, "로그인하고 캐릭터 관리하기")) return;
+
 
   const list = root.querySelector("[data-list]");
   const gate = root.querySelector("[data-gate]");

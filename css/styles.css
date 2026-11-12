@@ -14400,7 +14400,6 @@ button.dj-log-row:hover { background: rgba(0, 0, 0, 0.32); }
 .ym-guest-tool i { color: var(--muted); font-style: normal; font-size: 20px; }
 .ym-guest-tool .ym-feature-glyph { width: 44px; height: 44px; }
 .ym-guest-more ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.8; }
-.ym-feature-lock { margin-left: 4px; font-style: normal; font-size: 10px; opacity: 0.7; }
 @media (prefers-reduced-motion: reduce) {
   .login-open, .ym-guest-login, .ym-guest-tool, .auth-card > p.auth-reason { animation: none; transition: none; }
 }
@@ -17068,3 +17067,14 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 @keyframes mp-up-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .mp-day-up { animation: none; } }
 .mp-apply-note.is-error { color: var(--mp-rust); }
+
+.guest-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-block: 12px 18px;
+  padding: 16px;
+}
+.guest-preview p { margin: 0; color: var(--text); }

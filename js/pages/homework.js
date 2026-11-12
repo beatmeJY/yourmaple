@@ -1,3 +1,4 @@
+import { showGuestPreview } from "../guest-preview.js";
 import { bosses, bossTimeParts, formatStamp, readBossTime } from "../boss-cooldown.js";
 import { attachFaceUrls, faceMarkup, missingFaceColumn } from "../character-face.js";
 import { translateDbError } from "../db-error.js";
@@ -146,6 +147,8 @@ export async function render(root) {
       </dialog>
     </div>
   `;
+  if (showGuestPreview(root, "로그인하고 숙제 기록하기")) return;
+
 
   const cardsBox = root.querySelector("[data-cards]");
   const addForm = root.querySelector("[data-add-form]");
