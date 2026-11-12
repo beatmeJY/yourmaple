@@ -72,7 +72,7 @@ export function renderShell() {
         <div class="brand">
           <a class="brand-home" href="/" data-brand-home aria-label="Your Maple 홈으로">
             <img class="brand-logo" src="./apple-touch-icon.png" alt="" width="40" height="40" />
-            <strong>Your Maple</strong>
+            <span class="ym-wordmark">your<span>maple</span></span>
             <span>메이플 도우미</span>
           </a>
           <button class="nav-toggle nav-close" type="button" data-close-nav aria-label="메뉴 닫기">${NAV_CHEVRON}</button>

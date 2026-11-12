@@ -84,7 +84,7 @@ function renderGuest(root) {
     <div class="ym-home is-guest">
       <div class="ym-home-col">
         <section class="ym-home-hero ym-glass ym-guest-hero">
-          <span class="ym-guest-kicker">메이플랜드 도우미</span>
+          <div class="ym-home-brand"><img src="./apple-touch-icon.png" alt="" width="48" height="48" /><span class="ym-wordmark">your<span>maple</span></span></div>
           <h2>계산은 바로, 기록은 로그인해서</h2>
           <p>메이플랜드(메랜) 레벨업·메이커·무릉 계산과 아이템·몬스터 도감을 로그인 없이 이용해 보세요. 계산값이나 기록을 저장할 때 로그인하면 돼요.</p>
           <div class="ym-guest-providers" role="group" aria-label="로그인 방법 선택">${providerButtons("data-home-oauth")}</div>

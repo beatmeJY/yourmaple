@@ -14387,7 +14387,6 @@ button.dj-log-row:hover { background: rgba(0, 0, 0, 0.32); }
 .auth-reason b { font-size: 13px; }
 .ym-guest-hero h2 { margin: 6px 0 8px; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; word-break: keep-all; }
 .ym-guest-hero p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; word-break: keep-all; }
-.ym-guest-kicker { color: oklch(0.85 0.12 85); font-size: 12px; font-weight: 800; letter-spacing: 0.08em; }
 .ym-guest-login { margin-top: 16px; height: 44px; padding: 0 20px; border: 0; border-radius: 14px; background: var(--cta, linear-gradient(180deg, oklch(0.8 0.15 60), oklch(0.68 0.17 45))); color: #2a1600; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; transition: transform 0.45s var(--spring), filter 0.2s; }
 .ym-guest-login:hover { filter: brightness(1.08); }
 .ym-guest-login:active { transform: scale(0.96); }
@@ -16285,7 +16284,21 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .brand-home:hover .brand-logo { transform: translateY(-2px) rotate(-6deg) scale(1.05); box-shadow: 0 10px 24px -6px oklch(0.78 0.16 40 / 0.85); }
 .brand-home:active .brand-logo { transform: scale(.94); }
 .brand-home:focus-visible { outline: 2px solid var(--gold, #e8c46b); outline-offset: 2px; }
-.brand-home[aria-current="page"] strong { color: var(--gold, #e8c46b); }
+.ym-wordmark, .brand .ym-wordmark {
+  --wordmark-maple: #ff9e83;
+  color: #fff;
+  font-family: var(--font);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+.ym-wordmark span, .brand .ym-wordmark span {
+  color: var(--wordmark-maple);
+  font-size: inherit;
+}
+.brand .ym-wordmark { font-size: 20px; line-height: 1; }
+.ym-home-brand { display: flex; align-items: center; gap: 12px; }
+.ym-home-brand .ym-wordmark { font-size: clamp(26px, 5vw, 38px); }
 @media (prefers-reduced-motion: reduce) {
   .brand-home, .brand-home .brand-logo { transition: none; }
   .brand-home:hover .brand-logo, .brand-home:active .brand-logo { transform: none; }
