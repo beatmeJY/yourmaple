@@ -107,7 +107,8 @@ function subLink(route, activeId) {
   const active = route.id === activeId;
   const attrs = route.quick ? `type="button" data-quick-nav="${route.id}"` : `href="${routePath(route.id)}" data-route="${route.id}"`;
   const tag = route.quick ? "button" : "a";
-  return `<${tag} class="nav-sub${active ? " is-active" : ""}" ${attrs}${active ? ` aria-current="page"` : ""}><i class="nav-dot" aria-hidden="true"></i><span>${route.label}</span></${tag}>`;
+  const status = route.id === "enhance" ? '<span class="nav-sub-status">개발 예정</span>' : "";
+  return `<${tag} class="nav-sub${active ? " is-active" : ""}" ${attrs}${active ? ` aria-current="page"` : ""}><i class="nav-dot" aria-hidden="true"></i><span>${route.label}</span>${status}</${tag}>`;
 }
 
 // 펼침형 분류 트리. 기본은 모두 펼침, 사용자가 접은 분류만 접는다(지금 화면의 분류는 늘 펼침).
@@ -129,7 +130,8 @@ export function renderNav(nav, activeId) {
     // 메뉴가 하나뿐인 분류(무릉도장·거래 등)는 펼칠 것 없이 분류 줄을 누르면 바로 그 화면으로 간다(2026-10-21 사용자 요청).
     // 링크처럼 화면 없이 패널을 여는 메뉴(quick)는 링크 대신 버튼으로 둔다.
     const [only] = category.routes;
-    if (category.routes.length === 1) {
+    const showEnhancePlaceholder = category.id === "enhance" && isHiddenRoute("enhance");
+    if (category.routes.length === 1 && !showEnhancePlaceholder) {
       const attrs = only.quick
         ? `type="button" data-quick-nav="${only.id}"`
         : `href="${routePath(only.id)}" data-route="${only.id}"${active ? ` aria-current="page"` : ""}`;
@@ -145,10 +147,13 @@ export function renderNav(nav, activeId) {
       <button type="button" class="nav-cat" data-nav-cat="${category.id}" aria-expanded="${open}" aria-controls="nav-subs-${category.id}">
         ${glyph}
         <span class="nav-cat-name">${category.label}</span>
-        <span class="nav-count">${category.routes.length}</span>
+        <span class="nav-count">${category.routes.length + Number(showEnhancePlaceholder)}</span>
         <span class="nav-chev" aria-hidden="true">›</span>
       </button>
-      <div class="nav-subs" id="nav-subs-${category.id}"><div class="nav-subs-inner">${category.routes.map((route) => subLink(route, activeId)).join("")}</div></div>
+      <div class="nav-subs" id="nav-subs-${category.id}"><div class="nav-subs-inner">
+        ${category.routes.map((route) => subLink(route, activeId)).join("")}
+        ${showEnhancePlaceholder ? '<button type="button" class="nav-sub is-planned" data-planned-enhance><i class="nav-dot" aria-hidden="true"></i><span>강화 계산</span><span class="nav-sub-status">개발 예정</span></button>' : ""}
+      </div></div>
     </section>`;
   }).join("")}</div>`;
   // 메뉴를 다 펼치면 세로가 짧은 화면에서 사이드바가 스크롤된다. 지금 화면 메뉴가 보이게 사이드바 안에서만 맞춘다.
