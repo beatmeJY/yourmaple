@@ -32,7 +32,10 @@ function rollLabel(success, changeTotal) {
 // 자주 바르는 장비는 아이콘으로 바로 고른다(2026-11-01 사용자 지정). 나머지는 이름으로 찾는다.
 // 도감 이름과 띄어쓰기만 달라도 맞도록 띄어쓰기를 빼고 비교한다.
 const HORNTAIL_NECKLACE = "혼테일의 목걸이";
-const FAVORITE_ITEMS = ["검은색 허리띠", "부보안관 은뱃지", HORNTAIL_NECKLACE, "얼음결정 페이스페인팅"];
+const FAVORITE_ITEMS = [
+  "검은색 허리띠", "부보안관 은뱃지", HORNTAIL_NECKLACE,
+  "얼음결정 페이스페인팅", "슈피겔만의 혼돈 목걸이",
+];
 const squash = (text) => String(text ?? "").replace(/\s+/g, "");
 const isHorntailNecklace = (item) => item.subcategory === "Pendant" && squash(item.name) === squash(HORNTAIL_NECKLACE);
 const eggImage = '<img src="img/horntail-egg.png" alt="" width="40" height="40" class="cs-fav-image" />';
