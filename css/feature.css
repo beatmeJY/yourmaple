@@ -55,3 +55,21 @@
 
 /* 검색어 보강 한 줄(메랜·옛메·유얼메이플, 2026-11-16) */
 .feature-page .aka { max-width: 620px; margin-top: 10px; font-size: 14px; line-height: 1.6; color: var(--muted); opacity: .85; }
+
+/* 몬스터 검색용 페이지(tools/build_monster_pages.py, 2026-11-16) */
+.mon-crumb { margin: 8px 0 18px; font-size: 13px; color: var(--muted); }
+.mon-crumb a { color: var(--muted); }
+.mon-crumb a:hover { color: var(--gold); }
+.mon-lv { margin-left: 8px; padding: 3px 10px; border-radius: 999px; font-size: 15px; vertical-align: middle; color: var(--gold); border: 1px solid rgba(237, 205, 138, .45); }
+.mon-page .feature-art img { image-rendering: auto; }
+.mon-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 0; }
+.mon-stats div { padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.mon-stats dt { font-size: 12.5px; color: var(--muted); }
+.mon-stats dd { margin: 4px 0 0; font-size: 18px; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.mon-drops { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
+.mon-drops li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.mon-drops a { color: var(--text); text-decoration: none; min-width: 0; overflow-wrap: anywhere; }
+.mon-drops a:hover { color: var(--gold); }
+.mon-drops span { flex: none; color: var(--gold); font-variant-numeric: tabular-nums; }
+.mon-near a small, .mon-all a small { margin-left: 4px; color: var(--muted); }
+.mon-all { max-height: 420px; overflow: auto; }

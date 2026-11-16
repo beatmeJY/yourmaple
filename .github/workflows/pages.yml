@@ -80,6 +80,14 @@ jobs:
           # 기능 소개 페이지(검색 색인용, /dojo/ 등)
           python3 tools/build_feature_pages.py _site
 
+      - name: 몬스터 검색용 페이지 만들기
+        # 공개 도감(비로그인 읽기)으로 /monsters/<번호>/ 를 만들고 사이트맵·몬스터 소개 목록에 더한다.
+        # 저장소에는 넣지 않는다. 도감을 읽지 못하면 실패해 공개 사이트는 이전 배포 그대로 남는다.
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: python3 tools/build_monster_pages.py _site
+
       - name: 파일 주소에 버전 붙이기
         # 배포마다 커밋 번호를 JS·CSS 주소에 붙여 브라우저가 옛 파일과 새 파일을 섞지 않게 한다.
         run: python3 tools/stamp_version.py _site "${GITHUB_SHA::7}"

@@ -317,7 +317,7 @@ def page(p):
     <section aria-labelledby="t-what"><p class="section-number">01</p><h2 id="t-what">{e(p.get("what", "이런 걸 계산해요"))}</h2><ul class="feature-cards">{cards}</ul></section>
     <section aria-labelledby="t-rules"><p class="section-number">02</p><h2 id="t-rules">{e(p['rules_title'])}</h2><ul>{rules}</ul>{'' if p.get('what') else '<p class="hint">계산 결과는 입력한 값과 위 기준으로 낸 참고값이에요. 실제 게임 결과를 보장하지 않아요.</p>'}</section>
     <section aria-labelledby="t-how"><p class="section-number">03</p><h2 id="t-how">이렇게 써요</h2><ol class="steps">{steps}</ol></section>
-    <section aria-labelledby="t-faq"><p class="section-number">04</p><h2 id="t-faq">자주 묻는 질문</h2><div class="faq">{faq}</div></section>
+    <section aria-labelledby="t-faq"><p class="section-number">04</p><h2 id="t-faq">자주 묻는 질문</h2><div class="faq">{faq}</div></section>{chr(10) + "    <!-- monster-list -->" if p["slug"] == "monsters" else ""}
     <nav class="feature-nav" aria-label="다른 기능">{others}</nav>
   </main>
   <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Your Maple(유얼메이플)은 Nexon·메이플스토리·메이플랜드의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>

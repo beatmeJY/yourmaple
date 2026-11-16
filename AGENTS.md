@@ -32,6 +32,7 @@
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
 - 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
 - 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`·`/transport/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML이다. 앱 스크립트가 같은 경로에서 실제 화면을 그리며, GitHub Pages에 필요한 나머지 메뉴의 index.html도 생성기가 만든다. 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
+- 몬스터 검색용 페이지 `/monsters/<몬스터 번호>/`는 배포 때 `tools/build_monster_pages.py _site`가 공개 도감(비로그인 읽기)으로 만들고 sitemap·몬스터 소개 원본 목록(`<!-- monster-list -->` 자리)에 더한다. 저장소에는 넣지 않고, 도감을 못 읽으면 배포가 멈춘다. 로컬 실행은 `SSL_CERT_FILE=/etc/ssl/cert.pem python3 tools/build_monster_pages.py <임시 폴더>`, 검사는 `tools/monster-pages.check.mjs`(고정 자료). 2026-11-16 (Claude)
 - 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
 
 ## 4. 코드 규칙
@@ -67,6 +68,8 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-16 (Claude) 몬스터 검색용 페이지 배포 시 자동 생성(사용자 결정): `tools/build_monster_pages.py`·pages.yml 단계·`tools/monster-pages.check.mjs`, 몬스터 소개 원본에 전체 목록. 운영 공개 읽기로 806쪽·5.87MB·읽기 2.5초·만들기 0.2초, sitemap 817주소 xmllint 통과, CI 흉내(모으기→소개→몬스터→버전) 통과, PC·모바일 375 페이지 넘침 없음·그림 move→fly 순서, 검사 40개 통과 [실측]. 미커밋·미배포. 측정·증거 기록은 비공개 seo-evidence.md
 
 - 2026-11-16 (Claude) 몬스터 논리 삭제·검색어 보강(사용자 요청): 상세 "몬스터 삭제"(이유 선택)·관리자 화면 `/monster-trash/`(삭제한 몬스터만, 복구), 지운 몬스터·드랍은 공개 조회에서 숨김 `sql/071_catalog_monster_soft_delete.sql` — 사용자 실행 완료 [진술]. 홈·소개 페이지 제목/설명/본문/구조화 데이터에 메랜·옛메·메이플·메이플스토리·유얼메이플·YM 추가(생성기 `with_keywords`·홈 WebSite alternateName), 소개 페이지 다시 생성. 검사 39개 통과(PGlite 071: 일반/비로그인 거절, 지운 몬스터·드랍 숨김, 행 보존, 이력, 복구, 재실행), ?mock=reviewer 삭제→목록에서 빠짐→삭제한 몬스터 화면→복구·이력 2건, ?mock 화면 권한 안내·버튼 없음·RPC 거절, 모바일 375 넘침 없음 [실측]. 실제 운영 DB 미검증. 배포
 
