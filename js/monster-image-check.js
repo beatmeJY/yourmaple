@@ -5,6 +5,7 @@
 import { escapeHtml } from "./format.js";
 import { reviewRpc, reviewError } from "./catalog-review.js";
 import { clearCatalogCache } from "./catalog-api.js";
+import { monsterImageUrls } from "./catalog-image.js";
 import { apiInfoUrl, apiParts, apiRenderUrl, diagnose, imageCandidates } from "./monster-image-audit.js";
 
 const esc = (value) => escapeHtml(String(value ?? ""));
@@ -14,10 +15,17 @@ function safeUrl(url) {
   try { const parsed = new URL(url); return parsed.protocol === "https:" ? parsed.href : ""; } catch { return ""; }
 }
 
-function preview(url, label) {
-  const href = safeUrl(url);
-  if (!href) return `<span class="mic-thumb is-empty" title="${esc(label)}">없음</span>`;
-  return `<span class="mic-thumb"><img src="${esc(href)}" alt="${esc(label)}" referrerpolicy="no-referrer" loading="lazy" data-mic-img></span>`;
+// 미리보기도 도감 화면과 같이 원본 그림 API 동작 순서(move → fly → stand → die1)대로 시도한다.
+function preview(url, label, chain = true) {
+  const urls = chain ? monsterImageUrls(url) : [safeUrl(url)].filter(Boolean);
+  if (!urls.length) return `<span class="mic-thumb is-empty" title="${esc(label)}">없음</span>`;
+  return `<span class="mic-thumb"><img src="${esc(urls[0])}" data-alts="${esc(urls.slice(1).join(" "))}" alt="${esc(label)}" referrerpolicy="no-referrer" loading="lazy" data-mic-img></span>`;
+}
+
+// 동작 순서대로 하나라도 뜨면 성공
+async function probeChain(url) {
+  for (const href of monsterImageUrls(url)) if (await probe(href)) return true;
+  return false;
 }
 
 // 그림 한 장을 실제로 불러 본다(10초 넘으면 실패).
@@ -100,7 +108,7 @@ export function openMonsterImageCheck(root, { focusId = "", onChanged = () => {}
     const worker = async () => {
       while (next < urls.length && !closed) {
         const url = urls[next++];
-        loaded.set(url, await probe(url));
+        loaded.set(url, await probeChain(url));
         scan.done++;
         if (!current && (scan.done % 12 === 0 || scan.done === scan.total)) paintList();
       }
@@ -118,7 +126,7 @@ export function openMonsterImageCheck(root, { focusId = "", onChanged = () => {}
     const same = pickUrl && pickUrl === row.image_url;
     return `<p class="mic-verdict is-${esc(result.kind)}" role="status">${esc(result.text)}</p>
       ${actions ? `<div class="mic-actions" role="group" aria-label="원본 그림 동작">${actions}</div>` : ""}
-      ${pickUrl ? `<div class="mic-pick">${preview(pickUrl, "원본 API 그림")}<div><code>${esc(pickUrl)}</code>
+      ${pickUrl ? `<div class="mic-pick">${preview(pickUrl, "원본 API 그림", false)}<div><code>${esc(pickUrl)}</code>
         ${same ? '<p class="hint">이미 이 주소를 쓰고 있어요.</p>' : '<button type="button" class="primary-button" data-mic-fix>이 주소로 고치기</button>'}</div></div>` : ""}`;
   }
 
@@ -146,7 +154,7 @@ export function openMonsterImageCheck(root, { focusId = "", onChanged = () => {}
       <section class="mic-sec"><h3>2. 다른 몬스터 그림 이어 두기 <small>원본에 없을 때</small></h3><div data-mic-link-box>${linkHtml(row)}</div></section>
       <p data-mic-status role="status" class="hint"></p>`;
     // 원본 그림이 뜨는지 모르면 한 번 불러 본다.
-    if (row.image_url && !loaded.has(row.image_url)) void probe(row.image_url).then((ok) => { loaded.set(row.image_url, ok); if (!closed && current === row.id && !busy) paintPanel(); });
+    if (row.image_url && !loaded.has(row.image_url)) void probeChain(row.image_url).then((ok) => { loaded.set(row.image_url, ok); if (!closed && current === row.id && !busy) paintPanel(); });
   }
 
   async function checkApi(row) {
@@ -237,6 +245,8 @@ export function openMonsterImageCheck(root, { focusId = "", onChanged = () => {}
   // 미리보기 그림이 안 뜨면 깨진 그림 대신 "안 뜸"으로 보여 준다.
   dialog.addEventListener("error", (event) => {
     if (!event.target.matches?.("img[data-mic-img]")) return;
+    const alts = (event.target.dataset.alts || "").split(" ").filter(Boolean);
+    if (alts.length) { event.target.dataset.alts = alts.slice(1).join(" "); event.target.src = alts[0]; return; }
     const box = event.target.parentElement;
     box.classList.add("is-broken");
     box.textContent = "안 뜸";

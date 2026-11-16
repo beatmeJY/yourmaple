@@ -48,10 +48,10 @@ export function apiParts(imageUrl, sourceId) {
 export function apiInfoUrl(parts) { return `${parts.base}mob/${encodeURIComponent(parts.id)}`; }
 export function apiRenderUrl(parts, action) { return `${parts.base}mob/${encodeURIComponent(parts.id)}/render/${encodeURIComponent(action)}?bgColor=`; }
 
-// 몬스터 그림에 쓸 동작: 서 있기 → 걷기 → 날기 → 그 밖의 동작(맞기·죽기·공격 제외)
+// 몬스터 그림에 쓸 동작: 도감 화면과 같은 순서(move → fly → stand → die1) → 그 밖의 동작(맞기·공격 제외)
 export function pickAction(framebooks) {
   const names = Object.keys(framebooks ?? {});
-  for (const want of ["stand", "move", "fly"]) if (names.includes(want)) return want;
+  for (const want of ["move", "fly", "stand", "die1"]) if (names.includes(want)) return want;
   return names.find((name) => !/^(die|hit|attack|skill|regen|chase)/i.test(name)) ?? names[0] ?? null;
 }
 

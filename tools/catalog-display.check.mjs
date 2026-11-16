@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {changeCards} from '../js/catalog-history.js';
-import {catalogImage,catalogMonsterImage} from '../js/catalog-image.js';
+import {catalogImage,catalogMonsterImage,monsterImageUrls} from '../js/catalog-image.js';
 const html=changeCards([{entity_name:'<script>bad</script>',operation:'UPDATE',changed_at:'2026-10-28T00:00:00Z',changes:{base_options:{before:{attack:33,remaining_upgrades:7},after:{attack:34,remaining_upgrades:7}}}}]);
 assert(html.includes('&lt;script&gt;'));assert(!html.includes('<script>'));assert(html.includes('33'));assert(html.includes('34'));assert(!html.includes('남은 강화 횟수'));
 assert.equal(catalogImage('javascript:alert(1)'), '');
@@ -16,6 +16,13 @@ assert.equal(catalogMonsterImage({source_id:'9420521',name:'크렉셀(1페이즈
 assert.match(catalogMonsterImage({image_url:'https://a.test/x.png',image_fallback_url:'https://b.test/y.png'}), /data-fallback="https:\/\/b\.test\/y\.png"[^>]*src="https:\/\/a\.test\/x\.png"/);
 assert.match(catalogMonsterImage({image_url:null,image_fallback_url:'https://b.test/y.png'}), /is-fallback[^>]*src="https:\/\/b\.test\/y\.png"/);
 assert.doesNotMatch(catalogMonsterImage({image_url:'https://a.test/x.png'}), /data-fallback/);
+// 원본 그림 API 주소는 move → fly → stand → die1 순서로 시도(2026-11-16 사용자 요청)
+const api='https://maplestory.io/api/gms/100/mob/9300063/render/stand?bgColor=';
+assert.deepEqual(monsterImageUrls(api),['move','fly','stand','die1'].map(a=>`https://maplestory.io/api/gms/100/mob/9300063/render/${a}?bgColor=`));
+assert.deepEqual(monsterImageUrls('https://a.test/x.png'),['https://a.test/x.png']);
+assert.deepEqual(monsterImageUrls('javascript:alert(1)'),[]);
+const chain=catalogMonsterImage({image_url:api,image_fallback_url:'https://b.test/y.png'});
+assert.match(chain,/data-alts="[^"]*render\/fly\?bgColor= [^"]*render\/stand\?bgColor= [^"]*render\/die1\?bgColor="[^>]*data-fallback="https:\/\/b\.test\/y\.png"[^>]*src="[^"]*render\/move\?bgColor="/);
 assert.match(catalogMonsterImage({source_id:'8810018',name:'혼테일',image_url:'https://example.com/original.png'}), /https:\/\/example.com\/original.png/);
 assert(!catalogMonsterImage({source_id:'8810018',name:'혼테일',image_url:'javascript:alert(1)'}).includes('javascript:'));
 console.log('원본 이미지 우선·보스 ID/이름 일치 시 기존 공용 그림·미확인 몬스터 대체 금지 통과');

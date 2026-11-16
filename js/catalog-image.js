@@ -15,7 +15,14 @@ export function mountCatalogImageFallback(root) {
   root.addEventListener("error", event => {
     const image = event.target;
     if (!image.matches?.("img[data-catalog-image]")) return;
-    // 원본 그림이 안 뜨면 관리자가 이어 둔 다른 몬스터 그림으로 한 번만 바꾼다(sql/070).
+    // 원본 그림 API의 다음 동작(move → fly → stand → die1)을 차례로 불러 본다.
+    const alts = (image.dataset.alts || "").split(" ").filter(Boolean);
+    if (alts.length) {
+      image.dataset.alts = alts.slice(1).join(" ");
+      image.src = alts[0];
+      return;
+    }
+    // 그래도 안 뜨면 관리자가 이어 둔 다른 몬스터 그림으로 한 번만 바꾼다(sql/070).
     const fallbackUrl = image.dataset.fallback;
     if (fallbackUrl) {
       delete image.dataset.fallback;
@@ -39,14 +46,28 @@ const bossArt = {
   "8888888": { name: "자쿰", src: "img/zakum.png" },
   "8888889": { name: "카오스 자쿰", src: "img/zakum.png" },
 };
+// 원본 그림 API 몬스터 그림은 동작 순서대로 시도한다(2026-11-16 사용자 요청): move → fly → stand → die1.
+// 저장된 주소가 원본 그림 API 주소가 아니면 그 주소 하나만 쓴다.
+export const MONSTER_ACTIONS = ["move", "fly", "stand", "die1"];
+export function monsterImageUrls(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch { return []; }
+  if (parsed.protocol !== "https:") return [];
+  const match = /^(https:\/\/maplestory\.io\/api\/[^/]+\/[^/]+\/mob\/\d+\/render\/)[^/?#]+(.*)$/.exec(parsed.href);
+  if (!match) return [parsed.href];
+  return MONSTER_ACTIONS.map((action) => `${match[1]}${action}${match[2] || "?bgColor="}`);
+}
+
 export function catalogMonsterImage(row, size = 96) {
-  // 우선순위: 원본 그림 → (안 뜨거나 없으면) 관리자가 이어 둔 몬스터 그림
+  // 우선순위: 원본 그림(동작 순서대로) → (모두 안 뜨거나 없으면) 관리자가 이어 둔 몬스터 그림
   const fallback = catalogImage(row.image_fallback_url, "catalog-monster-image is-fallback", size);
-  const remote = catalogImage(row.image_url, "catalog-monster-image", size);
+  const urls = monsterImageUrls(row.image_url);
+  const remote = catalogImage(urls[0], "catalog-monster-image", size);
   if (remote) {
-    if (!fallback) return remote;
-    const url = new URL(row.image_fallback_url).href;
-    return remote.replace("<img data-catalog-image", `<img data-catalog-image data-fallback="${escapeHtml(url)}"`);
+    const extra = [];
+    if (urls.length > 1) extra.push(`data-alts="${escapeHtml(urls.slice(1).join(" "))}"`);
+    if (fallback) extra.push(`data-fallback="${escapeHtml(new URL(row.image_fallback_url).href)}"`);
+    return extra.length ? remote.replace("<img data-catalog-image", `<img data-catalog-image ${extra.join(" ")}`) : remote;
   }
   if (fallback) return fallback;
   const art = Object.hasOwn(bossArt, row.source_id) ? bossArt[row.source_id] : null;

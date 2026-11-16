@@ -27,8 +27,10 @@ assert.equal(apiInfoUrl(parts), "https://maplestory.io/api/gms/100/mob/9300063")
 assert.equal(apiRenderUrl(parts, "fly"), "https://maplestory.io/api/gms/100/mob/9300063/render/fly?bgColor=");
 assert.deepEqual(apiParts(null, "100100"), { base: "https://maplestory.io/api/gms/100/", id: "100100", action: null });
 assert.equal(pickAction({ die1: 4, fly: 2, hit1: 1 }), "fly", "스티지(월묘) 실제 응답");
-assert.equal(pickAction({ move: 3, stand: 2 }), "stand");
-assert.equal(pickAction({ die1: 1, attack1: 2, skill1: 1, jump: 1 }), "jump");
+assert.equal(pickAction({ move: 3, stand: 2 }), "move", "move 가 먼저");
+assert.equal(pickAction({ stand: 2, die1: 1 }), "stand");
+assert.equal(pickAction({ die1: 1, attack1: 2, skill1: 1, jump: 1 }), "die1", "die1 은 네 번째 순서");
+assert.equal(pickAction({ attack1: 2, jump: 1 }), "jump");
 assert.equal(pickAction({}), null);
 assert.equal(diagnose(parts, 200, { framebooks: { die1: 4, fly: 2, hit1: 1 } }).kind, "wrong-action");
 assert.equal(diagnose(parts, 200, { framebooks: { die1: 4, fly: 2, hit1: 1 } }).action, "fly");
