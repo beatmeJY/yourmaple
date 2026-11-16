@@ -262,11 +262,12 @@ export function render(root) {
     const latest = now - (previous?.stats[key] ?? now);
     const total = now - base;
     const tone = (delta) => delta > 0 ? "is-up" : delta < 0 ? "is-down" : "";
+    // 중요한 건 현재 수치라 크게 두고, 이번·전체 증가량은 옆에 작게 붙인다.
+    const baseName = start.egg ? "정옵" : start.baseLabel ?? "시작 옵션";
     return `<tr class="${tone(latest)}">
-      <th scope="row">${escapeHtml(label)}</th><td>${formatCount(base)}</td>
+      <th scope="row">${escapeHtml(label)}</th>
       <td class="cs-tip-current">${formatCount(now)}</td>
-      <td class="${tone(latest)}">${previous ? signed(latest) : "—"}</td>
-      <td class="${tone(total)}">${signed(total)}</td>
+      <td class="cs-tip-delta"><span class="cs-tip-latest ${tone(latest)}" title="이번 주문서로 바뀐 양">${previous && latest ? escapeHtml(signed(latest)) : ""}</span><small class="cs-tip-total ${tone(total)}" title="${escapeHtml(`${baseName} ${formatCount(base)} 대비`)}">${escapeHtml(baseName)} ${formatCount(base)} · <b>${escapeHtml(signed(total))}</b></small></td>
     </tr>`;
   }
 
@@ -329,7 +330,7 @@ export function render(root) {
         <div class="cs-tip-head"><span class="cs-grade" title="${escapeHtml(`${start.baseLabel} 대비 점수 · HP·MP는 10당 1점`)}"><i aria-hidden="true"></i>${escapeHtml(start.baseLabel)} 대비 <b>${escapeHtml(scoreText(graded.tenths))}</b><small>${escapeHtml(graded.grade.name)}</small></span><div class="cs-tip-name${wins ? " is-up" : ""}">${escapeHtml(start.name || "내 아이템")}${wins ? ` <small>(+${wins})</small>` : ""}</div>${start.label ? `<div class="cs-tip-meta">${escapeHtml(start.label)}</div>` : ""}</div>
       </div>
       <table class="cs-tip-stats" aria-label="장비 옵션 비교">
-        <thead><tr><th scope="col">옵션</th><th scope="col">${escapeHtml(start.egg ? "정옵" : start.baseLabel ?? "시작 옵션")}</th><th scope="col">현재 수치</th><th scope="col">이번 증가량</th><th scope="col">전체 증가량</th></tr></thead>
+        <thead><tr><th scope="col">옵션</th><th scope="col">현재 수치</th><th scope="col"><span class="sr-only">이번 증가량과 </span>${escapeHtml(start.egg ? "정옵" : start.baseLabel ?? "시작 옵션")} 대비</th></tr></thead>
         <tbody>${CHAOS_STATS.map((stat) => statLine(stat, history.at(-1)?.before)).join("")}</tbody>
       </table>
       <div class="cs-tip-slots"><span>업그레이드 가능 횟수</span><b>${escapeHtml(formatCount(current.slots))} / ${escapeHtml(formatCount(start.slots))}</b></div>
@@ -337,9 +338,13 @@ export function render(root) {
       <span class="cs-tip-fx" data-tip-fx></span>`;
   }
 
-  const changeChip = (change) => change.gone
-    ? `<span class="cs-chip is-down">${escapeHtml(CHAOS_STATS.find((stat) => stat.key === change.key).label)} 사라짐</span>`
-    : `<span class="cs-chip ${change.delta > 0 ? "is-up" : change.delta < 0 ? "is-down" : ""}">${escapeHtml(CHAOS_STATS.find((stat) => stat.key === change.key).label)} ${escapeHtml(signed(change.delta))}</span>`;
+  // 기록 한 줄의 능력치: 바른 뒤 현재 값을 크게, 이전 대비 변화를 작게.
+  const changeChip = (change, after) => {
+    const label = escapeHtml(CHAOS_STATS.find((stat) => stat.key === change.key).label);
+    const tone = change.gone || change.delta < 0 ? "is-down" : change.delta > 0 ? "is-up" : "";
+    const now = change.gone ? "사라짐" : formatCount(after?.stats[change.key] ?? 0);
+    return `<span class="cs-stat-chip ${tone}"><span>${label}</span><b>${escapeHtml(now)}</b><small>${escapeHtml(change.gone ? "" : signed(change.delta))}</small></span>`;
+  };
 
   function paintLog() {
     const wins = history.filter((item) => item.success).length;
@@ -366,17 +371,18 @@ export function render(root) {
     let wins = 0;
     return rolls.map((roll, index) => {
       if (roll.success) wins += 1;
-      const { tenths, grade } = gradeOf(rolls[index + 1]?.before ?? final, wins, setup);
+      const after = rolls[index + 1]?.before ?? final;
+      const { tenths, grade } = gradeOf(after, wins, setup);
       const change = tenths - chaosScoreTenths(setup.base, roll.before.stats);
       const changeClass = change > 0 ? " is-up" : change < 0 ? " is-down" : "";
       const label = rollLabel(roll.success, chaosChangeTotal(roll.changes));
       const labelClass = label === "대성공" ? "cs-log-great" : label === "떨어짐" ? "cs-log-down" : "";
-      const chips = roll.success ? roll.changes.map(changeChip).join("") || "바뀐 능력치 없음" : "능력치 변화 없음";
+      const chips = roll.success ? roll.changes.map((item) => changeChip(item, after)).join("") || '<span class="cs-log-none">바뀐 능력치 없음</span>' : '<span class="cs-log-none">능력치 변화 없음</span>';
       return `<li class="${roll.success ? "is-success" : "is-fail"}">
         <div class="cs-log-row"><span class="cs-log-n">${escapeHtml(roll.n)}장째</span><b class="${labelClass}">${label}</b>
           <div class="cs-log-scores">
-            <span class="cs-log-grade" style="--grade:${grade.color}" title="${escapeHtml(grade.name)}"><i aria-hidden="true"></i>누적 ${escapeHtml(scoreText(tenths))}점</span>
-            <span class="cs-log-change${changeClass}">이번 ${escapeHtml(change === 0 ? "±0" : scoreText(change))}점</span>
+            <span class="cs-log-grade" style="--grade:${grade.color}" title="${escapeHtml(grade.name)}"><i aria-hidden="true"></i>${escapeHtml(scoreText(tenths))}점</span>
+            <span class="cs-log-change${changeClass}" >이전 대비 ${escapeHtml(change === 0 ? "±0" : scoreText(change))}점</span>
           </div>
         </div><div class="cs-log-chips">${chips}</div>
       </li>`;
@@ -405,17 +411,22 @@ export function render(root) {
           <span><strong>${escapeHtml(row.start.name || "내 아이템")}</strong><small>${row.index + 1}번째 결과 · ${active ? "현재 장비" : "보관됨"} · 혼줌 ${row.history.length}장</small></span>
           ${selectedStats.length > 1 ? `<span class="cs-chip">합계 ${formatCount(row.selectedTotal)}</span>` : ""}
           <span class="cs-log-grade" style="--grade:${row.grade.color}"><i aria-hidden="true"></i>${escapeHtml(scoreText(row.tenths))} · ${escapeHtml(row.grade.name)}</span>
-          ${renderOptionComparison(row.start, row.current, selectedStats.length ? selectedStats : CHAOS_STATS)}
+          ${renderFinalStats(row.current, selectedStats)}
         </summary>
         <div data-attempt-detail>${open ? renderAttemptDetail(row) : ""}</div>
       </details>`;
     }).join("") : `<p class="cs-hint">혼줌을 바르면 여기에 장비 결과가 쌓여요.</p>`;
   }
 
+  // 강화 이력 요약: 정옵 없이 최종 수치만. 정렬에 고른 능력치가 있으면 그것만 보여 준다.
+  function renderFinalStats(state, picked = []) {
+    const keys = picked.length ? picked : CHAOS_STATS.filter(({ key }) => state.stats[key]);
+    return `<span class="cs-final-stats">${keys.map(({ key, label }) =>
+      `<span class="cs-chip"><span>${escapeHtml(label)}</span> <b>${state.stats[key] ? formatCount(state.stats[key]) : picked.length ? "0" : "사라짐"}</b></span>`).join("") || '<span class="cs-hint">남은 능력치 없음</span>'}</span>`;
+  }
+
   function renderAttemptDetail(entry) {
-    const stats = statDiff(entry.start, entry.current);
-    return `<p class="cs-hint">남은 강화 횟수 ${escapeHtml(entry.current.slots)}/${escapeHtml(entry.start.slots)} · ${entry.start.egg ? "알 적용" : "시작"} 옵션 대비</p>
-      <div class="cs-log-chips cs-attempt-stats">${stats.map(({ label, now, diff }) => `<span class="cs-chip ${diff > 0 ? "is-up" : diff < 0 ? "is-down" : ""}">${escapeHtml(label)} ${now ? escapeHtml(formatCount(now)) : "사라짐"} (${escapeHtml(signed(diff))})</span>`).join("")}</div>
+    return `<p class="cs-hint">남은 강화 횟수 ${escapeHtml(entry.current.slots)}/${escapeHtml(entry.start.slots)} · 주문서마다 바른 뒤 수치와 이전 대비 변화</p>
       <ol class="cs-log-list">${renderRolls(entry.start, entry.current, entry.history)}</ol>`;
   }
 
