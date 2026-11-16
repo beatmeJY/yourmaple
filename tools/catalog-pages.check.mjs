@@ -21,6 +21,8 @@ try {
       { id: "m3", name: "번호 없음", level: null, hp: null, exp: null, image_url: "http://bad/", source_id: null },
       { id: "m4", name: "같은 번호", level: 5, source_id: "100100" },
       { id: "m5", name: "이상한 번호", level: 5, source_id: "../x" },
+      { id: "m6", name: "혼테일", level: 160, source_id: "8810018", image_url: img(8810018) },
+      { id: "m7", name: "가짜 혼테일", level: 160, source_id: "8810118", image_url: img(8810118) },
     ],
     drops: [
       { monster_id: "m1", item_id: "i1", rate_percent: 0.5, source_entry: 1 },
@@ -38,7 +40,7 @@ try {
   writeFileSync(fixturePath, JSON.stringify(fixture));
   const run = spawnSync("python3", ["tools/build_catalog_pages.py", out, "--fixture", fixturePath], { cwd: root, encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
-  assert.match(run.stdout, /몬스터 페이지 3개 · 아이템 페이지 3개/);
+  assert.match(run.stdout, /몬스터 페이지 5개 · 아이템 페이지 3개/);
 
   // 1) 주소는 몬스터 번호, 번호가 없으면 id. 같은 번호·이상한 번호는 건너뛴다.
   const snail = readFileSync(join(out, "monsters", "100100", "index.html"), "utf8");
@@ -85,18 +87,25 @@ try {
   assert.match(snail, /href="\/items\/2000000\/">빨간 포션/);
   assert.match(snail, /href="\/items\/">아이템 정보 없음/);
 
+  // 3-2) 원본 그림이 빈 보스는 우리 그림(번호와 이름이 모두 맞을 때만)
+  const horntail = readFileSync(join(out, "monsters", "8810018", "index.html"), "utf8");
+  assert.match(horntail, /<img src="\/img\/horntail\.png"/);
+  assert.ok(!horntail.includes("mob/8810018/render"));
+  const fake = readFileSync(join(out, "monsters", "8810118", "index.html"), "utf8");
+  assert.ok(!fake.includes("/img/horntail.png") && fake.includes("mob/8810118/render/move"));
+
   // 4) 사이트맵: 예전 몬스터 주소는 지우고 새 주소만, 기본 주소는 유지
   const sitemap = readFileSync(join(out, "sitemap.xml"), "utf8");
   assert.ok(!sitemap.includes("/monsters/old/"));
   assert.ok(sitemap.includes("<loc>https://yourmaple.kr/monsters/</loc>"));
-  assert.equal((sitemap.match(/\/monsters\/[^<]+\/<\/loc>/g) || []).length, 3);
+  assert.equal((sitemap.match(/\/monsters\/[^<]+\/<\/loc>/g) || []).length, 5);
   assert.equal((sitemap.match(/\/items\/[^<]+\/<\/loc>/g) || []).length, 3);
 
   // 5) 소개 페이지 목록
   const intro = readFileSync(join(out, "monsters", "index.html"), "utf8");
   assert.ok(!intro.includes("<!-- monster-list -->"));
-  assert.match(intro, /메랜 몬스터 전체 목록 \(3마리\)/);
-  assert.equal((intro.match(/href="\/monsters\/[^"]+\/"/g) || []).length, 3);
+  assert.match(intro, /메랜 몬스터 전체 목록 \(5마리\)/);
+  assert.equal((intro.match(/href="\/monsters\/[^"]+\/"/g) || []).length, 5);
 
   // 6) 몬스터가 없으면 배포를 멈춘다
   writeFileSync(fixturePath, JSON.stringify({ monsters: [], drops: [], items: [] }));

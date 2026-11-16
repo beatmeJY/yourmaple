@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {changeCards} from '../js/catalog-history.js';
-import {catalogImage,catalogMonsterImage,monsterImageUrls} from '../js/catalog-image.js';
+import {catalogImage,catalogMonsterImage,isBlankImage,isChaosMonster,monsterImageUrls} from '../js/catalog-image.js';
 const html=changeCards([{entity_name:'<script>bad</script>',operation:'UPDATE',changed_at:'2026-10-28T00:00:00Z',changes:{base_options:{before:{attack:33,remaining_upgrades:7},after:{attack:34,remaining_upgrades:7}}}}]);
 assert(html.includes('&lt;script&gt;'));assert(!html.includes('<script>'));assert(html.includes('33'));assert(html.includes('34'));assert(!html.includes('남은 강화 횟수'));
 assert.equal(catalogImage('javascript:alert(1)'), '');
@@ -23,7 +23,17 @@ assert.deepEqual(monsterImageUrls('https://a.test/x.png'),['https://a.test/x.png
 assert.deepEqual(monsterImageUrls('javascript:alert(1)'),[]);
 const chain=catalogMonsterImage({image_url:api,image_fallback_url:'https://b.test/y.png'});
 assert.match(chain,/data-alts="[^"]*render\/fly\?bgColor= [^"]*render\/stand\?bgColor= [^"]*render\/die1\?bgColor="[^>]*data-fallback="https:\/\/b\.test\/y\.png"[^>]*src="[^"]*render\/move\?bgColor="/);
-assert.match(catalogMonsterImage({source_id:'8810018',name:'혼테일',image_url:'https://example.com/original.png'}), /https:\/\/example.com\/original.png/);
+// 2026-11-16 사용자 결정: 원본 주소가 있어도 보스 그림을 먼저 쓴다(혼테일 원본은 빈 그림뿐).
+const horntail = catalogMonsterImage({source_id:'8810018',name:'혼테일',image_url:'https://example.com/original.png'});
+assert.match(horntail, /img\/horntail.png/);
+assert.doesNotMatch(horntail, /original.png/);
+assert.match(catalogMonsterImage({source_id:'8810018',name:'다른 몬스터',image_url:'https://example.com/original.png'}), /original.png/);
+assert.equal(isChaosMonster('카오스 혼테일'), true);
+assert.equal(isChaosMonster('혼테일'), false);
+assert.equal(isChaosMonster('카오스혼테일'), false);
+assert.equal(isBlankImage({naturalWidth:4,naturalHeight:4}), true);
+assert.equal(isBlankImage({naturalWidth:4,naturalHeight:40}), false);
+assert.equal(isBlankImage({naturalWidth:96,naturalHeight:80}), false);
 assert(!catalogMonsterImage({source_id:'8810018',name:'혼테일',image_url:'javascript:alert(1)'}).includes('javascript:'));
 console.log('원본 이미지 우선·보스 ID/이름 일치 시 기존 공용 그림·미확인 몬스터 대체 금지 통과');
 

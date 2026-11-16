@@ -17211,3 +17211,59 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .mt-restore { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) { .mt-card, .md-danger { animation: none; transition: none; } .mt-card.is-leaving { transform: none; } }
+
+/* 카오스 몬스터 구분(2026-11-16 사용자 요청): 같은 이름의 일반 몬스터와 섞여도 보이게 CHAOS 딱지와 붉은 빛 */
+.mo-chaos { display: inline-flex; align-items: center; align-self: flex-start; flex: none; padding: 0 6px; border: 1px solid oklch(0.7 0.2 25 / 0.6); border-radius: var(--radius-pill); background: linear-gradient(135deg, oklch(0.55 0.21 25 / 0.55), oklch(0.42 0.17 15 / 0.45)); color: oklch(0.93 0.07 25); font-size: 9.5px; font-weight: 900; letter-spacing: 0.08em; line-height: 1.6; text-shadow: 0 0 6px oklch(0.65 0.22 25 / 0.8); box-shadow: 0 0 10px -2px oklch(0.6 0.22 25 / 0.7); }
+.mo-name .mo-chaos { font-size: 9.5px; color: oklch(0.93 0.07 25); }
+.mo-card.is-chaos { border-color: oklch(0.65 0.2 25 / 0.55); background: linear-gradient(160deg, oklch(0.5 0.18 25 / 0.2), rgba(255, 255, 255, 0.04) 70%); box-shadow: 0 0 0 1px oklch(0.65 0.2 25 / 0.18), 0 0 18px -6px oklch(0.62 0.22 25 / 0.75); }
+.mo-page .mo-card.is-chaos.is-on { border-color: oklch(0.75 0.19 25 / 0.85); box-shadow: 0 0 0 2px oklch(0.7 0.2 25 / 0.3), 0 10px 24px -10px oklch(0.62 0.22 25); }
+.mo-card.is-chaos .mo-art { box-shadow: inset 0 0 0 1px oklch(0.65 0.2 25 / 0.35), 0 0 14px -4px oklch(0.6 0.22 25 / 0.8); }
+.mo-d-title.is-chaos { align-items: center; }
+.mo-d-title.is-chaos .mo-chaos { align-self: center; font-size: 11px; padding: 1px 8px; }
+.mo-d-title.is-chaos strong { color: oklch(0.9 0.08 25); text-shadow: 0 0 14px oklch(0.6 0.22 25 / 0.55); }
+.catalog-dropper.is-chaos { border-color: oklch(0.65 0.2 25 / 0.45); box-shadow: 0 0 14px -6px oklch(0.62 0.22 25 / 0.75); }
+.catalog-dropper-name .mo-chaos { align-self: center; }
+@media (prefers-reduced-motion: reduce) { .mo-card.is-chaos, .catalog-dropper.is-chaos { transition: none; } }
+
+/* ── 몬스터 드랍 수정창(도감 관리자, sql/072) ── */
+.mde-dialog h2 small { margin-left: 6px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.mde-search { position: relative; display: flex; align-items: center; }
+.mde-search .ym-search-icon { position: absolute; left: 12px; pointer-events: none; }
+.catalog-edit-dialog .mde-search input { height: 40px; padding-left: 36px; border-radius: 12px; }
+.mde-results { list-style: none; margin: 6px 0 0; padding: 4px; display: grid; gap: 2px; max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); animation: ym-fade-up .18s ease both; }
+.mde-pick { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: background .15s, transform .25s var(--spring); }
+.mde-pick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mde-pick small, .mde-name small { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.mde-pick b { color: var(--gold); font-size: 16px; }
+.mde-pick-art { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: rgba(255,255,255,.04); }
+.mde-pick:hover, .mde-pick:focus-visible { background: color-mix(in srgb, var(--gold) 12%, transparent); outline: none; transform: translateX(2px); }
+.mde-muted { padding: 8px; color: var(--muted); font-size: 13px; }
+.mde-img { width: 28px; height: 28px; object-fit: contain; image-rendering: pixelated; }
+.mde-count { margin-left: 4px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.mde-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.mde-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 112px auto; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.02); transition: opacity .2s, border-color .2s, background .2s; }
+.mde-row.is-new { border-color: color-mix(in srgb, var(--gain) 55%, transparent); background: color-mix(in srgb, var(--gain) 7%, transparent); }
+.mde-row.is-flash { animation: mde-pop .5s var(--spring) both; }
+.mde-row.is-removed { opacity: .45; border-style: dashed; }
+.mde-row.is-removed .mde-name b { text-decoration: line-through; }
+.mde-row.is-invalid { border-color: var(--danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 25%, transparent); }
+.mde-art { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: rgba(255,255,255,.04); color: var(--muted); }
+.mde-art .mde-img { width: 32px; height: 32px; }
+.mde-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; font-size: 13.5px; }
+.mde-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.mde-tag { padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--gain) 20%, transparent); color: var(--gain); font-size: 10.5px; font-style: normal; font-weight: 800; }
+.catalog-edit-dialog label.mde-rate { display: flex; align-items: center; gap: 4px; }
+.catalog-edit-dialog .mde-rate input { height: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.mde-rate i { color: var(--muted); font-style: normal; font-size: 12px; }
+.mde-toggle { height: 32px; padding: 0 12px; font-size: 12px; }
+.mde-row:not(.is-removed) .mde-toggle:hover { color: var(--danger); }
+.mde-empty { padding: 18px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 13px; text-align: center; }
+.mde-dialog [data-edit-status].is-error { color: var(--danger); }
+@keyframes mde-pop { from { transform: scale(.96); box-shadow: 0 0 0 0 color-mix(in srgb, var(--gain) 45%, transparent); } 60% { transform: scale(1.01); box-shadow: 0 0 18px 2px color-mix(in srgb, var(--gain) 30%, transparent); } to { transform: none; box-shadow: none; } }
+@media (max-width: 600px) {
+  .mde-row { grid-template-columns: 32px minmax(0, 1fr) 70px auto; gap: 8px; padding: 6px; }
+  .mde-art { width: 32px; height: 32px; }
+  .mde-rate i { display: none; }
+  .mde-toggle { padding: 0 9px; }
+}
+@media (prefers-reduced-motion: reduce) { .mde-results, .mde-row.is-flash { animation: none; } .mde-pick, .mde-row { transition: none; } }

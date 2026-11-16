@@ -16,6 +16,9 @@ from collections import defaultdict
 
 SITE = "https://yourmaple.kr"
 ACTIONS = ["move", "fly", "stand", "die1"]
+# 원본 그림이 비어 있는 보스는 우리 그림을 먼저 쓴다(js/catalog-image.js 의 bossArt 와 같게, 번호와 이름이 모두 맞을 때만).
+BOSS_ART = {"8810018": ("혼테일", "/img/horntail.png"), "8810118": ("카오스 혼테일", "/img/horntail.png"),
+            "8888888": ("자쿰", "/img/zakum.png"), "8888889": ("카오스 자쿰", "/img/zakum.png")}
 KIND_NAMES = {"Etc": "기타", "Cash": "캐시", "Use": "소비", "Setup": "설치"}
 FOOTER = ('<footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a>'
           '<a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav>'
@@ -179,7 +182,8 @@ def monster_page(monster, drops, items, item_links, by_id, neighbors):
     desc = (f"메이플랜드(메랜) {name} {lv}: HP {fmt(monster.get('hp'))}, 경험치 {fmt(monster.get('exp'))}"
             + (f", 드랍 아이템 {len(rows)}개({top} 등)와 드랍 확률" if rows else "")
             + "을 확인하세요. Your Maple(유얼메이플) 몬스터 도감.")
-    urls = image_urls(monster.get("image_url"))
+    boss = BOSS_ART.get(str(monster.get("source_id")))
+    urls = [boss[1]] if boss and boss[0] == name else image_urls(monster.get("image_url"))
     fallback = by_id.get(monster.get("image_link_monster_id"), {}).get("image_url")
     if fallback:  # 원본이 다 안 뜨면 관리자가 이어 둔 몬스터 그림(sql/070)
         urls += image_urls(fallback)

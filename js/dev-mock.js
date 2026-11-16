@@ -536,6 +536,41 @@ const RPCS = {
     const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"monster",entity_id:p_id,entity_name:m.name,operation:"UPDATE",changes,release_label:"운영자 상세 수정",changed_at:iso()});
     save();return {monster:m};
   },
+  // sql/072 흉내: 드랍 수정(관리자 전용, 목록 전체 저장·버전 충돌·바뀐 줄마다 이력)
+  catalog_monster_drops_edit_detail({p_id}) {
+    assertMockReviewer();const m=rowsOf("catalog_monsters").find(x=>x.id===p_id&&!x.deleted_at);if(!m)throw new Error("몬스터를 찾을 수 없습니다");
+    const own=rowsOf("catalog_monster_drops").filter(d=>d.monster_id===p_id).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+    const items=rowsOf("catalog_items");
+    const drops=own.map(d=>{const i=items.find(x=>x.id===d.item_id);return {id:d.id,item_id:d.item_id,rate_percent:d.rate_percent??null,source:d.source,item:i?{id:i.id,name:i.name,image_url:i.image_url??null,source_id:i.source_id??null}:null};})
+      .sort((a,b)=>(b.rate_percent??-1)-(a.rate_percent??-1));
+    return {version:JSON.stringify(own),drops};
+  },
+  catalog_monster_drops_save({p_id,p_version,p_drops}) {
+    assertMockReviewer();const m=rowsOf("catalog_monsters").find(x=>x.id===p_id&&!x.deleted_at);if(!m)throw new Error("몬스터를 찾을 수 없습니다");
+    const all=rowsOf("catalog_monster_drops"),items=rowsOf("catalog_items");
+    const own=all.filter(d=>d.monster_id===p_id).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+    if(JSON.stringify(own)!==p_version)throw Object.assign(new Error("다른 화면에서 드랍이 바뀌었습니다. 다시 불러온 뒤 저장해 주세요"),{code:"40001"});
+    if(!Array.isArray(p_drops)||p_drops.length>500)throw new Error("드랍 목록 형식이 아닙니다");
+    const kept=new Set();
+    for(const e of p_drops){
+      if(!items.some(i=>i.id===e.item_id))throw new Error("도감에 없는 아이템입니다");
+      if(e.rate_percent!=null&&(typeof e.rate_percent!=="number"||e.rate_percent<0||e.rate_percent>100))throw new Error("드랍 확률은 0~100% 사이로 입력해 주세요");
+      if(e.id){if(!own.some(d=>d.id===e.id))throw new Error("이 몬스터의 드랍이 아닙니다");if(kept.has(e.id))throw new Error("같은 드랍이 두 번 들어 있습니다");kept.add(e.id);}
+    }
+    const log=rowsOf("catalog_changes"),name=id=>items.find(i=>i.id===id)?.name??null;
+    const push=(operation,changes)=>log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"monster",entity_id:p_id,entity_name:m.name,operation,changes,release_label:"운영자 드랍 수정",changed_at:iso()});
+    const label=r=>r==null?"확률 미상":`${r}%`;
+    for(const d of own)if(!kept.has(d.id)){all.splice(all.indexOf(d),1);push("DELETE",{item_id:{before:name(d.item_id),after:null},rate_percent:{before:d.rate_percent??null,after:null}});}
+    let next=all.filter(d=>d.source==="operator"&&d.monster_source_id===p_id).reduce((n,d)=>Math.max(n,d.source_entry+1),0);
+    for(const e of p_drops){
+      if(e.id){const d=all.find(x=>x.id===e.id),changes={};
+        if(d.item_id!==e.item_id)changes.item_id={before:name(d.item_id),after:name(e.item_id)};
+        if((d.rate_percent??null)!==(e.rate_percent??null))changes.rate_percent={before:d.rate_percent??null,after:e.rate_percent??null};
+        if(Object.keys(changes).length){Object.assign(d,{item_id:e.item_id,rate_percent:e.rate_percent??null,rate_text:label(e.rate_percent)});push("UPDATE",changes);}
+      }else{all.push({id:crypto.randomUUID(),monster_id:p_id,item_id:e.item_id,source:"operator",monster_source_id:p_id,source_entry:next++,rate_percent:e.rate_percent??null,rate_text:label(e.rate_percent),created_at:iso()});push("INSERT",{item_id:{before:null,after:name(e.item_id)},rate_percent:{before:null,after:e.rate_percent??null}});}
+    }
+    save();return this.catalog_monster_drops_edit_detail({p_id});
+  },
   catalog_item_edit_detail({p_id}) {
     assertMockReviewer();const item=rowsOf("catalog_items").find(x=>x.id===p_id);if(!item)throw new Error("아이템을 찾을 수 없습니다");
     return {version:JSON.stringify(item),speed_supported:true,percent_supported:true,level_up_supported:true,ranges_supported:true,ranges:structuredClone(item.source_data?.option_ranges||Object.fromEntries(rowsOf("catalog_item_stats").filter(x=>x.item_id===p_id&&x.minimum_value!=null&&x.maximum_value!=null).map(x=>[x.stat_key,{min:x.minimum_value,max:x.maximum_value}]))),draft:{attack_speed_label:item.attack_speed_label||"",level_up_count:item.level_up_count??null,name:item.name,description:item.description||"",effect_description:item.effect_description||"",base_options:structuredClone(item.base_options||{}),requirements:structuredClone(item.requirements||{}),review_note:""}};

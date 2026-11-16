@@ -5,7 +5,7 @@
 import { escapeHtml } from "./format.js";
 import { reviewRpc, reviewError } from "./catalog-review.js";
 import { clearCatalogCache } from "./catalog-api.js";
-import { monsterImageUrls } from "./catalog-image.js";
+import { isBlankImage, monsterImageUrls } from "./catalog-image.js";
 import { apiInfoUrl, apiParts, apiRenderUrl, diagnose, imageCandidates } from "./monster-image-audit.js";
 
 const esc = (value) => escapeHtml(String(value ?? ""));
@@ -36,7 +36,7 @@ function probe(url) {
     const image = new Image();
     image.referrerPolicy = "no-referrer";
     const timer = setTimeout(() => { image.src = ""; resolve(false); }, 10_000);
-    image.onload = () => { clearTimeout(timer); resolve(image.naturalWidth > 0); };
+    image.onload = () => { clearTimeout(timer); resolve(image.naturalWidth > 0 && !isBlankImage(image)); };
     image.onerror = () => { clearTimeout(timer); resolve(false); };
     image.src = href;
   });
@@ -243,6 +243,9 @@ export function openMonsterImageCheck(root, { focusId = "", onChanged = () => {}
     input.setSelectionRange(caret, caret);
   });
   // 미리보기 그림이 안 뜨면 깨진 그림 대신 "안 뜸"으로 보여 준다.
+  dialog.addEventListener("load", (event) => {
+    if (event.target.matches?.("img[data-mic-img]") && isBlankImage(event.target)) event.target.dispatchEvent(new Event("error"));
+  }, true);
   dialog.addEventListener("error", (event) => {
     if (!event.target.matches?.("img[data-mic-img]")) return;
     const alts = (event.target.dataset.alts || "").split(" ").filter(Boolean);

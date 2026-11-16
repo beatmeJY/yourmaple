@@ -8,10 +8,20 @@ export function catalogImage(url, className = "", size = 64) {
   } catch { return ""; }
 }
 
+// 불러왔지만 가로·세로가 8px 이하인 그림은 빈 그림으로 본다(2026-11-16: 혼테일 stand 가 4×4 빈 GIF 라 "뜬 것"으로 멈췄다).
+export function isBlankImage(image) {
+  return image.naturalWidth <= 8 && image.naturalHeight <= 8;
+}
+
 const mounted = new WeakSet();
 export function mountCatalogImageFallback(root) {
   if (mounted.has(root)) return;
   mounted.add(root);
+  // 빈 그림도 못 불러온 것과 같이 다음 그림으로 넘긴다.
+  root.addEventListener("load", event => {
+    const image = event.target;
+    if (image.matches?.("img[data-catalog-image]") && isBlankImage(image)) image.dispatchEvent(new Event("error", { bubbles: false }));
+  }, true);
   root.addEventListener("error", event => {
     const image = event.target;
     if (!image.matches?.("img[data-catalog-image]")) return;
@@ -40,6 +50,8 @@ export function mountCatalogImageFallback(root) {
 
 // 숙제 화면에서도 사용하는 보스 계열 그림입니다. 원본 수치/이미지 URL을 DB에 덮어쓰지 않습니다.
 // 출처의 특수 ID와 이름을 함께 확인해 다른 몬스터에 잘못 붙지 않도록 합니다.
+// 원본 그림 주소가 있어도 이 그림을 먼저 씁니다(2026-11-16 사용자 요청: 혼테일 원본은 빈 그림뿐).
+// tools/build_catalog_pages.py 의 BOSS_ART 와 같게 유지합니다.
 const bossArt = {
   "8810018": { name: "혼테일", src: "img/horntail.png" },
   "8810118": { name: "카오스 혼테일", src: "img/horntail.png" },
@@ -59,6 +71,8 @@ export function monsterImageUrls(url) {
 }
 
 export function catalogMonsterImage(row, size = 96) {
+  const art = Object.hasOwn(bossArt, row.source_id) && bossArt[row.source_id].name === row.name ? bossArt[row.source_id] : null;
+  if (art) return `<img data-catalog-image class="catalog-monster-image" src="${art.src}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" />`;
   // 우선순위: 원본 그림(동작 순서대로) → (모두 안 뜨거나 없으면) 관리자가 이어 둔 몬스터 그림
   const fallback = catalogImage(row.image_fallback_url, "catalog-monster-image is-fallback", size);
   const urls = monsterImageUrls(row.image_url);
@@ -69,8 +83,11 @@ export function catalogMonsterImage(row, size = 96) {
     if (fallback) extra.push(`data-fallback="${escapeHtml(new URL(row.image_fallback_url).href)}"`);
     return extra.length ? remote.replace("<img data-catalog-image", `<img data-catalog-image ${extra.join(" ")}`) : remote;
   }
-  if (fallback) return fallback;
-  const art = Object.hasOwn(bossArt, row.source_id) ? bossArt[row.source_id] : null;
-  if (!art || art.name !== row.name) return "";
-  return `<img data-catalog-image class="catalog-monster-image" src="${art.src}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" />`;
+  return fallback;
 }
+
+// 카오스 몬스터는 이름이 "카오스 "로 시작한다. 같은 이름의 일반 몬스터와 구분해 보이게 쓴다(2026-11-16 사용자 요청).
+export function isChaosMonster(name) {
+  return /^카오스\s/.test(String(name ?? ""));
+}
+export const chaosBadge = `<span class="mo-chaos" title="카오스 몬스터">CHAOS</span>`;

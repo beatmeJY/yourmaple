@@ -1,7 +1,7 @@
 import { monsterCombatFacts, neededMonsterAccuracy } from "../monster-details.js";
 import { formatExpPerHp, sortMonsterRows } from "../monster-view.js";
 import { catalogRpc, monsterDrops, clearCatalogCache } from "../catalog-api.js";
-import { catalogImage, catalogMonsterImage, mountCatalogImageFallback } from "../catalog-image.js";
+import { catalogImage, catalogMonsterImage, chaosBadge, isChaosMonster, mountCatalogImageFallback } from "../catalog-image.js";
 import { sfx } from "../effects.js";
 import { notify } from "../toast.js";
 import { escapeHtml, formatCount } from "../format.js";
@@ -11,6 +11,7 @@ import { catalogError } from "../catalog.js";
 import { mountHistoryDialog } from "../catalog-history.js";
 import { canReviewCatalog } from "../catalog-review.js";
 import { mountMonsterEditor } from "../catalog-monster-editor.js";
+import { mountMonsterDropsEditor } from "../monster-drops-editor.js";
 import { openMonsterImageCheck } from "../monster-image-check.js";
 import { openMonsterDelete } from "../monster-delete.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
@@ -188,7 +189,7 @@ export function render(root) {
     box.innerHTML = `
       <div class="catalog-detail-actions" data-monster-admin></div>
       <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
-      <div class="mo-d-title"><strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
+      <div class="mo-d-title${isChaosMonster(row.name) ? " is-chaos" : ""}">${isChaosMonster(row.name) ? chaosBadge : ""}<strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
       <div class="mo-d-stats">
         <div><span>HP</span><strong>${num(row.hp)}</strong></div>
         <div><span>EXP</span><strong>${num(row.exp)}</strong></div>
@@ -224,7 +225,7 @@ export function render(root) {
     void reviewer.then((allowed) => {
       const actions = box.querySelector("[data-monster-admin]");
       if (!allowed || request !== detailLoadId || !actions?.isConnected) return;
-      actions.innerHTML = '<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-check-image>그림 확인</button><button type="button" class="catalog-pill-button" data-edit-monster>몬스터 수정</button><button type="button" class="catalog-pill-button is-danger" data-delete-monster>몬스터 삭제</button>';
+      actions.innerHTML = '<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-check-image>그림 확인</button><button type="button" class="catalog-pill-button" data-edit-monster>몬스터 수정</button><button type="button" class="catalog-pill-button" data-edit-drops>드랍 수정</button><button type="button" class="catalog-pill-button is-danger" data-delete-monster>몬스터 삭제</button>';
       actions.querySelector("[data-delete-monster]").addEventListener("click", () => openMonsterDelete(root, row, () => {
         dropsCache.delete(row.id);
         sfx("check");
@@ -234,6 +235,13 @@ export function render(root) {
       }));
       actions.querySelector("[data-check-image]").addEventListener("click", () => openMonsterImageCheck(root, { focusId: row.id, onChanged: () => repaintList() }));
       mountHistoryDialog(actions.querySelector("[data-open-history]"), row.id, "monster", row.name);
+      mountMonsterDropsEditor(actions.querySelector("[data-edit-drops]"), root, row.id, row.name, (_saved, summary) => {
+        dropsCache.delete(row.id);
+        sfx("check");
+        const parts = [summary.added && `${summary.added}개 넣음`, summary.removed && `${summary.removed}개 뺌`].filter(Boolean);
+        notify(`${row.name} 드랍을 고쳐 공개 도감에 반영했어요.${parts.length ? ` (${parts.join(" · ")})` : ""}`, "success");
+        repaintList();
+      });
       mountMonsterEditor(actions.querySelector("[data-edit-monster]"), root, row.id, () => {
         dropsCache.delete(row.id);
         sfx("check");
@@ -402,9 +410,9 @@ export function render(root) {
           const accuracy = neededAccuracy(row, myLevel);
           const el = firstElement(row);
           // 작은 가로 카드(2026-11-06 사용자 요청): 그림(레벨 배지) | 이름 / 1 EXP당 HP 막대, 아래 줄 HP·EXP·명중, 속성.
-          return `<button type="button" class="mo-card${row.id === selectedId ? " is-on" : ""}" data-pick-monster="${row.id}" aria-pressed="${row.id === selectedId}" style="--i:${Math.min(index, 16)}">
+          return `<button type="button" class="mo-card${row.id === selectedId ? " is-on" : ""}${isChaosMonster(row.name) ? " is-chaos" : ""}" data-pick-monster="${row.id}" aria-pressed="${row.id === selectedId}" style="--i:${Math.min(index, 16)}">
             <span class="mo-art element-chip" data-element="${escapeHtml(el)}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<span class="mo-lv">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></span>
-            <span class="mo-name"><strong title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</strong></span>
+            <span class="mo-name">${isChaosMonster(row.name) ? chaosBadge : ""}<strong title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</strong></span>
             <span class="mo-eff" title="1 HP당 EXP ${escapeHtml(formatExpPerHp(row.hp,row.exp))}">
               <span class="mo-eff-top"><span>1 EXP당 HP</span>${hpCell(ratio)}</span>
               <span class="mo-eff-bar"><i style="width:${width}%"></i></span>

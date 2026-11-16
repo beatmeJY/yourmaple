@@ -2,7 +2,7 @@ import { mountItemEditor } from "../catalog-item-editor.js";
 import { canReviewCatalog } from "../catalog-review.js";
 import { catalogError } from "../catalog.js";
 import { catalogRpc, clearCatalogCache, itemDropPage } from "../catalog-api.js";
-import { catalogImage, catalogMonsterImage, mountCatalogImageFallback } from "../catalog-image.js";
+import { catalogImage, catalogMonsterImage, chaosBadge, isChaosMonster, mountCatalogImageFallback } from "../catalog-image.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { itemOptionFields } from "../item-options.js";
 import { equipmentCard, equipmentTypeName, isEquipment } from "../catalog-equipment.js";
@@ -150,7 +150,7 @@ async function mountItemDrops(slot, id) {
       const bar = `<span class="catalog-dropper-bar" aria-hidden="true"><i data-drop-rate="${Number.isFinite(rate) ? rate : ""}"></i></span>`;
       const unknown = drop.rate_percent == null ? " is-unknown" : "";
       if (!monster) return `<div class="catalog-dropper${unknown}"><div class="catalog-dropper-art"><span aria-hidden="true">?</span></div><span><span class="catalog-dropper-name"><b>몬스터 정보 미제공</b></span>${bar}</span><strong>${rateText}</strong></div>`;
-      return `<a class="catalog-dropper${unknown}" href="${monsterHref(monster)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><span class="catalog-dropper-name"><b>${text(monster.name)}</b><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small></span>${bar}</span><strong>${rateText}</strong></a>`;
+      return `<a class="catalog-dropper${unknown}${isChaosMonster(monster.name) ? " is-chaos" : ""}" href="${monsterHref(monster)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><span class="catalog-dropper-name">${isChaosMonster(monster.name) ? chaosBadge : ""}<b>${text(monster.name)}</b><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small></span>${bar}</span><strong>${rateText}</strong></a>`;
     }).join(""));
     paintRateBars(rowsSlot);
     count += rows.length;
