@@ -15819,20 +15819,19 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-tip-name { font-size: 17px; font-weight: 900; color: #f3effb; overflow-wrap: anywhere; }
 .cs2 .cs-tip-name.is-up, .cs2 .cs-tip-name small { color: var(--cs-gold); }
 .cs2 .cs-tip-meta { margin-top: 2px; font-size: 12px; color: #8f87a8; }
-.cs2 .cs-tip-stats { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.cs2 .cs-tip-stats li { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 8px; font-size: 14px; transition: background .3s; }
-.cs2 .cs-tip-stats li > span { color: #d9d3ea; }
-.cs2 .cs-tip-stats li > b { color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; }
-.cs2 .cs-tip-stats li.is-gone > span, .cs2 .cs-tip-stats li.is-gone > b { color: #6f6888; text-decoration: line-through; }
-.cs2 .cs-stage.is-ok .cs-tip-stats li.is-up, .cs2 .cs-stage.is-ok .cs-tip-stats li.is-down { animation: cs-row-flash 1.4s both; }
-.cs2 .cs-tip-stats li.is-up { --row: oklch(0.55 0.13 150 / .22); }
-.cs2 .cs-tip-stats li.is-down { --row: oklch(0.55 0.17 25 / .22); }
+.cs2 .cs-tip-stats { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cs2 .cs-tip-stats :is(th, td) { padding: 6px 3px; text-align: right; overflow-wrap: anywhere; }
+.cs2 .cs-tip-stats thead th { color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.25; word-break: keep-all; overflow-wrap: normal; border-bottom: 1px solid var(--line); }
+.cs2 .cs-tip-stats th:first-child { width: 24%; text-align: left; }
+.cs2 .cs-tip-stats tbody { font-size: 13px; }
+.cs2 .cs-tip-stats tbody th { font-weight: 600; }
+.cs2 .cs-tip-stats .cs-tip-current { color: var(--text); font-weight: 800; }
+.cs2 .cs-tip-stats td.is-up { color: var(--cs-up); }
+.cs2 .cs-tip-stats td.is-down { color: var(--cs-down); }
+.cs2 .cs-stage.is-ok .cs-tip-stats tbody tr:is(.is-up, .is-down) { animation: cs-row-flash 1.4s both; }
+.cs2 .cs-tip-stats tr.is-up { --row: oklch(0.55 0.13 150 / .22); }
+.cs2 .cs-tip-stats tr.is-down { --row: oklch(0.55 0.17 25 / .22); }
 @keyframes cs-row-flash { 0%, 60% { background: var(--row); } 100% { background: transparent; } }
-.cs2 .cs-delta { justify-self: end; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 12px; font-weight: 800; background: rgba(255,255,255,.07); color: #b9b1cf; animation: cs-chip-in .4s var(--spring) both; }
-.cs2 .cs-delta.is-blank { visibility: hidden; animation: none; }
-.cs2 .cs-delta.is-up { background: oklch(0.5 0.13 150 / .3); color: oklch(0.88 0.13 150); }
-.cs2 .cs-delta.is-down { background: oklch(0.5 0.17 25 / .3); color: oklch(0.85 0.12 25); }
-@keyframes cs-chip-in { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
 .cs2 .cs-tip-slots { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); font-size: 13px; color: #b9b1cf; }
 .cs2 .cs-tip-slots b { color: #fff; font-variant-numeric: tabular-nums; }
 .cs2 .cs-pips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -15909,6 +15908,21 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-cost-total strong { color: var(--gold); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .cs2 .cs-attempts-head, .cs2 .cs-attempt summary { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .cs2 .cs-attempts-head select { background: var(--bg-raised); color: var(--text); border: 1px solid var(--glass-line); border-radius: 10px; padding: 6px 8px; }
+.cs2 .cs-attempt-sort-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.cs2 .cs-attempt-sort-stats[hidden] { display: none; }
+.cs2 .cs-attempt-sort-stats legend { padding-inline: 6px; color: var(--muted); }
+.cs2 .cs-attempt-sort-stats label { gap: 5px; cursor: pointer; }
+.cs2 .cs-attempt-sort-stats label:has(:checked) { border-color: var(--gold); color: var(--text); }
+.cs2 .cs-attempt-sort-stats .cs-hint { flex-basis: 100%; }
 .cs2 [data-attempts] { display: grid; gap: 8px; }
 .cs2 .cs-attempt { min-width: 0; padding: 10px 12px; border: 1px solid var(--glass-line); border-radius: 12px; background: var(--glass); }
 .cs2 .cs-attempt summary { cursor: pointer; }
@@ -15916,6 +15930,10 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-attempt summary strong { overflow-wrap: anywhere; }
 .cs2 .cs-attempt summary::after { content: "▾"; color: var(--muted); }
 .cs2 .cs-attempt[open] summary::after { content: "▴"; }
+.cs2 .cs-option-comparison { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.cs2 .cs-attempt summary > .cs-option-comparison { flex-basis: 100%; order: 1; }
+.cs2 .cs-option-comparison-label { color: var(--muted); font-size: 12px; }
+.cs2 .cs-option-comparison .cs-chip { font-size: 12px; font-variant-numeric: tabular-nums; }
 .cs2 [data-attempt-detail] { margin-top: 10px; }
 .cs2 .cs-attempt-stats { margin-block: 6px 10px; }
 .cs2 .cs-log-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -15963,7 +15981,7 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 }
 @media (prefers-reduced-motion: reduce) {
   .cs2 .cs-head, .cs2 .cs-head-icon, .cs2 .cs-panel, .cs2 .cs-odds, .cs2 .cs-delta-cell, .cs2 .cs-delta-bar > i, .cs2 .cs-pick-results, .cs2 .cs-fav, .cs2 .cs-picked,
-  .cs2 .cs-tip-stats li, .cs2 .cs-delta, .cs2 .cs-tip-fx, .cs2 .cs-orb-ring, .cs2 .cs-scroll, .cs2 .cs-scroll-orb img, .cs2 .cs-log-list li { animation: none !important; }
+  .cs2 .cs-tip-stats tbody tr, .cs2 .cs-tip-fx, .cs2 .cs-orb-ring, .cs2 .cs-scroll, .cs2 .cs-scroll-orb img, .cs2 .cs-log-list li { animation: none !important; }
   .cs2 .cs-start, .cs2 .cs-scroll, .cs2 .cs-fav, .cs2 .cs-delta-bar > i, .cs2 .cs-stage-glow { transition: none; }
 }
 

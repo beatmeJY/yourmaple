@@ -81,7 +81,6 @@ export function render(root) {
   let history = savedAttempt?.history ?? []; // [{ n, success, changes, before }]
   let archived = savedAttempt?.archived ?? [];
   let storageWarning = false;
-  let lastChanges = new Map();
   let autoTimer = 0;
   let autoTarget = false;
   let lastGrade = ""; // 등급이 바뀌는 순간에만 테두리 빛을 한 번 퍼뜨린다.
@@ -173,8 +172,8 @@ export function render(root) {
             <p class="cs-hint" data-cost-hint></p>
           </div>
           <div class="cs-log-head"><h2 id="cs-log-title">현재 장비 기록</h2><span data-log-count></span></div>
-          <div class="cs-log-stats" data-log-stats></div>
           <div class="cs-diff" data-diff></div>
+          <div class="cs-log-stats" data-log-stats></div>
           <ol class="cs-log-list" data-log></ol>
         </section>
       </div>
@@ -182,10 +181,15 @@ export function render(root) {
         <div class="cs-attempts-head">
           <h2 id="cs-attempts-title">장비 강화 이력</h2>
           <label><span class="sr-only">강화 이력 정렬</span><select data-attempt-order>
-            <option value="recent">최신순</option><option value="score">강화 잘된 순</option>
+            <option value="recent">최신순</option><option value="score">강화 잘된 순</option><option value="stats">선택 옵션 순</option>
           </select></label>
         </div>
-        <p class="cs-hint">장비를 펼치면 최종 옵션과 주문서별 결과를 볼 수 있어요. 강화 잘된 순은 장비의 등급 점수 기준이에요. 이 브라우저에 저장되며 시도 전체 초기화로 지울 수 있어요.</p>
+        <fieldset class="cs-attempt-sort-stats" data-attempt-sort-stats hidden>
+          <legend>비교할 능력치</legend>
+          ${CHAOS_STATS.map(({ key, label }) => `<label class="ym-chip"><input type="checkbox" value="${key}" /> ${escapeHtml(label)}</label>`).join("")}
+          <p class="cs-hint">선택한 최종 수치의 합이 높은 순으로 정렬해요. 합이 같거나 선택한 옵션이 없으면 강화 등급 점수순이에요.</p>
+        </fieldset>
+        <p class="cs-hint">장비를 펼치면 최종 옵션과 주문서별 결과를 볼 수 있어요. 이 브라우저에 저장되며 시도 전체 초기화로 지울 수 있어요.</p>
         <div data-attempts></div>
       </section>
     </div>
@@ -209,7 +213,13 @@ export function render(root) {
   const diffBox = root.querySelector("[data-diff]");
   const attempts = root.querySelector("[data-attempts]");
   const attemptOrder = root.querySelector("[data-attempt-order]");
-  attemptOrder.value = stored.attemptOrder === "score" ? "score" : "recent";
+  const attemptStatFilters = root.querySelector("[data-attempt-sort-stats]");
+  const attemptStatInputs = [...attemptStatFilters.querySelectorAll("input")];
+  attemptOrder.value = ["score", "stats"].includes(stored.attemptOrder) ? stored.attemptOrder : "recent";
+  attemptStatFilters.hidden = attemptOrder.value !== "stats";
+  for (const input of attemptStatInputs) {
+    input.checked = Array.isArray(stored.attemptSortStats) && stored.attemptSortStats.includes(input.value);
+  }
 
   function readSetup() {
     const name = root.querySelector("[data-item-name]").value.trim();
@@ -245,20 +255,37 @@ export function render(root) {
     if (history.length) archived.push({ start, current, history });
   }
 
-  function statLine({ key, label }) {
-    const now = current?.stats[key];
-    const was = start?.stats[key];
-    if (!(was > 0) && !(now > 0)) return "";
-    const change = lastChanges.get(key);
-    const tone = change ? (change.gone || change.delta < 0 ? "is-down" : change.delta > 0 ? "is-up" : "is-same") : "";
-    const badge = change && !change.gone ? `<em class="cs-delta ${tone}">${escapeHtml(signed(change.delta))}</em>` : `<em class="cs-delta is-blank"></em>`;
-    if (!(now > 0)) return `<li class="is-gone${change ? " is-changed is-down" : ""}"><span>${escapeHtml(label)}</span><b>사라짐</b>${badge}</li>`;
-    return `<li class="${change ? `is-changed ${tone}` : ""}"><span>${escapeHtml(label)}</span><b>+${escapeHtml(formatCount(now))}</b>${badge}</li>`;
+  function statLine({ key, label }, previous) {
+    const base = (start.base ?? start.stats)[key] ?? 0;
+    const now = current.stats[key] ?? 0;
+    if (!base && !now && !start.stats[key]) return "";
+    const latest = now - (previous?.stats[key] ?? now);
+    const total = now - base;
+    const tone = (delta) => delta > 0 ? "is-up" : delta < 0 ? "is-down" : "";
+    return `<tr class="${tone(latest)}">
+      <th scope="row">${escapeHtml(label)}</th><td>${formatCount(base)}</td>
+      <td class="cs-tip-current">${formatCount(now)}</td>
+      <td class="${tone(latest)}">${previous ? signed(latest) : "—"}</td>
+      <td class="${tone(total)}">${signed(total)}</td>
+    </tr>`;
   }
 
   function gradeOf(state, wins, setup = start) {
     const tenths = chaosScoreTenths(setup.base, state.stats);
     return { tenths, grade: chaosGrade(tenths, wins) };
+  }
+
+  function renderOptionComparison(setup, state, options = CHAOS_STATS) {
+    const rows = statDiff({ stats: setup.base ?? setup.stats }, state);
+    return `<span class="cs-option-comparison">
+      <span class="cs-option-comparison-label">${escapeHtml(setup.baseLabel ?? "시작 옵션")} / 현재</span>
+      ${options.map(({ key, label }) => {
+        const row = rows.find((stat) => stat.key === key);
+        if (!row && options === CHAOS_STATS) return "";
+        const diff = row?.diff ?? 0;
+        return `<span class="cs-chip${diff > 0 ? " is-up" : diff < 0 ? " is-down" : ""}">${escapeHtml(label)} <b>${formatCount(row?.start ?? 0)} / ${formatCount(row?.now ?? 0)}</b></span>`;
+      }).join("")}
+    </span>`;
   }
 
   function paintGrade() {
@@ -301,7 +328,10 @@ export function render(root) {
         ${image ? `<div class="cs-tip-art">${image}</div>` : ""}
         <div class="cs-tip-head"><span class="cs-grade" title="${escapeHtml(`${start.baseLabel} 대비 점수 · HP·MP는 10당 1점`)}"><i aria-hidden="true"></i>${escapeHtml(start.baseLabel)} 대비 <b>${escapeHtml(scoreText(graded.tenths))}</b><small>${escapeHtml(graded.grade.name)}</small></span><div class="cs-tip-name${wins ? " is-up" : ""}">${escapeHtml(start.name || "내 아이템")}${wins ? ` <small>(+${wins})</small>` : ""}</div>${start.label ? `<div class="cs-tip-meta">${escapeHtml(start.label)}</div>` : ""}</div>
       </div>
-      <ul class="cs-tip-stats">${CHAOS_STATS.map(statLine).join("")}</ul>
+      <table class="cs-tip-stats" aria-label="장비 옵션 비교">
+        <thead><tr><th scope="col">옵션</th><th scope="col">${escapeHtml(start.egg ? "정옵" : start.baseLabel ?? "시작 옵션")}</th><th scope="col">현재 수치</th><th scope="col">이번 증가량</th><th scope="col">전체 증가량</th></tr></thead>
+        <tbody>${CHAOS_STATS.map((stat) => statLine(stat, history.at(-1)?.before)).join("")}</tbody>
+      </table>
       <div class="cs-tip-slots"><span>업그레이드 가능 횟수</span><b>${escapeHtml(formatCount(current.slots))} / ${escapeHtml(formatCount(start.slots))}</b></div>
       <div class="cs-pips" aria-hidden="true">${pips}</div>
       <span class="cs-tip-fx" data-tip-fx></span>`;
@@ -324,9 +354,11 @@ export function render(root) {
     log.innerHTML = history.length
       ? renderRolls(start, current, history)
       : `<li class="cs-log-empty">가운데 주문서를 눌러 바르기 시작해요</li>`;
-    diffBox.innerHTML = current && (start.egg || history.length)
-      ? `<p class="cs-field-label">${start.egg ? "알 적용 옵션 대비" : "시작 대비"}</p>${rows.map((row) => `<div class="cs-diff-row ${row.diff > 0 ? "is-up" : row.diff < 0 ? "is-down" : ""}"><span>${escapeHtml(row.label)}</span><small>${escapeHtml(formatCount(row.start))} → ${row.now ? escapeHtml(formatCount(row.now)) : "사라짐"}</small><b>${escapeHtml(signed(row.diff))}</b></div>`).join("")}`
-      : "";
+    diffBox.innerHTML = current ? renderOptionComparison(start, current) : "";
+    if (start?.egg) {
+      diffBox.innerHTML += `<p class="cs-field-label">알 적용 옵션 대비</p>${rows.map((row) =>
+        `<div class="cs-diff-row ${row.diff > 0 ? "is-up" : row.diff < 0 ? "is-down" : ""}"><span>${escapeHtml(row.label)}</span><small>${formatCount(row.start)} → ${row.now ? formatCount(row.now) : "사라짐"}</small><b>${escapeHtml(signed(row.diff))}</b></div>`).join("")}`;
+    }
   }
 
   function renderRolls(setup, final, rolls) {
@@ -352,13 +384,18 @@ export function render(root) {
   }
 
   function paintAttempts() {
+    const order = attemptOrder.value;
+    const selectedStats = order === "stats"
+      ? CHAOS_STATS.filter((_, index) => attemptStatInputs[index].checked)
+      : [];
     const expanded = new Set([...attempts.querySelectorAll("details[open]")].map((node) => node.dataset.attempt));
     const entries = history.length ? [...archived, { start, current, history }] : archived;
     const rows = entries.map((entry, index) => {
       const wins = entry.history.filter((roll) => roll.success).length;
-      return { ...entry, index, ...gradeOf(entry.current, wins, entry.start) };
+      const selectedTotal = selectedStats.reduce((sum, { key }) => sum + (entry.current.stats[key] ?? 0), 0);
+      return { ...entry, index, selectedTotal, ...gradeOf(entry.current, wins, entry.start) };
     });
-    rows.sort((a, b) => (attemptOrder.value === "score" ? b.tenths - a.tenths : 0) || b.index - a.index);
+    rows.sort((a, b) => b.selectedTotal - a.selectedTotal || (order === "recent" ? 0 : b.tenths - a.tenths) || b.index - a.index);
     attempts.innerHTML = rows.length ? rows.map((row) => {
       const key = String(row.index);
       const active = row.index === archived.length;
@@ -366,7 +403,9 @@ export function render(root) {
       return `<details class="cs-attempt" data-attempt="${key}" ${open ? "open" : ""}>
         <summary>
           <span><strong>${escapeHtml(row.start.name || "내 아이템")}</strong><small>${row.index + 1}번째 결과 · ${active ? "현재 장비" : "보관됨"} · 혼줌 ${row.history.length}장</small></span>
+          ${selectedStats.length > 1 ? `<span class="cs-chip">합계 ${formatCount(row.selectedTotal)}</span>` : ""}
           <span class="cs-log-grade" style="--grade:${row.grade.color}"><i aria-hidden="true"></i>${escapeHtml(scoreText(row.tenths))} · ${escapeHtml(row.grade.name)}</span>
+          ${renderOptionComparison(row.start, row.current, selectedStats.length ? selectedStats : CHAOS_STATS)}
         </summary>
         <div data-attempt-detail>${open ? renderAttemptDetail(row) : ""}</div>
       </details>`;
@@ -389,7 +428,12 @@ export function render(root) {
     if (!body.firstChild) body.innerHTML = renderAttemptDetail(entry);
   }, true);
   attemptOrder.addEventListener("change", () => {
+    attemptStatFilters.hidden = attemptOrder.value !== "stats";
     persist({ attemptOrder: attemptOrder.value });
+    paintAttempts();
+  });
+  attemptStatFilters.addEventListener("change", () => {
+    persist({ attemptSortStats: attemptStatInputs.filter((input) => input.checked).map((input) => input.value) });
     paintAttempts();
   });
 
@@ -623,7 +667,6 @@ export function render(root) {
     }
     history.push({ n: history.length + 1, success: out.success, changes: out.changes, before: current });
     current = out.item;
-    lastChanges = new Map(out.changes.map((change) => [change.key, change]));
     saveAttempt();
     paint();
     const changeTotal = chaosChangeTotal(out.changes);
@@ -764,7 +807,6 @@ export function render(root) {
     root.querySelector("[data-fx]").replaceChildren();
     current = { slots: start.slots, stats: { ...start.stats } };
     history = [];
-    lastChanges = new Map();
     result.textContent = "";
   }
 
@@ -843,7 +885,6 @@ export function render(root) {
     if (event.target.closest("[data-undo]") && history.length) {
       const last = history.pop();
       current = last.before;
-      lastChanges = new Map();
       result.textContent = `${last.n}장째 이전 상태로 돌아왔어요`;
       saveAttempt();
       sfx("uncheck");
