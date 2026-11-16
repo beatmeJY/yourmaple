@@ -55,7 +55,7 @@
 
 - 변경은 `sql/NNN_설명.sql` 새 파일로 추가하고, 사용자가 Supabase SQL Editor 또는 DBeaver 쓰기 연결(비공개 운영 기록의 "DBeaver로 운영 DB 보기")에서 직접 실행한다. 에이전트는 운영 DB에 접속하지 않는다. 새 파일을 만들면 사용자에게 실행해 달라고 꼭 알린다.
 - **같은 파일을 다시 실행해도 안전하게** 작성한다: `create table if not exists`, `drop constraint/policy/trigger if exists` 후 다시 생성.
-- 개인 데이터 표는 `user_id` + `assign_user_id` 트리거 + RLS(본인 행만 select/insert/update/delete)를 갖는다. 2026-10-21 사용자 결정에 따라 `catalog_monsters`·`catalog_items`는 공용 기준 정보 예외로 `user_id` 없이 비로그인 포함 SELECT만 허용하며, 쓰기는 SQL Editor 운영자만 한다. 예외: SQL058 설치 후 검증된 Google 검토 운영자는 권한 검사 RPC로 선택한 검토 아이템을 공개 반영할 수 있다(일반 사용자의 직접 쓰기는 불가). `catalog_monster_reviews`는 운영자 전용 비공개 검토 표다. `sql/016_dojo.sql`, `sql/027_maker.sql`을 본보기로 쓴다.
+- 개인 데이터 표는 `user_id` + `assign_user_id` 트리거 + RLS(본인 행만 select/insert/update/delete)를 갖는다. 2026-10-21 사용자 결정에 따라 `catalog_monsters`·`catalog_items`는 공용 기준 정보 예외로 `user_id` 없이 비로그인 포함 SELECT만 허용하며, 쓰기는 SQL Editor 운영자만 한다. 예외: SQL058 설치 후 검증된 Google 검토 운영자는 권한 검사 RPC로 선택한 검토 아이템을 공개 반영할 수 있다(일반 사용자의 직접 쓰기는 불가). SQL059~062·069 이후 같은 운영자는 아이템·몬스터 상세를 권한 검사 RPC로 고칠 수 있고, 도감 변경 이력(`catalog_changes`)은 운영자만 읽는다(2026-11-16). `catalog_monster_reviews`는 운영자 전용 비공개 검토 표다. `sql/016_dojo.sql`, `sql/027_maker.sql`을 본보기로 쓴다.
 - 새 SQL 파일은 비공개 운영 기록(공용 agent-context의 `projects/yourmaple/operations.md`)에도 적용 조건과 함께 한 줄 추가한다.
 
 ## 6. 기능별 도메인 메모
@@ -67,6 +67,8 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-16 (Claude) 몬스터 도감 관리자 수정·변경 이력 관리자 전용(사용자 요청): 몬스터 상세 "몬스터 수정" 창(이름·레벨·HP·EXP·MP·명중·전투 수치·약점/반감), 변경 이력·수정 버튼은 관리자만, `sql/069_catalog_monster_edit.sql`(수정 RPC·이력 읽기 관리자만·수정값 보관) — 사용자 실행 완료 [진술]. 052의 정규화 함수도 수정값을 지키도록 069와 같게 맞춤. 검사 36개 통과(PGlite 069: 일반/비로그인 이력 0행·수정 거절, 버전 충돌·범위·속성 겹침 거절, 저장 반영·이력 1건·052 재실행에도 유지), ?mock=reviewer 저장 → 상세·이력 반영, ?mock·guest 버튼 없음·이력 0행, 모바일 375 넘침 없음·콘솔 오류 없음 [실측]. 실제 운영 DB 미검증. 미커밋·미배포
 
 - 2026-11-13 (Codex) 홈·사이드바·로그인·공개 안내에 쓰는 공용 로고를 사용자 제공 라이트 버전으로 교체. 원본 PNG와 대조. 미배포. [실측·진술]
 
@@ -101,6 +103,8 @@
 - 2026-11-09 (Codex) 혼줌 주황 등급의 이미지 뒤 광원을 낮춤. Chrome 미리보기에서 주황 중심/중간 31%/12%, 빨강 57%/25% 확인. 미배포. [실측·진술]
 
 - 2026-11-09 (Codex) 혼줌 원본 정옵 총점·알 적용 옵션 비교·이미지 중앙 등급빛 ecb73a4 배포. 최신 몬파 작업과 AGENTS 충돌 양쪽 보존. 검사 33개·Pages 42611403392 통과, 공개 Chrome 버전·원본 +355·알 적용 옵션 대비·빨강 원형 광원과 콘솔 오류 없음 확인. [실측]
+
+- 2026-11-09 (Claude) 몬스터파크 달력 Lv↑ 그림 5f63ec5 배포(Actions 42612773864 성공, 공개 v=5f63ec5·img/lv-up.png 200) [실측]
 
 - 2026-11-09 (Claude) 몬스터파크 달력 레벨업 그림을 사용자 Lv↑ 그림 `img/lv-up.png`(21KB)로 교체, 예전 level-up.png 삭제(다른 참조 없음 확인). ?mock 그림 8개 로딩·26×20px·넘침 없음, 검사 33개 통과 [실측]. 미커밋·미배포
 

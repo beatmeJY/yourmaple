@@ -17105,3 +17105,20 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   padding: 16px;
 }
 .guest-preview p { margin: 0; color: var(--text); }
+
+/* ── 몬스터 수정창(2026-11-16, 도감 관리자 전용): 아이템 수정창 틀에 숫자 칸·속성 칩만 더한다 ── */
+[data-monster-edit-form] section { display: grid; gap: 8px; }
+[data-monster-edit-form] .catalog-edit-grid input { width: 132px; font-variant-numeric: tabular-nums; }
+.catalog-edit-el-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.catalog-edit-el-row > span { width: 36px; font-size: 13px; color: var(--muted); }
+.catalog-edit-els { display: flex; flex-wrap: wrap; gap: 6px; }
+.catalog-edit-dialog label.catalog-edit-el { display: inline-flex; align-items: center; gap: 0; margin: 0; padding: 0; cursor: pointer; background: transparent; border-radius: 999px; }
+.catalog-edit-el input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.catalog-edit-el span { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; transition: background .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .25s var(--spring, cubic-bezier(.34,1.56,.64,1)); }
+.catalog-edit-el:hover span { border-color: color-mix(in srgb, var(--el) 60%, var(--line)); }
+.catalog-edit-el input:checked + span { color: var(--el-ink); background: color-mix(in srgb, var(--el) 26%, transparent); border-color: var(--el); box-shadow: 0 0 12px color-mix(in srgb, var(--el) 40%, transparent); transform: scale(1.05); }
+.catalog-edit-el input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+[data-monster-edit-form] [data-edit-status].is-error { color: var(--danger); }
+.mo-detail [data-monster-admin]:empty { display: none; }
+@media (max-width: 600px) { [data-monster-edit-form] .catalog-edit-grid { grid-template-columns: 1fr; } [data-monster-edit-form] .catalog-edit-grid input { width: 150px; } }
+@media (prefers-reduced-motion: reduce) { .catalog-edit-el span { transition: none; } .catalog-edit-el input:checked + span { transform: none; } }

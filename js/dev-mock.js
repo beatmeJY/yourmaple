@@ -264,6 +264,8 @@ class Query {
       return { data: null, error: { message: "permission denied for monster park settings", code: "42501" } };
     }
     if ((["catalog_monsters", "catalog_items", "catalog_monster_drops", "catalog_changes", "catalog_revision", "catalog_item_stats", "catalog_item_requirements", "catalog_item_jobs", "catalog_item_source_attributes"].includes(this.table) && this.action !== "select") || this.table === "catalog_monster_reviews") return { data: null, error: { message: "permission denied for shared catalog", code: "42501" } };
+    // sql/063·069 와 같이 도감 변경 이력은 관리자만 읽는다.
+    if (this.table === "catalog_changes" && this.action === "select" && !reviewAllowed()) return { data: [], error: null, count: 0 };
     const rows = rowsOf(this.table);
     let result = [];
     if (this.action === "select") {
@@ -468,6 +470,22 @@ const RPCS = {
     return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
   },
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
+  catalog_monster_edit_detail({p_id}) {
+    assertMockReviewer();const m=rowsOf("catalog_monsters").find(x=>x.id===p_id);if(!m)throw new Error("몬스터를 찾을 수 없습니다");
+    const keys=["level","hp","exp","mp","required_accuracy","accuracy_reference_level","accuracy_per_level","physical_attack","magic_attack","physical_defense","magic_defense","movement_speed","knockback_damage","meso_value"];
+    const split=v=>String(v??"").split(", ").filter(Boolean);
+    return {version:JSON.stringify(m),draft:{name:m.name,...Object.fromEntries(keys.map(k=>[k,m[k]??null])),weak_elements:split(m.weak_elements),resist_elements:split(m.resist_elements)}};
+  },
+  catalog_monster_edit_save({p_id,p_version,p_draft}) {
+    assertMockReviewer();const m=rowsOf("catalog_monsters").find(x=>x.id===p_id);if(!m)throw new Error("몬스터를 찾을 수 없습니다");
+    if(JSON.stringify(m)!==p_version)throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
+    const next={...p_draft,weak_elements:p_draft.weak_elements.length?p_draft.weak_elements.join(", "):null,resist_elements:p_draft.resist_elements.length?p_draft.resist_elements.join(", "):null};
+    const changes={};for(const [k,v] of Object.entries(next))if(JSON.stringify(m[k]??null)!==JSON.stringify(v))changes[k]={before:m[k]??null,after:v};
+    if(!Object.keys(changes).length)return {monster:m};
+    Object.assign(m,next,{updated_at:iso()});
+    const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"monster",entity_id:p_id,entity_name:m.name,operation:"UPDATE",changes,release_label:"운영자 상세 수정",changed_at:iso()});
+    save();return {monster:m};
+  },
   catalog_item_edit_detail({p_id}) {
     assertMockReviewer();const item=rowsOf("catalog_items").find(x=>x.id===p_id);if(!item)throw new Error("아이템을 찾을 수 없습니다");
     return {version:JSON.stringify(item),speed_supported:true,percent_supported:true,level_up_supported:true,ranges_supported:true,ranges:structuredClone(item.source_data?.option_ranges||Object.fromEntries(rowsOf("catalog_item_stats").filter(x=>x.item_id===p_id&&x.minimum_value!=null&&x.maximum_value!=null).map(x=>[x.stat_key,{min:x.minimum_value,max:x.maximum_value}]))),draft:{attack_speed_label:item.attack_speed_label||"",level_up_count:item.level_up_count??null,name:item.name,description:item.description||"",effect_description:item.effect_description||"",base_options:structuredClone(item.base_options||{}),requirements:structuredClone(item.requirements||{}),review_note:""}};

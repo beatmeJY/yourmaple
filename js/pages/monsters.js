@@ -3,11 +3,14 @@ import { formatExpPerHp, sortMonsterRows } from "../monster-view.js";
 import { catalogRpc, monsterDrops, clearCatalogCache } from "../catalog-api.js";
 import { catalogImage, catalogMonsterImage, mountCatalogImageFallback } from "../catalog-image.js";
 import { sfx } from "../effects.js";
+import { notify } from "../toast.js";
 import { escapeHtml, formatCount } from "../format.js";
 import { matchesText, parseBound } from "../filters.js";
 import { elements, hpPerExp, readElementTokens } from "../monster-merge.js";
 import { catalogError } from "../catalog.js";
 import { mountHistoryDialog } from "../catalog-history.js";
+import { canReviewCatalog } from "../catalog-review.js";
+import { mountMonsterEditor } from "../catalog-monster-editor.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
 
@@ -118,6 +121,9 @@ export function render(root) {
   let accMine = readAccuracy();
   let detailLoadId = 0;
   const dropsCache = new Map();
+  // 변경 이력·수정은 도감 관리자만(2026-11-16 사용자 요청, DB 는 sql/069 가 막는다). 화면마다 한 번만 묻는다.
+  let reviewer = null;
+  let repaintList = () => {};
 
 
   // 드랍 칸: 확률이 높은 순, 막대는 0.01%~100%를 로그 눈금으로(희귀 드랍도 보이게). 확률은 합산하지 않는다.
@@ -161,7 +167,7 @@ export function render(root) {
     const tags = elementTags(row);
 
     box.innerHTML = `
-      <div class="catalog-detail-actions"><button type="button" class="catalog-history-button" data-open-history>변경 이력</button></div>
+      <div class="catalog-detail-actions" data-monster-admin></div>
       <div class="mo-stage element-chip" data-element="${escapeHtml(firstElement(row))}">${catalogMonsterImage(row) || `<b>${escapeHtml(initial(row.name))}</b>`}<i aria-hidden="true"></i></div>
       <div class="mo-d-title"><strong>${escapeHtml(row.name)}</strong><span class="mo-badge">Lv.${row.level == null ? "-" : escapeHtml(formatCount(row.level))}</span></div>
       <div class="mo-d-stats">
@@ -195,7 +201,19 @@ export function render(root) {
       facts.innerHTML = monsterCombatFacts(row);
       paintAccuracy();
     });
-    mountHistoryDialog(box.querySelector("[data-open-history]"), row.id, "monster", row.name);
+    reviewer ??= canReviewCatalog();
+    void reviewer.then((allowed) => {
+      const actions = box.querySelector("[data-monster-admin]");
+      if (!allowed || request !== detailLoadId || !actions?.isConnected) return;
+      actions.innerHTML = '<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-edit-monster>몬스터 수정</button>';
+      mountHistoryDialog(actions.querySelector("[data-open-history]"), row.id, "monster", row.name);
+      mountMonsterEditor(actions.querySelector("[data-edit-monster]"), root, row.id, () => {
+        dropsCache.delete(row.id);
+        sfx("check");
+        notify(`${row.name} 정보를 고쳐 공개 도감에 반영했어요.`, "success");
+        repaintList();
+      });
+    });
     const cached = dropsCache.get(row.id);
     const pending = cached && Date.now() - cached.time < 30_000 ? Promise.resolve(cached.result) : monsterDrops(row.id);
     void pending.then(result => {
@@ -375,6 +393,7 @@ export function render(root) {
     extraHtml: `<p class="hint" data-level-range hidden></p>`,
     fields: [],
     bind({ root: page, reload, showStatus, repaint }) {
+      repaintList = repaint;
       // 처음 내 레벨은 대표 캐릭터 레벨(명중 계산 칸). 필터의 "내 레벨"을 적으면 그 값을 따른다.
       loadMainCharacter().then((state) => {
         if (accLevel) return;

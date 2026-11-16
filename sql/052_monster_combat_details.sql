@@ -23,24 +23,44 @@ grant execute on function catalog_import_private.monster_stat(text,text) to serv
 -- 사용자 결정: 원문에 필요 명중 숫자가 있으면 기존 값을 덮어씁니다.
 -- 원문 미제공일 때는 정규화 트리거의 coalesce로 기존 값을 유지합니다.
 
+-- 2026-11-16: sql/069 의 관리자 수정값(source_data.manual_edit)을 다시 실행해도 지키도록 069 와 같은 정의로 맞춤.
 create or replace function public.catalog_monster_columns()
 returns trigger language plpgsql security invoker set search_path='' as $$
-declare v text;
+declare v text; m jsonb; k text;
 begin
- if new.source is distinct from 'collected' then return new; end if;
- v:=new.source_data->>'stats_text';
- -- MP는 이미 해석된 숫자를 우선 사용해 50K 같은 축약 표기를 잘못 읽지 않습니다.
- new.mp:=case when jsonb_typeof(new.source_data->'mp')='number' then (new.source_data->>'mp')::numeric else catalog_import_private.monster_stat(v,'MP') end;
- new.physical_attack:=catalog_import_private.monster_stat(v,'물리 데미지');
- new.magic_attack:=catalog_import_private.monster_stat(v,'마법 데미지');
- new.physical_defense:=catalog_import_private.monster_stat(v,'물리 방어력');
- new.magic_defense:=catalog_import_private.monster_stat(v,'마법 방어력');
- new.movement_speed:=catalog_import_private.monster_stat(v,'속도');
- new.knockback_damage:=catalog_import_private.monster_stat(v,'넉백 가능 데미지');
- new.meso_value:=catalog_import_private.monster_stat(v,'메소');
- new.required_accuracy:=coalesce(catalog_import_private.monster_stat(v,'필요 명중'),new.required_accuracy);
- new.accuracy_reference_level:=(regexp_match(v,'([0-9]+)레벨[[:space:]]*에서의 필요 명중'))[1]::integer;
- -- 레벨별 증가량은 원문에 없으므로 기존 값을 유지하고 임의로 정하지 않습니다.
+ if new.source is not distinct from 'collected' then
+  v:=new.source_data->>'stats_text';
+  -- MP는 이미 해석된 숫자를 우선 사용해 50K 같은 축약 표기를 잘못 읽지 않습니다.
+  new.mp:=case when jsonb_typeof(new.source_data->'mp')='number' then (new.source_data->>'mp')::numeric else catalog_import_private.monster_stat(v,'MP') end;
+  new.physical_attack:=catalog_import_private.monster_stat(v,'물리 데미지');
+  new.magic_attack:=catalog_import_private.monster_stat(v,'마법 데미지');
+  new.physical_defense:=catalog_import_private.monster_stat(v,'물리 방어력');
+  new.magic_defense:=catalog_import_private.monster_stat(v,'마법 방어력');
+  new.movement_speed:=catalog_import_private.monster_stat(v,'속도');
+  new.knockback_damage:=catalog_import_private.monster_stat(v,'넉백 가능 데미지');
+  new.meso_value:=catalog_import_private.monster_stat(v,'메소');
+  new.required_accuracy:=coalesce(catalog_import_private.monster_stat(v,'필요 명중'),new.required_accuracy);
+  new.accuracy_reference_level:=(regexp_match(v,'([0-9]+)레벨[[:space:]]*에서의 필요 명중'))[1]::integer;
+ end if;
+ m:=new.source_data->'manual_edit';
+ if jsonb_typeof(m)='object' then
+  foreach k in array array['mp','required_accuracy','accuracy_reference_level','physical_attack','magic_attack','physical_defense','magic_defense','movement_speed','knockback_damage','meso_value'] loop
+   if m ? k then
+    case k
+     when 'mp' then new.mp:=(m->>k)::numeric;
+     when 'required_accuracy' then new.required_accuracy:=(m->>k)::numeric;
+     when 'accuracy_reference_level' then new.accuracy_reference_level:=(m->>k)::integer;
+     when 'physical_attack' then new.physical_attack:=(m->>k)::numeric;
+     when 'magic_attack' then new.magic_attack:=(m->>k)::numeric;
+     when 'physical_defense' then new.physical_defense:=(m->>k)::numeric;
+     when 'magic_defense' then new.magic_defense:=(m->>k)::numeric;
+     when 'movement_speed' then new.movement_speed:=(m->>k)::numeric;
+     when 'knockback_damage' then new.knockback_damage:=(m->>k)::numeric;
+     when 'meso_value' then new.meso_value:=(m->>k)::numeric;
+    end case;
+   end if;
+  end loop;
+ end if;
  return new;
 end $$;
 revoke all on function public.catalog_monster_columns() from public,anon,authenticated;
