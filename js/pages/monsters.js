@@ -11,6 +11,7 @@ import { catalogError } from "../catalog.js";
 import { mountHistoryDialog } from "../catalog-history.js";
 import { canReviewCatalog } from "../catalog-review.js";
 import { mountMonsterEditor } from "../catalog-monster-editor.js";
+import { openMonsterImageCheck } from "../monster-image-check.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
 
@@ -205,7 +206,8 @@ export function render(root) {
     void reviewer.then((allowed) => {
       const actions = box.querySelector("[data-monster-admin]");
       if (!allowed || request !== detailLoadId || !actions?.isConnected) return;
-      actions.innerHTML = '<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-edit-monster>몬스터 수정</button>';
+      actions.innerHTML = '<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-check-image>그림 확인</button><button type="button" class="catalog-pill-button" data-edit-monster>몬스터 수정</button>';
+      actions.querySelector("[data-check-image]").addEventListener("click", () => openMonsterImageCheck(root, { focusId: row.id, onChanged: () => repaintList() }));
       mountHistoryDialog(actions.querySelector("[data-open-history]"), row.id, "monster", row.name);
       mountMonsterEditor(actions.querySelector("[data-edit-monster]"), root, row.id, () => {
         dropsCache.delete(row.id);
@@ -294,7 +296,7 @@ export function render(root) {
       <div class="mo-page">
         <header class="ym-page-head mo-head">
           <div><h1>몬스터 도감</h1><p>레벨·약점으로 찾고, 1 EXP당 HP로 사냥 효율을 비교해요.</p></div>
-          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><button type="button" class="mo-ghost" data-catalog-reload>새로 확인</button></div>
+          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><button type="button" class="mo-ghost" data-image-audit hidden>그림 점검</button><button type="button" class="mo-ghost" data-catalog-reload>새로 확인</button></div>
         </header>
         <div class="mo-layout">
           <div class="mo-main">
@@ -406,7 +408,12 @@ export function render(root) {
         }
       });
 
+      // 그림 점검은 도감 관리자에게만 보인다(sql/070).
+      reviewer ??= canReviewCatalog();
+      void reviewer.then((allowed) => { const button = page.querySelector("[data-image-audit]"); if (allowed && button) button.hidden = false; });
+
       page.addEventListener("click", (event) => {
+        if (event.target.closest("[data-image-audit]")) { openMonsterImageCheck(root, { onChanged: () => repaintList() }); return; }
         if (event.target.closest("[data-catalog-reload]")) { clearCatalogCache(); dropsCache.clear(); repaint(); return; }
         const sortButton = event.target.closest("[data-sort-mode]");
         if (sortButton) {

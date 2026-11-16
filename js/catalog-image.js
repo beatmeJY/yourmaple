@@ -15,6 +15,14 @@ export function mountCatalogImageFallback(root) {
   root.addEventListener("error", event => {
     const image = event.target;
     if (!image.matches?.("img[data-catalog-image]")) return;
+    // 원본 그림이 안 뜨면 관리자가 이어 둔 다른 몬스터 그림으로 한 번만 바꾼다(sql/070).
+    const fallbackUrl = image.dataset.fallback;
+    if (fallbackUrl) {
+      delete image.dataset.fallback;
+      image.classList.add("is-fallback");
+      image.src = fallbackUrl;
+      return;
+    }
     const fallback = document.createElement("span");
     fallback.className = "catalog-image-fallback";
     fallback.textContent = "?";
@@ -32,8 +40,15 @@ const bossArt = {
   "8888889": { name: "카오스 자쿰", src: "img/zakum.png" },
 };
 export function catalogMonsterImage(row, size = 96) {
+  // 우선순위: 원본 그림 → (안 뜨거나 없으면) 관리자가 이어 둔 몬스터 그림
+  const fallback = catalogImage(row.image_fallback_url, "catalog-monster-image is-fallback", size);
   const remote = catalogImage(row.image_url, "catalog-monster-image", size);
-  if (remote) return remote;
+  if (remote) {
+    if (!fallback) return remote;
+    const url = new URL(row.image_fallback_url).href;
+    return remote.replace("<img data-catalog-image", `<img data-catalog-image data-fallback="${escapeHtml(url)}"`);
+  }
+  if (fallback) return fallback;
   const art = Object.hasOwn(bossArt, row.source_id) ? bossArt[row.source_id] : null;
   if (!art || art.name !== row.name) return "";
   return `<img data-catalog-image class="catalog-monster-image" src="${art.src}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" />`;

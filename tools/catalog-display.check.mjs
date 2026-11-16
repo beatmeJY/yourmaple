@@ -12,6 +12,10 @@ assert.match(catalogMonsterImage({source_id:'8810018',name:'혼테일'}), /img\/
 assert.match(catalogMonsterImage({source_id:'8888889',name:'카오스 자쿰'}), /img\/zakum.png/);
 assert.equal(catalogMonsterImage({source_id:'8810018',name:'다른 몬스터'}), '');
 assert.equal(catalogMonsterImage({source_id:'9420521',name:'크렉셀(1페이즈)'}), '');
+// 원본 그림 우선, 대체 그림은 오류 때 쓰도록 data-fallback 에만(2026-11-16, sql/070)
+assert.match(catalogMonsterImage({image_url:'https://a.test/x.png',image_fallback_url:'https://b.test/y.png'}), /data-fallback="https:\/\/b\.test\/y\.png"[^>]*src="https:\/\/a\.test\/x\.png"/);
+assert.match(catalogMonsterImage({image_url:null,image_fallback_url:'https://b.test/y.png'}), /is-fallback[^>]*src="https:\/\/b\.test\/y\.png"/);
+assert.doesNotMatch(catalogMonsterImage({image_url:'https://a.test/x.png'}), /data-fallback/);
 assert.match(catalogMonsterImage({source_id:'8810018',name:'혼테일',image_url:'https://example.com/original.png'}), /https:\/\/example.com\/original.png/);
 assert(!catalogMonsterImage({source_id:'8810018',name:'혼테일',image_url:'javascript:alert(1)'}).includes('javascript:'));
 console.log('원본 이미지 우선·보스 ID/이름 일치 시 기존 공용 그림·미확인 몬스터 대체 금지 통과');

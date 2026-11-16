@@ -61,7 +61,11 @@ function seed() {
     dojo_score_log: [],
     dojo_belt_prices: [{ id: "p1", user_id: USER.id, belt: "white", price: "180000", created_at: iso(-30) }],
     notes: [{ id: "n1", user_id: USER.id, title: "목업 메모", content: "?mock 으로 연 가짜 데이터입니다.", category: "일반", created_at: iso(-10), updated_at: iso(-10) }],
-    catalog_monsters: [{ id: "d0000000-0000-4000-8000-000000000001", name: "연습용 달팽이", level: 1, hp: 15, exp: 3, required_accuracy: 1, accuracy_per_level: 0.1, weak_elements: null, resist_elements: null }],
+    catalog_monsters: [{ id: "d0000000-0000-4000-8000-000000000001", name: "연습용 달팽이", level: 1, hp: 15, exp: 3, required_accuracy: 1, accuracy_per_level: 0.1, weak_elements: null, resist_elements: null },
+      // 그림 점검 확인용: 스티지는 뜨고, 스티지(월묘)는 원본 API에 없는 stand 동작이라 안 뜨고, 마지막은 그림 주소가 없다.
+      { id: "d0000000-0000-4000-8000-000000000002", name: "스티지", source_id: "2300100", level: 22, hp: 90, exp: 15, required_accuracy: 33, weak_elements: null, resist_elements: null, image_url: "https://maplestory.io/api/gms/100/mob/2300100/render/fly?bgColor=" },
+      { id: "d0000000-0000-4000-8000-000000000003", name: "스티지(월묘)", source_id: "9300063", level: 22, hp: 90, exp: 15, required_accuracy: 33, weak_elements: null, resist_elements: null, image_url: "https://maplestory.io/api/gms/100/mob/9300063/render/stand?bgColor=" },
+      { id: "d0000000-0000-4000-8000-000000000004", name: "그림 없는 시험 몬스터", source_id: "9999990", level: 30, hp: 300, exp: 20, required_accuracy: 40, weak_elements: null, resist_elements: null, image_url: null }],
     catalog_items: [
       // 혼줌 알 적용 확인용 장비. 수치는 가짜 데이터다.
       { id: "e0000000-0000-4000-8000-000000000014", name: "혼테일의 목걸이", category: "장비", subcategory: "Pendant", required_level: 120, base_options: { str: 7, dex: 7, int: 7, luk: 7, defense: 100, magic_defense: 100, avoidability: 0, remaining_upgrades: 3 }, requirements: {}, image_url: null },
@@ -467,7 +471,36 @@ const RPCS = {
       &&p_resist.every(v=>String(r.resist_elements??"").split(", ").includes(v))
       &&(!p_drop||rowsOf("catalog_monster_drops").some(d=>d.monster_id===r.id&&rowsOf("catalog_items").some(i=>i.id===d.item_id&&(i.name.toLowerCase().includes(p_drop.toLowerCase())||i.source_id===p_drop)))))
       .sort((a,b)=>(p_sort==="eff"?(a.exp>0?a.hp/a.exp:Infinity)-(b.exp>0?b.hp/b.exp:Infinity):0)||a.level-b.level||String(a.id).localeCompare(String(b.id)));
-    return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
+    const fallback=r=>rowsOf("catalog_monsters").find(l=>l.id===r.image_link_monster_id)?.image_url??null;
+    return {rows:filtered.slice(p_page*24,p_page*24+24).map(r=>({...r,image_fallback_url:fallback(r)})),total:filtered.length,revision:1};
+  },
+  // sql/070 흉내: 그림 점검·원본 주소 고치기·대체 그림 연결
+  catalog_monster_image_audit() {
+    assertMockReviewer();const all=rowsOf("catalog_monsters");
+    return all.map(m=>{const l=all.find(x=>x.id===m.image_link_monster_id);return {id:m.id,name:m.name,level:m.level,source_id:m.source_id??null,image_url:m.image_url??null,image_link_monster_id:m.image_link_monster_id??null,image_link_name:l?.name??null,image_fallback_url:l?.image_url??null};})
+      .sort((a,b)=>(a.level??Infinity)-(b.level??Infinity)||a.name.localeCompare(b.name));
+  },
+  catalog_monster_set_image({p_id,p_expected,p_image_url}) {
+    assertMockReviewer();const m=rowsOf("catalog_monsters").find(x=>x.id===p_id);if(!m)throw new Error("몬스터를 찾을 수 없습니다");
+    if(p_image_url!=null&&!/^https:\/\/\S+$/.test(p_image_url))throw new Error("https:// 로 시작하는 그림 주소를 입력해 주세요");
+    if((m.image_url??null)!==(p_expected??null))throw Object.assign(new Error("다른 화면에서 그림이 바뀌었습니다"),{code:"40001"});
+    if((m.image_url??null)===p_image_url)return {id:p_id,image_url:p_image_url};
+    const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"monster",entity_id:p_id,entity_name:m.name,operation:"UPDATE",changes:{image_url:{before:m.image_url??null,after:p_image_url}},release_label:"운영자 원본 그림 주소 수정",changed_at:iso()});
+    m.image_url=p_image_url;save();return {id:p_id,image_url:p_image_url};
+  },
+  catalog_monster_set_image_link({p_id,p_expected,p_link}) {
+    assertMockReviewer();const all=rowsOf("catalog_monsters"),m=all.find(x=>x.id===p_id);if(!m)throw new Error("몬스터를 찾을 수 없습니다");
+    if((m.image_link_monster_id??null)!==(p_expected??null))throw Object.assign(new Error("다른 화면에서 그림 연결이 바뀌었습니다"),{code:"40001"});
+    const target=p_link?all.find(x=>x.id===p_link):null;
+    if(p_link&&p_link===p_id)throw new Error("자기 자신은 연결할 수 없습니다");
+    if(p_link&&!target)throw new Error("연결할 몬스터를 찾을 수 없습니다");
+    if(target&&!target.image_url)throw new Error("연결할 몬스터에 그림이 없습니다");
+    if((m.image_link_monster_id??null)!==(p_link??null)){
+      const before=all.find(x=>x.id===m.image_link_monster_id)?.name??null;
+      const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"monster",entity_id:p_id,entity_name:m.name,operation:"UPDATE",changes:{image_link:{before,after:target?.name??null}},release_label:"운영자 대체 그림 연결",changed_at:iso()});
+      m.image_link_monster_id=p_link??null;save();
+    }
+    return {id:p_id,image_link_monster_id:p_link??null,image_fallback_url:target?.image_url??null};
   },
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
   catalog_monster_edit_detail({p_id}) {
