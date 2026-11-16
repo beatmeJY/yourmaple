@@ -17267,3 +17267,30 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .mde-toggle { padding: 0 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .mde-results, .mde-row.is-flash { animation: none; } .mde-pick, .mde-row { transition: none; } }
+
+.cs2 .cs-target {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 360px);
+  min-inline-size: 0;
+  margin: 16px auto 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-align: left;
+}
+.cs2 .cs-target legend { padding: 0 6px; color: var(--gold); font-weight: 700; }
+.cs2 .cs-target-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cs2 .cs-target-fields label { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+.cs2 .cs-target-fields :is(select, input) {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+}
+.cs2 .cs-target-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.cs2 .cs-target [data-target-status]:empty { display: none; }

@@ -1,4 +1,4 @@
-import { CHAOS_STATS, DEFAULT_CHAOS, HORNTAIL_EGG_BONUS, applyChaos, chaosChangeTotal, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
+import { CHAOS_STATS, DEFAULT_CHAOS, HORNTAIL_EGG_BONUS, applyChaos, canReachChaosTarget, chaosChangeTotal, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
 import { escapeHtml, formatCount, readBig } from "../format.js";
 import { burstAt, sfx } from "../effects.js";
 import { notify } from "../toast.js";
@@ -83,6 +83,7 @@ export function render(root) {
   let storageWarning = false;
   let lastChanges = new Map();
   let autoTimer = 0;
+  let autoTarget = false;
   let lastGrade = ""; // 등급이 바뀌는 순간에만 테두리 빛을 한 번 퍼뜨린다.
   let flashTimer = 0;
 
@@ -149,6 +150,16 @@ export function render(root) {
             <button type="button" class="cs-ghost cs-next" data-next-item disabled>다음 장비 가져오기</button>
             <button type="button" class="cs-ghost" data-reset disabled>시도 전체 초기화</button>
           </div>
+          <fieldset class="cs-target">
+            <legend>목표 옵션 반복</legend>
+            <div class="cs-target-fields">
+              <label>능력치<select data-target-stat>${CHAOS_STATS.map(({ key, label }) => `<option value="${key}"${key === "attack" ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label>
+              <label>목표 수치 이상<input type="number" min="1" step="1" inputmode="numeric" data-target-value placeholder="예: 10" /></label>
+            </div>
+            <label class="cs-target-check"><input type="checkbox" data-target-quick /> 빠른 새 장비 교체</label>
+            <button type="button" class="cs-ghost cs-next" data-target-run disabled>목표까지 반복</button>
+            <p class="cs-hint" data-target-status role="status"></p>
+          </fieldset>
         </section>
 
         <section class="cs-panel cs-log" aria-labelledby="cs-log-title">
@@ -184,6 +195,11 @@ export function render(root) {
   const result = root.querySelector("[data-result]");
   const rollButton = root.querySelector("[data-roll]");
   const autoButton = root.querySelector("[data-auto]");
+  const targetButton = root.querySelector("[data-target-run]");
+  const targetStat = root.querySelector("[data-target-stat]");
+  const targetValue = root.querySelector("[data-target-value]");
+  const targetQuick = root.querySelector("[data-target-quick]");
+  const targetStatus = root.querySelector("[data-target-status]");
   const undoButton = root.querySelector("[data-undo]");
   const nextButton = root.querySelector("[data-next-item]");
   const itemPrice = root.querySelector('[data-cost="item"]');
@@ -396,8 +412,11 @@ export function render(root) {
     const can = Boolean(current) && current.slots > 0 && checkChaosTable(table).ok;
     rollButton.disabled = !can || Boolean(autoTimer);
     autoButton.disabled = !can;
-    autoButton.textContent = autoTimer ? "멈추기" : "남은 횟수 모두 바르기";
-    if (autoTimer) autoButton.disabled = false;
+    autoButton.textContent = autoTimer && !autoTarget ? "멈추기" : "남은 횟수 모두 바르기";
+    if (autoTimer) autoButton.disabled = Boolean(autoTarget);
+    targetButton.disabled = !start || Boolean(autoTimer && !autoTarget);
+    targetButton.textContent = autoTarget ? "반복 멈추기" : "목표까지 반복";
+    for (const input of [targetStat, targetValue, targetQuick]) input.disabled = Boolean(autoTarget);
     undoButton.disabled = !history.length || Boolean(autoTimer);
     nextButton.disabled = !history.length || Boolean(autoTimer);
     resetButton.disabled = (!history.length && !archived.length && !replacedItems) || Boolean(autoTimer);
@@ -625,7 +644,89 @@ export function render(root) {
   function stopAuto() {
     window.clearTimeout(autoTimer);
     autoTimer = 0;
+    autoTarget = false;
     paintButtons();
+  }
+
+  function nextItem({ quiet = false } = {}) {
+    archiveCurrent();
+    previousScrolls += history.length;
+    replacedItems += 1;
+    resetCurrentItem();
+    saveAttempt();
+    result.textContent = `${replacedItems + 1}번째 장비를 가져왔어요.`;
+    if (!quiet) sfx("tick");
+    paint();
+  }
+
+  function repeatToTarget() {
+    if (autoTarget) {
+      stopAuto();
+      targetStatus.textContent = "반복을 멈췄어요.";
+      return;
+    }
+    const key = targetStat.value;
+    const label = targetStat.selectedOptions[0].textContent;
+    const value = targetValue.valueAsNumber;
+    const quick = targetQuick.checked;
+    const odds = checkChaosTable(table);
+    if (!Number.isSafeInteger(value) || value < 1 || !odds.ok) {
+      targetStatus.textContent = odds.error || "목표 수치를 1 이상의 정수로 입력해 주세요.";
+      return;
+    }
+    if ((current.stats[key] ?? 0) >= value) {
+      targetStatus.textContent = `목표 달성 · ${label} ${formatCount(current.stats[key])}`;
+      return;
+    }
+    const reachable = (item) => canReachChaosTarget(item, key, value, table);
+    if (!reachable(current) && !reachable(start)) {
+      targetStatus.textContent = "현재 장비와 새 장비 모두 목표에 도달할 수 없어요. 목표 수치와 확률을 확인해 주세요.";
+      return;
+    }
+    autoTarget = true;
+    const finish = (message) => {
+      stopAuto();
+      targetStatus.textContent = message;
+    };
+    const schedule = () => {
+      autoTimer = window.setTimeout(step, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 60 : 520);
+      paintButtons();
+    };
+    let replace = !reachable(current);
+    function step() {
+      if (!root.isConnected) {
+        stopAuto();
+        return;
+      }
+      if (!checkChaosTable(table).ok) {
+        finish("확률 설정을 확인해 주세요.");
+        return;
+      }
+      if (replace || !reachable(current)) {
+        if (!reachable(start)) {
+          finish("새 장비로 목표에 도달할 수 없어요.");
+          return;
+        }
+        nextItem({ quiet: true });
+      }
+      if (!rollOnce()) {
+        finish("확률 설정을 확인해 주세요.");
+        return;
+      }
+      const actual = current.stats[key] ?? 0;
+      if (actual >= value) {
+        finish(`목표 달성 · ${label} ${formatCount(actual)}`);
+        return;
+      }
+      const last = history.at(-1);
+      const quickReplace = quick && ((!last.success && last.n === 1) || actual < (last.before.stats[key] ?? 0));
+      // 현재 장비만 목표에 닿을 수 있다면 빠른 교체보다 남은 시도를 우선한다.
+      replace = !reachable(current) || (quickReplace && reachable(start));
+      targetStatus.textContent = `${replacedItems + 1}번째 장비 · ${label} ${formatCount(actual)} / 목표 ${formatCount(value)}${replace && reachable(start) ? " · 새 장비로 교체 예정" : ""}`;
+      schedule();
+    }
+    targetStatus.textContent = `${label} ${formatCount(current.stats[key] ?? 0)} / 목표 ${formatCount(value)}`;
+    schedule();
   }
 
   function startItem({ quiet = false } = {}) {
@@ -718,6 +819,10 @@ export function render(root) {
       rollOnce();
       return;
     }
+    if (event.target.closest("[data-target-run]") && !targetButton.disabled) {
+      repeatToTarget();
+      return;
+    }
     if (event.target.closest("[data-auto]")) {
       if (autoTimer) {
         stopAuto();
@@ -746,14 +851,7 @@ export function render(root) {
       return;
     }
     if (event.target.closest("[data-next-item]") && !nextButton.disabled) {
-      archiveCurrent();
-      previousScrolls += history.length;
-      replacedItems += 1;
-      resetCurrentItem();
-      saveAttempt();
-      result.textContent = `${replacedItems + 1}번째 장비를 가져왔어요.`;
-      sfx("tick");
-      paint();
+      nextItem();
       return;
     }
     if (event.target.closest("[data-reset]") && !resetButton.disabled) {

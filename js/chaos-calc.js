@@ -46,6 +46,14 @@ export function statScale(key) {
   return CHAOS_STATS.find((stat) => stat.key === key)?.scale ?? 1;
 }
 
+export function canReachChaosTarget(item, key, target, table) {
+  const value = item.stats[key] ?? 0;
+  if (value >= target) return true;
+  if (value <= 0 || table.successRate <= 0 || !item.slots) return false;
+  const maxDelta = Math.max(0, ...table.deltas.filter(({ percent }) => Number(percent) > 0).map(({ value }) => value));
+  return value + item.slots * maxDelta * statScale(key) >= target;
+}
+
 // 확률 설정 검사: 성공률 0~100, 변화량 확률은 0 이상이고 합이 100(소수 둘째 자리 반올림 오차 허용).
 export function checkChaosTable(table) {
   const rate = Number(table?.successRate);

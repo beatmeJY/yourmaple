@@ -1,5 +1,16 @@
 import assert from "node:assert/strict";
-import { DEFAULT_CHAOS, applyChaos, checkChaosTable, pickDelta, statDiff } from "./chaos-calc.js";
+import { DEFAULT_CHAOS, applyChaos, canReachChaosTarget, checkChaosTable, pickDelta, statDiff } from "./chaos-calc.js";
+
+assert.equal(canReachChaosTarget({ slots: 1, stats: { attack: 4 } }, "attack", 10, DEFAULT_CHAOS), false);
+assert.equal(canReachChaosTarget({ slots: 1, stats: { attack: 5 } }, "attack", 10, DEFAULT_CHAOS), true);
+assert.equal(canReachChaosTarget({ slots: 3, stats: {} }, "attack", 5, DEFAULT_CHAOS), false);
+assert.equal(canReachChaosTarget({ slots: 1, stats: { hp: 20 } }, "hp", 70, DEFAULT_CHAOS), true);
+assert.equal(canReachChaosTarget({ slots: 1, stats: { attack: 5 } }, "attack", 10, {
+  successRate: 100, deltas: [{ value: 4, percent: 100 }, { value: 5, percent: 0 }],
+}), false);
+assert.equal(canReachChaosTarget({ slots: 3, stats: { attack: 5 } }, "attack", 10, {
+  ...DEFAULT_CHAOS, successRate: 0,
+}), false);
 
 // 기본 확률표는 합 100%, 성공률 60%
 assert.equal(checkChaosTable(DEFAULT_CHAOS).ok, true);
