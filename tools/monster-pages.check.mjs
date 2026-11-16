@@ -50,6 +50,9 @@ try {
   assert.match(snail, /12\.25%/);
   assert.match(snail, /확률 미상/);
   assert.match(snail, /render\/move\?bgColor=/);
+  assert.match(snail, /<div id="app">/);
+  assert.match(snail, /<script type="module" src=".\/js\/main.js"><\/script>/);
+  assert.match(snail, /href=".\/css\/styles.css" data-app-style disabled/);
   assert.match(snail, /data-alts="[^"]*render\/fly[^"]*render\/stand[^"]*render\/die1/);
 
   // 3) 이름은 이스케이프, 그림이 없으면 이어 둔 몬스터 그림

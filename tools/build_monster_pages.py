@@ -147,12 +147,16 @@ def page(monster, drops, items, by_id, neighbors):
   <meta property="og:image" content="{SITE}/apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="./css/public.css" />
-  <link rel="stylesheet" href="./css/feature.css" />
+  <link rel="stylesheet" href="./css/public.css" data-feature-style />
+  <link rel="stylesheet" href="./css/feature.css" data-feature-style />
+  <link rel="stylesheet" href="./css/styles.css" data-app-style disabled />
+  <link rel="stylesheet" href="./css/catalog-review.css" data-app-style disabled />
   <script type="application/ld+json">{ld_json}</script>
 </head>
 <body class="feature-page mon-page">
-  <!-- 몬스터 검색용 페이지. tools/build_monster_pages.py 가 배포할 때 공개 도감으로 만든다(저장소에 없음). -->
+  <div id="app">
+  <!-- 몬스터 검색용 원본. tools/build_monster_pages.py 가 배포할 때 공개 도감으로 만든다(저장소에 없음).
+       앱(main.js)이 뜨면 이 자리를 몬스터 도감 화면으로 바꿔 그리고, 주소의 번호로 이 몬스터를 검색·선택한다. -->
   <a class="skip-link" href="/monsters/{e(slug(monster))}/#content">본문으로 건너뛰기</a>
   <header class="site-header"><a class="brand" href="/"><img src="/apple-touch-icon.png" width="36" height="36" alt="" />Your Maple</a></header>
   <main id="content" tabindex="-1">
@@ -169,6 +173,8 @@ def page(monster, drops, items, by_id, neighbors):
     {f'<section aria-labelledby="t-near"><p class="section-number">03</p><h2 id="t-near">비슷한 레벨 몬스터</h2><nav class="feature-nav mon-near">{near}</nav></section>' if near else ""}
   </main>
   <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Your Maple(유얼메이플)은 Nexon·메이플스토리·메이플랜드의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>
+  </div>
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
 """

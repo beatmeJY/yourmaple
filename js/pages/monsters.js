@@ -15,6 +15,7 @@ import { openMonsterImageCheck } from "../monster-image-check.js";
 import { openMonsterDelete } from "../monster-delete.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
+import { monsterSlugFromPath } from "../route-url.js";
 
 const columns =
   "id, name, level, hp, exp, required_accuracy, hp_per_exp, accuracy_per_level, weak_elements, resist_elements, updated_at, image_url";
@@ -126,6 +127,21 @@ export function render(root) {
   // 변경 이력·수정은 도감 관리자만(2026-11-16 사용자 요청, DB 는 sql/069 가 막는다). 화면마다 한 번만 묻는다.
   let reviewer = null;
   let repaintList = () => {};
+  // 주소 /monsters/<몬스터 번호>/ 로 열면 그 번호로 검색해 그 몬스터를 고른다. 고른 몬스터는 주소·탭 제목에도 남긴다(2026-11-16 사용자 요청).
+  const pathSlug = monsterSlugFromPath(location.pathname);
+  let wantSlug = pathSlug;
+  let urlTracks = Boolean(pathSlug); // 그냥 /monsters/ 로 열면 첫 몬스터 자동 선택은 주소에 남기지 않고, 직접 고르면 남긴다.
+  const slugOf = (row) => String(row.source_id ?? row.id);
+  function syncAddress(row) {
+    if (!urlTracks || !row || !root.isConnected) return;
+    const path = `/monsters/${encodeURIComponent(slugOf(row))}/`;
+    if (location.pathname !== path) history.replaceState(history.state, "", path + location.search);
+    const title = `메랜 ${row.name} — 드랍 아이템·확률·경험치 | Your Maple`;
+    root.dataset.docTitle = title; // main.js 가 화면을 그린 뒤 제목을 정할 때 이 값을 쓴다.
+    document.title = title;
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = `https://yourmaple.kr${path}`;
+  }
 
 
   // 드랍 칸: 확률이 높은 순, 막대는 0.01%~100%를 로그 눈금으로(희귀 드랍도 보이게). 확률은 합산하지 않는다.
@@ -165,6 +181,7 @@ export function render(root) {
       if (dropsBox) dropsBox.innerHTML = `<p class="mo-muted">몬스터를 고르면 드랍 아이템을 보여 줘요.</p>`;
       return;
     }
+    syncAddress(row);
     const ratio = hpPerExp(row.hp, row.exp);
     const tags = elementTags(row);
 
@@ -287,7 +304,7 @@ export function render(root) {
     order: "level",
     ascending: true,
     emptyText: "아직 공용 몬스터 정보가 없습니다. 운영자가 도감 데이터를 준비하고 있습니다.",
-    initialQuery: (new URLSearchParams(location.search).get("q") || "").slice(0,100),
+    initialQuery: (new URLSearchParams(location.search).get("q") || pathSlug).slice(0,100),
     searchLabel: "몬스터명",
     searchPlaceholder: "이름·몬스터 번호",
     searchFields: ["name"],
@@ -372,6 +389,11 @@ export function render(root) {
       const values = every.map((row) => hpPerExp(row.hp, row.exp)).filter((value) => value != null);
       const max = values.length ? Math.max(...values) : 0;
       const min = values.length ? Math.min(...values) : 0;
+      if (wantSlug && rows.length) {
+        const hit = rows.find((row) => slugOf(row) === wantSlug);
+        if (hit) selectedId = hit.id;
+        wantSlug = "";
+      }
       if (!rows.some((row) => row.id === selectedId)) selectedId = rows[0]?.id || "";
       const cards = rows
         .map((row, index) => {
@@ -438,6 +460,7 @@ export function render(root) {
         const card = event.target.closest("[data-pick-monster]");
         if (card && card.dataset.pickMonster !== selectedId) {
           selectedId = card.dataset.pickMonster;
+          urlTracks = true;
           sfx("tick");
           for (const item of page.querySelectorAll("[data-pick-monster]")) {
             const on = item.dataset.pickMonster === selectedId;

@@ -20,7 +20,8 @@ HTML_ASSET = re.compile(r"""((?:src|href)=["'])(\./(?:js|css)/[^"'?#]+\.(?:js|cs
 
 def stamp(site: pathlib.Path, version: str) -> tuple[int, int]:
     html_count = 0
-    for index in sorted(site.rglob("index.html")):
+    pages = sorted(site.rglob("index.html")) + ([site / "404.html"] if (site / "404.html").exists() else [])
+    for index in pages:
         html = index.read_text(encoding="utf-8")
         html, asset_count = HTML_ASSET.subn(rf"\1\2?v={version}\3", html)
         html, module_count = IMPORT.subn(rf"\1\2?v={version}\3", html)

@@ -347,3 +347,7 @@ for route_id in sorted(route_ids):
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(shell, encoding="utf-8")
     print("wrote", out.relative_to(root))
+
+# 없는 주소(예: 배포 뒤 새로 생긴 몬스터 /monsters/<번호>/)도 앱이 열어 주소대로 그리게 GitHub Pages 404 페이지를 같은 틀로 만든다.
+(root / "404.html").write_text(shell, encoding="utf-8")
+print("wrote 404.html")

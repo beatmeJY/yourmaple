@@ -2,11 +2,19 @@
 const paths = { dashboard: "/", "level-plan": "/level-up/", "item-catalog": "/items/" };
 const ids = Object.fromEntries(Object.entries(paths).map(([id, path]) => [path, id]));
 
+// 몬스터 하나를 고른 주소 /monsters/<몬스터 번호>/ 도 몬스터 도감 화면이다(2026-11-16 사용자 요청).
+const monsterPath = /^\/monsters\/([0-9A-Za-z-]+)\/?$/;
+
+export function monsterSlugFromPath(pathname) {
+  return pathname.match(monsterPath)?.[1] ?? "";
+}
+
 export function routePath(id) {
   return Object.hasOwn(paths, id) ? paths[id] : `/${id}/`;
 }
 
 export function routeFromPath(pathname) {
+  if (monsterPath.test(pathname)) return "monsters";
   const path = pathname.replace(/\/+$/, "") + "/";
   return ids[path] ?? path.slice(1, -1);
 }
