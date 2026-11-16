@@ -158,7 +158,7 @@ export function render(root) {
       const width = value == null ? 0 : Math.max(4, Math.min(100, ((Math.log10(Math.max(value, 0.0001)) + 2) / 4) * 100));
       const label = value == null ? "확률 미상" : `${escapeHtml(drop.rate_percent)}%`;
       const name = drop.item?.name ?? "아이템 정보 없음";
-      return `<a class="mo-drop-row ${dropTier(value)}" href="/items/?id=${encodeURIComponent(drop.item_id)}" style="--i:${Math.min(index, 14)}" title="${escapeHtml(name)} · ${label}">
+      return `<a class="mo-drop-row ${dropTier(value)}" href="${drop.item?.source_id ? `/items/${encodeURIComponent(drop.item.source_id)}/` : `/items/?id=${encodeURIComponent(drop.item_id)}`}" style="--i:${Math.min(index, 14)}" title="${escapeHtml(name)} · ${label}">
         <span class="mo-drop-icon">${catalogImage(drop.item?.image_url, "catalog-drop-image", 36) || `<i aria-hidden="true">${escapeHtml(initial(drop.item?.name))}</i>`}</span>
         <span class="mo-drop-copy"><strong>${escapeHtml(name)}</strong><span class="mo-drop-bar" aria-hidden="true"><i style="--w:${width}%"></i></span></span>
         <b class="mo-drop-rate">${label}</b>

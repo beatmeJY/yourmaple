@@ -7,6 +7,7 @@ import { escapeHtml, formatCount } from "../format.js";
 import { itemOptionFields } from "../item-options.js";
 import { equipmentCard, equipmentTypeName, isEquipment } from "../catalog-equipment.js";
 import { mountHistoryDialog } from "../catalog-history.js";
+import { itemSlugFromPath } from "../route-url.js";
 
 const labels = Object.fromEntries(itemOptionFields.map(f => [f.key, f.label]));
 const text = v => escapeHtml(v == null || v === "" ? "미제공" : String(v));
@@ -15,6 +16,9 @@ export async function render(root) {
   const params = new URLSearchParams(location.search);
   const id = params.get("id");
   if (id) return renderDetail(root, id);
+  // 주소 /items/<아이템 번호>/ 로 열면 그 아이템 상세를 보여 준다(2026-11-16 사용자 요청, 몬스터 도감과 같은 방식).
+  const slug = itemSlugFromPath(location.pathname);
+  if (slug) return renderSlug(root, slug);
   root.innerHTML = `<section class="catalog-page"><header class="ym-page-head"><div><h1>아이템 도감</h1><p>장비 옵션과 착용 조건을 확인하고, 몬스터의 드랍과 연결해 보세요.</p></div></header><div class="catalog-tools"><label class="field catalog-search"><span>아이템 검색</span><input data-catalog-search placeholder="이름 일부·별명도 돼요 (예: 혼주문, 혼줌)" maxlength="100" /></label><button type="button" class="mo-ghost" data-catalog-refresh>새로 확인</button></div><p class="hint" data-catalog-count aria-live="polite"></p><div class="catalog-grid" data-catalog-list></div><nav class="catalog-pager" aria-label="아이템 페이지"><button type="button" data-prev>이전</button><span data-page></span><button type="button" data-next>다음</button></nav></section>`;
   void canReviewCatalog().then(allowed => {
     if (allowed && root.isConnected) root.querySelector(".ym-page-head").insertAdjacentHTML("beforeend", `<a class="mo-ghost" href="/catalog-review/">비공개 검토 보관함</a>`);
@@ -33,12 +37,41 @@ export async function render(root) {
     root.querySelector("[data-page]").textContent = `${page+1} / ${Math.max(1,Math.ceil(total/24))}`;
     root.querySelector("[data-prev]").disabled = page === 0;
     root.querySelector("[data-next]").disabled = (page+1)*24 >= total;
-    list.innerHTML = rows.length ? rows.map((item,index)=>`<a class="catalog-item ym-glass" href="/items/?id=${encodeURIComponent(item.id)}" style="--i:${Math.min(index,16)}"><div class="catalog-item-art">${catalogImage(item.image_url) || `<span aria-hidden="true">${text([...item.name][0])}</span>`}</div><div class="catalog-item-copy"><h2 title="${text(item.name)}">${text(item.name)}</h2><p class="catalog-item-meta"><small class="ym-chip">${text(itemKind(item))}</small>${levelBadge(item)}</p></div></a>`).join("") : `<p class="empty">검색 결과가 없습니다.</p>`;
+    list.innerHTML = rows.length ? rows.map((item,index)=>`<a class="catalog-item ym-glass" href="${itemHref(item)}" style="--i:${Math.min(index,16)}"><div class="catalog-item-art">${catalogImage(item.image_url) || `<span aria-hidden="true">${text([...item.name][0])}</span>`}</div><div class="catalog-item-copy"><h2 title="${text(item.name)}">${text(item.name)}</h2><p class="catalog-item-meta"><small class="ym-chip">${text(itemKind(item))}</small>${levelBadge(item)}</p></div></a>`).join("") : `<p class="empty">검색 결과가 없습니다.</p>`;
   }
   root.querySelector("input").addEventListener("input",()=>{clearTimeout(timer);++loadId;page=0;root.querySelectorAll(".catalog-pager button").forEach(b=>b.disabled=true);timer=setTimeout(()=>{if(root.isConnected)void load();},300);});
   root.addEventListener("click",e=>{if(e.target.closest("[data-prev]"))page=Math.max(0,page-1);else if(e.target.closest("[data-next]"))page++;else if(e.target.closest("[data-catalog-refresh]")){clearCatalogCache();page=0;}else return;clearTimeout(timer);void load();});
   await load();
 }
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const itemHref = item => `/items/${encodeURIComponent(String(item.source_id || item.id))}/`;
+const monsterHref = monster => monster.source_id ? `/monsters/${encodeURIComponent(monster.source_id)}/` : `/monsters/?q=${encodeURIComponent(monster.name)}`;
+
+// 아이템 번호로 공개 아이템을 찾아 상세를 그린다. 번호 검색은 이름 검색과 같은 함수를 쓴다(번호가 같으면 그 아이템).
+async function renderSlug(root, slug) {
+  if (uuidPattern.test(slug)) return renderDetail(root, slug);
+  root.innerHTML = `<section class="catalog-page item-detail-page"><div class="catalog-detail-actions"><a class="catalog-back-link" href="/items/">← 아이템 목록</a></div><p class="empty" data-item-slug-status>아이템 정보를 불러오는 중입니다.</p></section>`;
+  const result = await catalogRpc("catalog_search_items", { p_query: slug, p_page: 0 });
+  if (!root.isConnected) return;
+  const hit = (result.data?.rows ?? []).find(row => String(row.source_id) === slug);
+  if (hit) return renderDetail(root, hit.id);
+  root.querySelector("[data-item-slug-status]").textContent = result.error ? catalogError(result.error) : `아이템 번호 ${slug}을(를) 찾을 수 없습니다. 목록에서 다시 찾아 주세요.`;
+}
+
+// 보고 있는 아이템을 주소·탭 제목·canonical 에 남긴다. 예전 /items/?id=… 주소도 번호 주소로 바꾼다.
+function syncItemAddress(root, item) {
+  const params = new URLSearchParams(location.search);
+  params.delete("id");
+  const query = params.toString();
+  const path = itemHref(item);
+  if (location.pathname !== path || location.search !== (query ? `?${query}` : "")) history.replaceState(history.state, "", path + (query ? `?${query}` : ""));
+  const title = `메랜 ${item.name} — 옵션·드랍 몬스터 | Your Maple`;
+  root.dataset.docTitle = title; // main.js 가 화면을 그린 뒤 제목을 정할 때 이 값을 쓴다.
+  document.title = title;
+  const canonical = document.querySelector('link[rel="canonical"]');
+  if (canonical) canonical.href = `https://yourmaple.kr${path}`;
+}
+
 // 목록 카드(2026-11-06 작게): 종류는 장비면 한글 이름(아대·신발 등), 아니면 큰 분류(소비·설치·기타). 레벨은 장비거나 0보다 클 때만 배지로.
 const kindNames = { Etc: "기타", Cash: "캐시", Use: "소비", Setup: "설치" };
 function itemKind(item) {
@@ -58,6 +91,7 @@ async function renderDetail(root,id) {
   const slot = root.querySelector("[data-item-detail]");
   if (result.error || !result.data?.item) { slot.innerHTML = `<p class="empty">${result.error ? text(catalogError(result.error)) : "아이템을 찾을 수 없습니다."}</p>`; return; }
   const {item,stats=[],requirements=[],jobs=[],attributes=[]} = result.data;
+  syncItemAddress(root, item);
   const req = [item.required_level == null ? "레벨 미제공" : `Lv.${item.required_level}`,...requirements.map(r=>`${labels[r.requirement_key] ?? r.requirement_key} ${r.required_value}`),jobs.join(" · "),item.gender_restriction].filter(Boolean);
   const basicDetail = `<header class="catalog-item-hero ym-glass"><div class="catalog-detail-art">${catalogImage(item.image_url,"",120) || `<span>${text([...item.name][0])}</span>`}</div><div><span class="ym-chip">${text([item.category,item.middle_category,item.subcategory].filter(Boolean).join(" · "))}</span><h1>${text(item.name)}</h1><p>${text(req.join(" · "))}</p><p class="hint">기본 옵션과 가능한 범위입니다. 실제 거래 옵션은 물건마다 다를 수 있어요.</p></div></header><div class="catalog-detail-layout"><section class="catalog-detail-panel ym-glass"><h2>기본 옵션</h2><div class="catalog-stat-grid">${stats.length ? stats.map(r=>`<div class="catalog-stat"><span>${text(labels[r.stat_key] ?? r.stat_key)}</span><strong>${text(r.base_value)}</strong>${r.minimum_value == null ? "" : `<small>${text(r.minimum_value)} ~ ${text(r.maximum_value)}</small>`}</div>`).join("") : `<p class="hint">제공된 수치 옵션이 없습니다.</p>`}</div></section><section class="catalog-detail-panel ym-glass"><h2>아이템 정보</h2><dl class="catalog-facts"><div><dt>공격속도</dt><dd>${text(item.attack_speed_label ?? item.attack_speed)}</dd></div><div><dt>상점 판매가</dt><dd>${item.shop_sell_price == null ? "미제공" : `${text(formatCount(item.shop_sell_price))} 메소`}</dd></div></dl>${item.description ? `<p class="catalog-public-description">${text(item.description)}</p>` : ""}${item.effect_description && item.effect_description !== item.description ? `<p class="catalog-public-description">${text(item.effect_description)}</p>` : ""}${attributes.length ? `<details><summary>추가 정보</summary><dl class="catalog-facts">${attributes.map(a=>`<div><dt>${text(a.attribute_name)}</dt><dd>${text(a.value_text)}</dd></div>`).join("")}</dl></details>` : ""}</section></div>`;
   root.querySelector(".catalog-detail-actions").insertAdjacentHTML("beforeend", `<button type="button" class="catalog-pill-button" data-item-refresh>새로 확인</button>`);
@@ -116,8 +150,7 @@ async function mountItemDrops(slot, id) {
       const bar = `<span class="catalog-dropper-bar" aria-hidden="true"><i data-drop-rate="${Number.isFinite(rate) ? rate : ""}"></i></span>`;
       const unknown = drop.rate_percent == null ? " is-unknown" : "";
       if (!monster) return `<div class="catalog-dropper${unknown}"><div class="catalog-dropper-art"><span aria-hidden="true">?</span></div><span><span class="catalog-dropper-name"><b>몬스터 정보 미제공</b></span>${bar}</span><strong>${rateText}</strong></div>`;
-      const query = monster.source_id || monster.name;
-      return `<a class="catalog-dropper${unknown}" href="/monsters/?q=${encodeURIComponent(query)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><span class="catalog-dropper-name"><b>${text(monster.name)}</b><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small></span>${bar}</span><strong>${rateText}</strong></a>`;
+      return `<a class="catalog-dropper${unknown}" href="${monsterHref(monster)}"><div class="catalog-dropper-art">${catalogMonsterImage(monster,48) || `<span aria-hidden="true">${text([...monster.name][0])}</span>`}</div><span><span class="catalog-dropper-name"><b>${text(monster.name)}</b><small>${monster.level == null ? "레벨 미제공" : `Lv.${text(monster.level)}`}</small></span>${bar}</span><strong>${rateText}</strong></a>`;
     }).join(""));
     paintRateBars(rowsSlot);
     count += rows.length;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { legacyRoute, monsterSlugFromPath, routeFromPath, routePath } from "./route-url.js";
+import { itemSlugFromPath, legacyRoute, monsterSlugFromPath, routeFromPath, routePath } from "./route-url.js";
 
 for (const id of ["dashboard", "dojo", "level-plan", "item-catalog", "trades", "transport"]) {
   const path = routePath(id);
@@ -21,5 +21,9 @@ assert.equal(monsterSlugFromPath("/monsters/"), "");
 assert.equal(monsterSlugFromPath("/monsters/a/b/"), "");
 assert.equal(monsterSlugFromPath("/monster-park/"), "");
 assert.equal(routeFromPath("/monster-trash/"), "monster-trash");
+assert.equal(routeFromPath("/items/1302000/"), "item-catalog");
+assert.equal(itemSlugFromPath("/items/1302000/"), "1302000");
+assert.equal(itemSlugFromPath("/items/"), "");
+assert.equal(routeFromPath("/items/"), "item-catalog");
 assert.ok(existsSync(new URL("../404.html", import.meta.url)), "없는 주소용 404.html");
 console.log("경로 변환과 직접 접속 파일 검증 통과");

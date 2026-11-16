@@ -32,7 +32,7 @@
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
 - 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
 - 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`·`/transport/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML이다. 앱 스크립트가 같은 경로에서 실제 화면을 그리며, GitHub Pages에 필요한 나머지 메뉴의 index.html도 생성기가 만든다. 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
-- 몬스터 검색용 페이지 `/monsters/<몬스터 번호>/`는 배포 때 `tools/build_monster_pages.py _site`가 공개 도감(비로그인 읽기)으로 만들고 sitemap·몬스터 소개 원본 목록(`<!-- monster-list -->` 자리)에 더한다. 저장소에는 넣지 않고, 도감을 못 읽으면 배포가 멈춘다. 이 페이지도 앱(main.js)을 띄워 몬스터 도감 화면에서 그 번호로 검색·선택하고, 몬스터를 고르면 주소·탭 제목·canonical을 `/monsters/<번호>/`로 바꾼다(`route-url.js` `monsterSlugFromPath`). 배포 뒤 새로 생긴 번호는 생성기가 만드는 `404.html`(앱 틀, noindex)이 열어 준다. 로컬 실행은 `SSL_CERT_FILE=/etc/ssl/cert.pem python3 tools/build_monster_pages.py <임시 폴더>`, 검사는 `tools/monster-pages.check.mjs`(고정 자료). 2026-11-16 (Claude)
+- 몬스터·아이템 검색용 페이지 `/monsters/<몬스터 번호>/`·`/items/<아이템 번호>/`는 배포 때 `tools/build_catalog_pages.py _site`가 공개 도감(비로그인 읽기)으로 만들고 sitemap·몬스터 소개 원본 목록(`<!-- monster-list -->` 자리)에 더한다. 저장소에는 넣지 않고, 도감을 못 읽으면 배포가 멈춘다. 이 페이지는 검색 로봇용 원본 내용과 함께 앱(main.js)을 띄운다. 몬스터는 도감 화면에서 그 번호로 검색·선택하고 고르면 주소·탭 제목·canonical을 바꾸며, 아이템은 그 아이템 상세를 열고 주소(예전 `?id=`도)를 번호 주소로 바꾼다(`route-url.js` `monsterSlugFromPath`·`itemSlugFromPath`). 배포 뒤 새로 생긴 번호는 생성기가 만드는 `404.html`(앱 틀, noindex)이 열어 준다. 로컬 실행은 `SSL_CERT_FILE=/etc/ssl/cert.pem python3 tools/build_catalog_pages.py <임시 폴더>`, 검사는 `tools/catalog-pages.check.mjs`(고정 자료). 2026-11-16 (Claude)
 - 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
 
 ## 4. 코드 규칙
@@ -68,6 +68,10 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-16 (Claude) 아이템도 번호 주소(사용자 요청 "아이템도 똑같이"): /items/<번호>/ 로 열면 그 아이템 상세, 목록 카드·몬스터 드랍·아이템의 드랍 몬스터 링크가 번호 주소, 예전 ?id= 주소는 번호 주소로 바꿈, 탭 제목·canonical 반영. 생성기를 `tools/build_catalog_pages.py`로 바꿔 아이템 원본 페이지(종류·착용 레벨·설명·드랍 몬스터)도 생성(검사 `tools/catalog-pages.check.mjs`). 운영 공개 읽기 몬스터 802·아이템 3,679쪽·24.06MB·읽기 3.2초·만들기 0.9초, sitemap 4,492주소 xmllint 통과. 배포 흉내 사이트에서 /items/4000019/ 상세·드랍 몬스터 /monsters/2220000/ → 마노 선택 → 드랍 /items/4000016/ 이동, 예전 ?id= → /items/4000019/, 다른 화면으로 가면 탭 제목 원래대로, 모바일 375 넘침 없음, 검사 40개 통과 [실측]. 작업 중 라우터가 #main 복제 때 앞 화면의 탭 제목 값까지 옮기던 문제 발견·수정. 미커밋·미배포
+
+- 2026-11-16 (Claude) 몬스터 주소 = 도감 화면 선택 45a9191 배포(Actions 43862207058 성공, CI "몬스터 페이지 802개 · 6.17MB · 읽기 17.7초", 공개 /monsters/100100/ 앱 화면에서 100100 검색·달팽이 1마리 선택·드랍 11개·탭 제목 반영, 없는 번호 /monsters/99999999/ 는 404 상태로 404.html 앱 틀이 몬스터 도감·"검색 결과 없음" 표시, /monsters/ 요청 4xx 없음) [실측]
 
 - 2026-11-16 (Claude) 몬스터 주소 = 도감 화면 선택(사용자 정정: 별도 페이지가 아니라 지금 화면에서 고른 몬스터): /monsters/<번호>/ 로 열면 몬스터 도감에서 번호 검색·그 몬스터 선택·탭 제목/canonical 반영, 고르면 주소 변경(replaceState), 그냥 /monsters/ 의 자동 첫 선택은 주소 그대로. 생성 페이지는 원본 내용(검색 로봇용) + 앱, 없는 번호는 404.html 앱 틀. 배포 흉내 사이트 + 운영 공개 읽기(?mock=0)로 달팽이 1마리 검색·선택·드랍 11개, 검색 지우고 스포아 고르면 /monsters/120100/·제목 변경, /monsters/ 처음엔 주소 유지·고르면 /monsters/100120/, 모바일 375 넘침/콘솔 오류 없음, 검사 40개 통과 [실측]. 로컬 서버는 404.html을 안 써 없는 번호 흐름은 미검증. 미커밋·미배포
 

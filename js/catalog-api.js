@@ -25,7 +25,7 @@ export async function monsterDrops(id, client = null) {
   const rows = [];
   for (let offset = 0;; offset += 200) {
     const result = await supabase.from("catalog_monster_drops")
-      .select("id,item_id,source_entry,rate_percent,item:catalog_items(id,name,image_url)")
+      .select("id,item_id,source_entry,rate_percent,item:catalog_items(id,name,image_url,source_id)")
       .eq("monster_id", id).order("source_entry", { ascending: true }).range(offset, offset + 199);
     if (result.error) return result;
     rows.push(...(result.data ?? []));

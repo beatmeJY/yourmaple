@@ -71,6 +71,7 @@ export async function renderRoute(root) {
   const current = document.querySelector("#main") ?? root;
   const fresh = current.cloneNode(false);
   fresh.dataset.page = id;
+  delete fresh.dataset.docTitle; // 앞 화면이 정한 탭 제목(고른 몬스터·아이템)은 새 화면으로 옮기지 않는다.
   current.replaceWith(fresh);
   await page.render(fresh);
   return fresh.isConnected && getRouteId() === id ? id : null;

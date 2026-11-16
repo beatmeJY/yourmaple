@@ -94,7 +94,7 @@ export async function render(root) {
     const article = button.closest("[data-trash-row]");
     article?.classList.add("is-leaving");
     setTimeout(() => { rows = rows.filter((item) => item.id !== row.id); paint(); }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260);
-    notify(`${row.name}을(를) 복구했어요. 공개 도감에 다시 보여요.`, "success", { label: "도감에서 보기", onClick: () => { location.href = `/monsters/?q=${encodeURIComponent(row.name)}`; } });
+    notify(`${row.name}을(를) 복구했어요. 공개 도감에 다시 보여요.`, "success", { label: "도감에서 보기", onClick: () => { location.href = row.source_id ? `/monsters/${encodeURIComponent(row.source_id)}/` : `/monsters/?q=${encodeURIComponent(row.name)}`; } });
   });
   void load();
 }
