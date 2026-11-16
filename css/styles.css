@@ -17174,3 +17174,40 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
   .mic-cand { grid-template-columns: 40px minmax(0, 1fr) auto; }
 }
 @media (prefers-reduced-motion: reduce) { .mic-row, .mic-cand, .mic-verdict { animation: none; transition: none; } .mic-progress i { transition: none; } }
+
+/* ── 몬스터 논리 삭제·삭제한 몬스터(관리자 전용, sql/071) ── */
+.mo-head [data-monster-trash][hidden] { display: none; }
+.catalog-pill-button.is-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.catalog-pill-button.is-danger:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.md-dialog { width: min(480px, calc(100vw - 24px)); }
+.md-dialog form { display: grid; gap: 12px; margin-top: 12px; }
+.md-lead strong { color: var(--gold); }
+.md-dialog small { color: var(--muted); font-weight: 400; }
+.md-dialog [data-md-status].is-error { color: var(--danger); }
+.md-danger { height: 40px; padding: 0 18px; border-radius: 999px; border: 0; font: inherit; font-weight: 700; color: #fff; background: var(--danger); cursor: pointer; transition: transform .15s var(--spring, ease), filter .15s ease; }
+.md-danger:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.md-danger:disabled { opacity: .6; cursor: wait; transform: none; }
+.mt-page { display: grid; gap: 16px; max-width: 1080px; margin: 0 auto; }
+.mt-page .ym-page-head > div:last-child { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mt-bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; justify-content: space-between; }
+.mt-bar .field { min-width: min(280px, 100%); }
+.mt-count { color: var(--muted); font-size: 13px; }
+.mt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 10px; }
+.mt-card { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px; border-radius: 16px; border: 1px solid var(--line); animation: ym-fade-up .3s ease both; animation-delay: calc(var(--i) * 30ms); transition: opacity .25s ease, transform .25s ease; }
+.mt-card.is-leaving { opacity: 0; transform: translateX(24px) scale(.97); }
+.mt-art { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 14px; background: var(--bg); border: 1px dashed color-mix(in srgb, var(--danger) 40%, var(--line)); overflow: hidden; filter: grayscale(.6); }
+.mt-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.mt-art b { font-size: 24px; color: var(--muted); }
+.mt-copy { display: grid; gap: 4px; min-width: 0; }
+.mt-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mt-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-meta { font-size: 12.5px; color: var(--muted); }
+.mt-reason { font-size: 13px; padding: 6px 10px; border-radius: 8px; background: var(--bg); border-left: 3px solid color-mix(in srgb, var(--danger) 60%, transparent); overflow-wrap: anywhere; }
+.mt-muted { color: var(--muted); }
+.mt-empty { grid-column: 1 / -1; padding: 32px 16px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 16px; }
+@media (max-width: 600px) {
+  .mt-card { grid-template-columns: 56px minmax(0, 1fr); }
+  .mt-art { width: 56px; height: 56px; }
+  .mt-restore { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { .mt-card, .md-danger { animation: none; transition: none; } .mt-card.is-leaving { transform: none; } }

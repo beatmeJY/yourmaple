@@ -274,6 +274,10 @@ class Query {
     let result = [];
     if (this.action === "select") {
       result = rows.filter((row) => this.matches(row));
+      // sql/071 흉내: 지운 몬스터와 그 드랍은 공개 읽기에서 숨긴다
+      const gone = new Set(rowsOf("catalog_monsters").filter((row) => row.deleted_at).map((row) => row.id));
+      if (this.table === "catalog_monsters") result = result.filter((row) => !gone.has(row.id));
+      if (this.table === "catalog_monster_drops") result = result.filter((row) => !gone.has(row.monster_id));
     } else if (this.action === "insert") {
       const list = (Array.isArray(this.payload) ? this.payload : [this.payload]).map((row) => this.prepare(row));
       rows.push(...list);
@@ -465,7 +469,7 @@ const RPCS = {
     return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
   },
   catalog_search_monsters({p_query="",p_drop="",p_min=null,p_max=null,p_weak=[],p_resist=[],p_sort="level",p_page=0}={}) {
-    const filtered=rowsOf("catalog_monsters").filter(r=>(String(r.name).toLowerCase().includes(p_query.toLowerCase())||r.source_id===p_query)
+    const filtered=rowsOf("catalog_monsters").filter(r=>!r.deleted_at&&(String(r.name).toLowerCase().includes(p_query.toLowerCase())||r.source_id===p_query)
       &&(p_min==null||r.level>=p_min)&&(p_max==null||r.level<=p_max)
       &&p_weak.every(v=>String(r.weak_elements??"").split(", ").includes(v))
       &&p_resist.every(v=>String(r.resist_elements??"").split(", ").includes(v))
@@ -477,8 +481,21 @@ const RPCS = {
   // sql/070 흉내: 그림 점검·원본 주소 고치기·대체 그림 연결
   catalog_monster_image_audit() {
     assertMockReviewer();const all=rowsOf("catalog_monsters");
-    return all.map(m=>{const l=all.find(x=>x.id===m.image_link_monster_id);return {id:m.id,name:m.name,level:m.level,source_id:m.source_id??null,image_url:m.image_url??null,image_link_monster_id:m.image_link_monster_id??null,image_link_name:l?.name??null,image_fallback_url:l?.image_url??null};})
+    return all.filter(m=>!m.deleted_at).map(m=>{const l=all.find(x=>x.id===m.image_link_monster_id);return {id:m.id,name:m.name,level:m.level,source_id:m.source_id??null,image_url:m.image_url??null,image_link_monster_id:m.image_link_monster_id??null,image_link_name:l?.name??null,image_fallback_url:l?.image_url??null};})
       .sort((a,b)=>(a.level??Infinity)-(b.level??Infinity)||a.name.localeCompare(b.name));
+  },
+  // sql/071 흉내: 논리 삭제·복구·삭제한 몬스터 목록
+  catalog_monster_set_deleted({p_id,p_deleted,p_reason=null}) {
+    assertMockReviewer();const m=rowsOf("catalog_monsters").find(x=>x.id===p_id);if(!m)throw new Error("몬스터를 찾을 수 없습니다");
+    const reason=String(p_reason??"").trim()||null;if(reason&&reason.length>500)throw new Error("삭제 이유는 500자까지 적을 수 있습니다");
+    if(Boolean(m.deleted_at)===p_deleted)return {id:p_id,deleted_at:m.deleted_at??null,deleted_reason:m.deleted_reason??null};
+    m.deleted_at=p_deleted?iso():null;m.deleted_reason=p_deleted?reason:null;
+    const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"monster",entity_id:p_id,entity_name:m.name,operation:"UPDATE",changes:{deleted:{before:!p_deleted,after:p_deleted},...(p_deleted&&reason?{deleted_reason:{before:null,after:reason}}:{})},release_label:p_deleted?"운영자 몬스터 삭제":"운영자 몬스터 복구",changed_at:iso()});
+    save();return {id:p_id,deleted_at:m.deleted_at,deleted_reason:m.deleted_reason};
+  },
+  catalog_monster_deleted_list() {
+    assertMockReviewer();const all=rowsOf("catalog_monsters");
+    return all.filter(m=>m.deleted_at).sort((a,b)=>String(b.deleted_at).localeCompare(String(a.deleted_at))).map(m=>({id:m.id,name:m.name,level:m.level,hp:m.hp,exp:m.exp,source_id:m.source_id??null,image_url:m.image_url??null,image_fallback_url:all.find(l=>l.id===m.image_link_monster_id)?.image_url??null,deleted_at:m.deleted_at,deleted_reason:m.deleted_reason??null,drop_count:rowsOf("catalog_monster_drops").filter(d=>d.monster_id===m.id).length}));
   },
   catalog_monster_set_image({p_id,p_expected,p_image_url}) {
     assertMockReviewer();const m=rowsOf("catalog_monsters").find(x=>x.id===p_id);if(!m)throw new Error("몬스터를 찾을 수 없습니다");

@@ -227,7 +227,20 @@ PAGES = [
 NAV = [("dojo", "무릉도장"), ("maker", "메이커"), ("chaos-scroll", "혼돈의 주문서"), ("level-up", "레벨업"), ("monster-park", "몬스터파크"), ("monsters", "몬스터 도감"), ("items", "아이템 도감"), ("transport", "배 시간표·헬리오스탑")]
 
 
+# 검색어 보강(2026-11-16 사용자 요청): 메랜·옛메·메이플·메이플스토리·유얼메이플·YM 으로도 찾게 한다.
+KEYWORDS = "메랜, 메이플랜드, 옛메, 메이플, 메이플스토리, 유얼메이플, 유얼 메이플, Your Maple, YM"
+ALT_NAMES = ["유얼메이플", "유얼 메이플", "YM", "yourmaple"]
+
+
+def with_keywords(p):
+    """제목은 '메랜·메이플랜드 …', 설명은 '메랜(메이플랜드) …'로 시작하게 한다(이미 메랜이 있으면 그대로)."""
+    title = p["title"] if "메랜" in p["title"] else p["title"].replace("메이플랜드 ", "메랜·메이플랜드 ", 1)
+    desc = p["desc"] if "메랜" in p["desc"] else p["desc"].replace("메이플랜드", "메랜(메이플랜드)", 1)
+    return {**p, "title": title, "desc": desc}
+
+
 def page(p):
+    p = with_keywords(p)
     url = f"{SITE}/{p['slug']}/"
     # 기간이 끝난 이벤트는 만들 때 종료 안내로 바꾼다. 다시 만들기 전에도 브라우저에서 날짜를 보고 바꾼다(아래 스크립트).
     ended = bool(p.get("until")) and datetime.datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat() > p["until"]
@@ -259,7 +272,8 @@ def page(p):
         "applicationCategory": "GameApplication", "operatingSystem": "Web", "inLanguage": "ko",
         "description": p["desc"], "isAccessibleForFree": True,
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "KRW"},
-        "publisher": {"@type": "Organization", "name": "Your Maple", "url": SITE + "/"},
+        "keywords": f"{p['h1']}, {KEYWORDS}",
+        "publisher": {"@type": "Organization", "name": "Your Maple", "alternateName": ALT_NAMES, "url": SITE + "/"},
     }
     return f"""<!DOCTYPE html>
 <html lang="ko">
@@ -269,6 +283,7 @@ def page(p):
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{e(p['title'])}</title>
   <meta name="description" content="{e(p['desc'])}" />
+  <meta name="keywords" content="{e("메랜 " + p['h1'] + ", " + KEYWORDS)}" />
   <link rel="canonical" href="{url}" />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="ko_KR" />
@@ -294,6 +309,7 @@ def page(p):
   <main id="content" tabindex="-1">
     <div class="feature-hero">
       <div class="hero"><p class="eyebrow">{e(p['eyebrow'])}</p><h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>
+        <p class="aka">메랜·옛메(메이플랜드)를 즐기는 메이플 유저를 위한 Your Maple(유얼메이플·YM)의 무료 도구예요. 옛날 메이플스토리 감성 그대로 쓰기 쉽게 만들었어요.</p>
 {ended_html}{other_tools}
         <p class="version">{e(p.get("note", "로그인 없이 계산할 수 있어요 · 저장할 때만 Google·Discord 로그인"))}</p></div>
       <div class="feature-art{' is-smooth' if p.get('smooth') else ''}">{art}</div>
@@ -304,7 +320,7 @@ def page(p):
     <section aria-labelledby="t-faq"><p class="section-number">04</p><h2 id="t-faq">자주 묻는 질문</h2><div class="faq">{faq}</div></section>
     <nav class="feature-nav" aria-label="다른 기능">{others}</nav>
   </main>
-  <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Nexon·메이플스토리의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>
+  <footer><a class="footer-brand" href="/">Your Maple</a><nav aria-label="정책"><a href="/privacy.html">개인정보 처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:yourmaplekr@gmail.com">문의</a></nav><p>Your Maple(유얼메이플)은 Nexon·메이플스토리·메이플랜드의 공식 서비스가 아닌 이용자 도구입니다.</p></footer>
   </div>
 {ended_script}  {app_script}
 </body>

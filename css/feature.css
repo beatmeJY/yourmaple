@@ -52,3 +52,6 @@
 .ended-notice strong { color: var(--gold); }
 .ended-notice p { margin: 4px 0 12px; font-size: 15px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .ended-notice { animation: none; } }
+
+/* 검색어 보강 한 줄(메랜·옛메·유얼메이플, 2026-11-16) */
+.feature-page .aka { max-width: 620px; margin-top: 10px; font-size: 14px; line-height: 1.6; color: var(--muted); opacity: .85; }

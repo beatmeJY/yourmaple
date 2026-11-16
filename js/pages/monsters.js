@@ -12,6 +12,7 @@ import { mountHistoryDialog } from "../catalog-history.js";
 import { canReviewCatalog } from "../catalog-review.js";
 import { mountMonsterEditor } from "../catalog-monster-editor.js";
 import { openMonsterImageCheck } from "../monster-image-check.js";
+import { openMonsterDelete } from "../monster-delete.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
 
@@ -206,7 +207,14 @@ export function render(root) {
     void reviewer.then((allowed) => {
       const actions = box.querySelector("[data-monster-admin]");
       if (!allowed || request !== detailLoadId || !actions?.isConnected) return;
-      actions.innerHTML = '<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-check-image>그림 확인</button><button type="button" class="catalog-pill-button" data-edit-monster>몬스터 수정</button>';
+      actions.innerHTML = '<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-check-image>그림 확인</button><button type="button" class="catalog-pill-button" data-edit-monster>몬스터 수정</button><button type="button" class="catalog-pill-button is-danger" data-delete-monster>몬스터 삭제</button>';
+      actions.querySelector("[data-delete-monster]").addEventListener("click", () => openMonsterDelete(root, row, () => {
+        dropsCache.delete(row.id);
+        sfx("check");
+        notify(`${row.name}을(를) 공개 도감에서 숨겼어요.`, "success", { label: "삭제한 몬스터 보기", onClick: () => { location.href = "/monster-trash/"; } });
+        selectedId = "";
+        repaintList();
+      }));
       actions.querySelector("[data-check-image]").addEventListener("click", () => openMonsterImageCheck(root, { focusId: row.id, onChanged: () => repaintList() }));
       mountHistoryDialog(actions.querySelector("[data-open-history]"), row.id, "monster", row.name);
       mountMonsterEditor(actions.querySelector("[data-edit-monster]"), root, row.id, () => {
@@ -296,7 +304,7 @@ export function render(root) {
       <div class="mo-page">
         <header class="ym-page-head mo-head">
           <div><h1>몬스터 도감</h1><p>레벨·약점으로 찾고, 1 EXP당 HP로 사냥 효율을 비교해요.</p></div>
-          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><button type="button" class="mo-ghost" data-image-audit hidden>그림 점검</button><button type="button" class="mo-ghost" data-catalog-reload>새로 확인</button></div>
+          <div><span class="ym-badge">모두가 함께 보는 공용 도감</span><button type="button" class="mo-ghost" data-image-audit hidden>그림 점검</button><a class="mo-ghost" href="/monster-trash/" data-monster-trash hidden>삭제한 몬스터</a><button type="button" class="mo-ghost" data-catalog-reload>새로 확인</button></div>
         </header>
         <div class="mo-layout">
           <div class="mo-main">
@@ -410,7 +418,7 @@ export function render(root) {
 
       // 그림 점검은 도감 관리자에게만 보인다(sql/070).
       reviewer ??= canReviewCatalog();
-      void reviewer.then((allowed) => { const button = page.querySelector("[data-image-audit]"); if (allowed && button) button.hidden = false; });
+      void reviewer.then((allowed) => { if (allowed) for (const node of page.querySelectorAll("[data-image-audit],[data-monster-trash]")) node.hidden = false; });
 
       page.addEventListener("click", (event) => {
         if (event.target.closest("[data-image-audit]")) { openMonsterImageCheck(root, { onChanged: () => repaintList() }); return; }
