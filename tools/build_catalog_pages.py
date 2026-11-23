@@ -256,7 +256,9 @@ def item_page(item, drops, monsters, monster_links):
     if item.get("category") not in EQUIP_CATEGORIES:
         effects = [line for line in clean_text(item.get("effect_description")).split("\n") if line]
         options = item.get("base_options") or {}
-        effects += [f"{STAT_LABELS.get(k, k)} {'+' if isinstance(v, (int, float)) and v > 0 else ''}{v}" for k, v in options.items()]
+        order = list(STAT_LABELS)  # 장비 옵션 입력칸 순서(js/item-options.js)와 같게
+        ordered = sorted(options.items(), key=lambda kv: order.index(kv[0]) if kv[0] in order else len(order))
+        effects += [f"{STAT_LABELS.get(k, k)} {'+' if isinstance(v, (int, float)) and v > 0 else ''}{v}" for k, v in ordered]
         if effects:
             facts.append(("효과", " · ".join(effects)))
             fact_html = "".join(f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>" for k, v in facts)

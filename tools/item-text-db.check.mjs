@@ -37,14 +37,20 @@ await add('사과','빨갛게 잘 익은 사과이다.HP를 약 30 회복시킨�
 await add('운영자가 고친 주문서',itemTextCases[1].raw,{},{str:9});
 await add('평범한 설명','평범한 설명이다.');
 await add('설명 없음',null);
+// 074 대상(자유 글 효과) 예시: 실제 번호·이름·원문 그대로. 실자료를 넣을 때는 실자료가 대신한다.
+const free=[['2070001','월비 표창','강철로 만든 표창이다. 여러 개가 들어있으며 모두 사용했다면 다시 충전해야 한다.','공격력 + 17, 충전량 500'],
+ ['2040037','기적의 주문서(얼굴장식)','베이컨트 서클릿에 옵션 추가. 성공률 5%, STR/INT/DEX/LUK +4, 방어력 +14, 최대HP/최대MP +40, 이동속도 +4, 점프력 +4.',null],
+ ['2022121','겔트 초콜릿','성탄 페스티벌에서 나누어주는 맛있는 초콜릿이다. HP/MP 100 회복, 10분간 공격력 +120, 방어력 +120, 명중률 +30, 회피율 +30, 이동속도 +10, 점프력 +10.',null],
+ ['2060001','활전용 청동화살','청동화살이 들어있는 화살통이다. 반드시 활과 함께 사용해야 한다.공격력 + 1',null]];
+if(!process.env.ITEMS_JSON) for(const [sid,name,desc,effect] of free) await db.query(`insert into catalog_items(name,category,source,source_id,source_data)values($1,'소비','collected',$2,$3)`,[name,sid,JSON.stringify({description_text:`DSC ${desc}`,effect_text:effect&&`EFFECT ${effect}`,import_payload:{x:1}})]);
 const id=async name=>(await one('select id from catalog_items where name=$1',[name])).id;
 assert.match((await one("select description from catalog_items where name='한손검 공격력 주문서 10%'")).description,/#c/,'073 전에는 #c 그대로');
 const untouched=await one("select to_jsonb(i) j from catalog_items i where name='평범한 설명'");
 
 // (로컬) 공개 도감 전체를 073 전 상태로 넣는다(062 트리거가 지금 운영처럼 #c 가 남은 설명을 만든다).
 const realRows=process.env.ITEMS_JSON?JSON.parse(fs.readFileSync(process.env.ITEMS_JSON,'utf8')):[];
-for(const r of realRows) await db.query(`insert into catalog_items(name,category,source,source_id,source_data,base_options,requirements)values($1,'소비','collected',$2,$3,$4,$5)`,['실자료 '+r.name,'real-'+r.id,JSON.stringify(r.source_data),JSON.stringify(r.base_options??{}),JSON.stringify(r.requirements??{})]);
-if(realRows.length) assert.equal((await one("select count(*)::int n from catalog_items where name like '실자료 %' and description like '%#c%'")).n,427,'운영과 같은 #c 설명 수');
+for(const r of realRows) await db.query(`insert into catalog_items(name,category,source,source_id,source_data,base_options,requirements)values($1,'소비','collected',$2,$3,$4,$5)`,['실자료 '+r.name,r.source_id??('real-'+r.id),JSON.stringify(r.source_data),JSON.stringify(r.base_options??{}),JSON.stringify(r.requirements??{})]);
+if(realRows.length) assert.equal((await one("select count(*)::int n from catalog_items where name like '실자료 %' and description like '%#c%'")).n,realRows.filter(r=>/#c/.test(r.source_data?.description_text??'')).length,'원문의 #c 설명이 그대로 나옴');
 
 const sql=fs.readFileSync('sql/073_catalog_item_text_cleanup.sql','utf8');
 const started=Date.now();
@@ -83,11 +89,11 @@ assert.equal((await item('설명 없음')).description,null);
 
 // 3) 이력·보관
 const logs=await q("select entity_name,changes from catalog_changes where release_label='설명 정리·주문서 효과 분리' and entity_type='item' and entity_name not like '실자료 %' order by id");
-assert.deepEqual([...new Set(logs.map(l=>l.entity_name))].sort(),['[마스터리북]슈퍼 트랜스폼 20','드래곤의 돌','사과','운영자가 고친 주문서','한손검 공격력 주문서 10%'].sort(),'바뀐 아이템만 이력');
+assert.deepEqual([...new Set(logs.map(l=>l.entity_name).filter(n=>!free.some(f=>f[1]===n)))].sort(),['[마스터리북]슈퍼 트랜스폼 20','드래곤의 돌','사과','운영자가 고친 주문서','한손검 공격력 주문서 10%'].sort(),'바뀐 아이템만 이력');
 assert(logs.find(l=>l.entity_name==='한손검 공격력 주문서 10%').changes.base_options,'옵션 바뀜 이력');
 const kept=await one('select * from catalog_import_private.scrub_073_rows where row_id=$1',[sword.id]);
 assert.match(kept.description,/#c성공률/);assert.deepEqual(kept.base_options,{});
-assert.equal((await one("select count(*)::int n from catalog_import_private.scrub_073_rows r join catalog_items i on i.id=r.row_id where i.name not like '실자료 %'")).n,5);
+assert.equal((await one("select count(*)::int n from catalog_import_private.scrub_073_rows r join catalog_items i on i.id=r.row_id where i.name not like '실자료 %' and i.source_id not in ('2070001','2040037','2022121','2060001')")).n,5);
 
 // 4) 다시 실행: 바뀌는 값·이력 없음, 보관한 처음 값 유지
 const n0=(await one('select count(*)::int n from catalog_changes')).n;
@@ -106,6 +112,31 @@ assert.deepEqual(fresh.base_options,{int:2,magic_attack:1,magic_defense:3});
 // 운영자 수정창 저장처럼 정리된 글을 원문 칸에 쓰면 그대로 남는다.
 await db.query(`update catalog_items set source_data=source_data||$2 where id=$1`,[sword.id,JSON.stringify({description_text:'고친 설명이다.',effect_text:'성공률 10%\n주의 문구'})]);
 assert.deepEqual([(await item('한손검 공격력 주문서 10%')).description,(await item('한손검 공격력 주문서 10%')).effect_description],['고친 설명이다.','성공률 10%\n주의 문구']);
+
+// 6) 074: 자유 글 효과 42개(예시 4개)
+const sql74=fs.readFileSync('sql/074_catalog_item_free_text_effects.sql','utf8');
+await db.exec(sql74);
+const star=await one("select * from catalog_items where source_id='2070001'");
+assert.deepEqual([star.description,star.effect_description,star.base_options],['강철로 만든 표창이다. 여러 개가 들어있으며 모두 사용했다면 다시 충전해야 한다.','충전량 500',{attack:17}],'표창');
+assert.deepEqual((await q("select stat_key,base_value from catalog_item_stats where item_id=$1",[star.id])).map(r=>[r.stat_key,r.base_value]),[['attack',17]]);
+if(!process.env.ITEMS_JSON) assert.deepEqual(star.source_data.import_payload,{x:1},'등록 판단용 원문 묶음 유지');
+const miracle=await one("select * from catalog_items where source_id='2040037'");
+assert.deepEqual([miracle.description,miracle.effect_description],['베이컨트 서클릿에 옵션 추가.','성공률 5%']);
+assert.deepEqual(miracle.base_options,{str:4,int:4,dex:4,luk:4,defense:14,hp:40,mp:40,speed:4,jump:4});
+const choco=await one("select * from catalog_items where source_id='2022121'");
+assert.deepEqual([choco.description,choco.effect_description,choco.base_options],['성탄 페스티벌에서 나누어주는 맛있는 초콜릿이다.','HP/MP 100 회복\n10분간 공격력 +120, 방어력 +120, 명중률 +30, 회피율 +30, 이동속도 +10, 점프력 +10',{}],'음식은 효과 글만');
+const arrow=await one("select * from catalog_items where source_id='2060001'");
+assert.deepEqual([arrow.description,arrow.base_options],['청동화살이 들어있는 화살통이다. 반드시 활과 함께 사용해야 한다.',{attack:1}],'073 줄바꿈 뒤 설명으로 맞춰 고름');
+const n74=(await one("select count(*)::int n from catalog_changes where release_label='자유 글 효과 정리'")).n;
+assert.equal(n74,process.env.ITEMS_JSON?42:4,'바뀐 아이템마다 이력');
+await db.exec(sql74);
+assert.equal((await one("select count(*)::int n from catalog_changes where release_label='자유 글 효과 정리'")).n,n74,'074 재실행 무기록');
+assert.match((await one('select description from catalog_import_private.scrub_074_rows where row_id=$1',[star.id])).description??'',/표창/);
+// 이미 다르게 고친 아이템은 건너뛴다.
+await db.query("update catalog_items set source_data=source_data||'{\"description_text\":\"운영자가 고친 설명.\"}', base_options='{}' where id=$1",[star.id]);
+await db.exec(sql74);
+assert.deepEqual([(await one('select description,base_options from catalog_items where id=$1',[star.id]))].map(r=>[r.description,r.base_options])[0],['운영자가 고친 설명.',{}],'이전 값이 다르면 건너뜀');
+const free74=` · 074 자유 글 ${n74}개 정리(표창·기적의 주문서·음식·화살)·재실행 무기록·다른 값 건너뜀`;
 
 // 6) (로컬) 공개 도감 전체 자료로 SQL·JS 비교
 let real='';
@@ -130,5 +161,5 @@ if(realRows.length){
   real+=` · 실자료 073 적용 ${took}ms: 대상 ${real073.saved}개·이력 ${real073.logged}개·옵션 있는 아이템 ${real073.with_options}개·기호 0`;
   real+=` · 공개 도감 ${rows.length}개 SQL=JS 일치(설명 바뀜 ${changed}, 옵션 꺼냄 ${optionItems})`;
 }
-console.log(`073 아이템 설명 정리: SQL·JS 예시 ${itemTextCases.length}개 일치, 주문서 옵션(관계표)·효과·조건/파괴·마스터리북 줄바꿈·착용 조건 기호만 제거·운영자 옵션 보존·변경 없는 아이템 그대로, 바뀐 아이템만 이력·처음 값 비공개 보관, 재실행 무기록, 재등록·새 등록·수정 저장 통과${real}`);
+console.log(`073 아이템 설명 정리: SQL·JS 예시 ${itemTextCases.length}개 일치, 주문서 옵션(관계표)·효과·조건/파괴·마스터리북 줄바꿈·착용 조건 기호만 제거·운영자 옵션 보존·변경 없는 아이템 그대로, 바뀐 아이템만 이력·처음 값 비공개 보관, 재실행 무기록, 재등록·새 등록·수정 저장 통과${free74}${real}`);
 await db.close();

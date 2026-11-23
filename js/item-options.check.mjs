@@ -25,3 +25,10 @@ assert.equal(combineLots([noOption,{...noOption,buy_price:200}]).buy_price,150);
 const catalog={name:'아대',category:'무기',base_options:{attack:30},requirements:{레벨:50}};
 const snapshot=itemSnapshot(catalog);catalog.base_options.attack=999;assert.equal(snapshot.base_options.attack,30);
 console.log('아이템 옵션: 값 검증·0/빈 값·합산 분리·스냅샷 달라도 같은 옵션 합침·키 순서·기존 거래·스냅샷 독립 통과');
+
+// 옵션 표시 순서: 장비 옵션 입력칸 순서, 모르는 옵션은 뒤로(2026-11-23 사용자 요청).
+{
+  const { sortByOption } = await import("./item-options.js");
+  const keys = sortByOption([{ stat_key: "defense" }, { stat_key: "mystery" }, { stat_key: "hp" }, { stat_key: "str" }, { stat_key: "attack" }, { stat_key: "dex" }, { stat_key: "int" }, { stat_key: "luk" }]).map((row) => row.stat_key);
+  assert.deepEqual(keys, ["attack", "str", "dex", "int", "luk", "hp", "defense", "mystery"]);
+}

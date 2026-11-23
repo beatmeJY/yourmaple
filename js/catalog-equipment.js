@@ -1,6 +1,6 @@
 import { escapeHtml, formatCount, readBig } from "./format.js";
 import { catalogImage } from "./catalog-image.js";
-import { itemOptionFields } from "./item-options.js";
+import { itemOptionFields, sortByOption } from "./item-options.js";
 
 const text = value => escapeHtml(value == null || value === "" ? "미제공" : String(value));
 const labels = Object.fromEntries(itemOptionFields.map(field => [field.key, field.label]));
@@ -38,10 +38,7 @@ export function equipmentCard({ item, stats = [], requirements = [], jobs = [], 
     return `<span class="equipment-range-bar" aria-hidden="true"><i></i>${pos == null ? "" : `<b style="left:${pos.toFixed(1)}%"></b>`}</span><small class="equipment-range">${text(min)}${unit} ~ ${text(max)}${unit}</small>`;
   };
   const row = (label, value, range = `<small class="equipment-range is-unknown">—<span class="sr-only"> 범위 미제공</span></small>`, index = 0) => `<div class="catalog-stat equipment-stat" style="--i:${index}"><dt>${text(label)}</dt><dd><strong>${text(value)}</strong><span class="equipment-range-cell">${range}</span></dd></div>`;
-  const order = itemOptionFields.map(field => field.key);
-  const ordered = [...stats].sort((a, b) => {
-    return (order.indexOf(a.stat_key) < 0 ? 999 : order.indexOf(a.stat_key)) - (order.indexOf(b.stat_key) < 0 ? 999 : order.indexOf(b.stat_key));
-  });
+  const ordered = sortByOption(stats);
   const hasSpeed = item.attack_speed_label != null || item.attack_speed != null;
   const statRows = ordered.map((stat, index) => row(
     stat.stat_key === "remaining_upgrades" ? "업그레이드 가능 횟수" : detailLabels[stat.stat_key] || labels[stat.stat_key] || stat.stat_key,

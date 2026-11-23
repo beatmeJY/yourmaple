@@ -31,7 +31,7 @@ try {
     ],
     items: [
       { id: "i1", name: "달팽이 껍질", category: "Etc", source_id: "4000019", image_url: "https://maplestory.io/api/gms/100/item/4000019/icon" },
-      { id: "i2", name: "빨간 포션", category: "Use", source_id: "2000000", description: "빨간 약초로 만든 물약이다.#c더블클릭하면 마신다.#", effect_description: "HP를 50 회복한다.", base_options: { attack: 1 } },
+      { id: "i2", name: "빨간 포션", category: "Use", source_id: "2000000", description: "빨간 약초로 만든 물약이다.#c더블클릭하면 마신다.#", effect_description: "HP를 50 회복한다.", base_options: { defense: 2, str: 1, attack: 1 } },
       { id: "i3", name: "<아대>", category: "Equip", subcategory: "아대", required_level: 70, source_id: "1472000" },
       { id: "i4", name: "번호 겹침", category: "Etc", source_id: "4000019" },
     ],
@@ -82,7 +82,7 @@ try {
   // 설명의 #c 기호는 지우고 문장 끝 뒤 강조 글은 새 줄로, 소비 아이템 효과(효과 글·옵션)는 기본 정보에(sql/073 규칙).
   assert.match(potion, /빨간 약초로 만든 물약이다\.<br \/>더블클릭하면 마신다\./);
   assert.doesNotMatch(potion, /#c더블/);
-  assert.match(potion, /<dt>효과<\/dt><dd>HP를 50 회복한다\. · 공격력 \+1<\/dd>/);
+  assert.match(potion, /<dt>효과<\/dt><dd>HP를 50 회복한다\. · 공격력 \+1 · STR \+1 · 물리 방어 \+2<\/dd>/);
   assert.match(potion, /HP를 50 회복한다\./);
   assert.match(potion, /소비/);
   const claw = readFileSync(join(out, "items", "1472000", "index.html"), "utf8");

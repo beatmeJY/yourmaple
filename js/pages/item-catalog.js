@@ -4,7 +4,7 @@ import { catalogError } from "../catalog.js";
 import { catalogRpc, clearCatalogCache, itemDropPage } from "../catalog-api.js";
 import { catalogImage, catalogMonsterImage, chaosBadge, isChaosMonster, mountCatalogImageFallback } from "../catalog-image.js";
 import { escapeHtml, formatCount } from "../format.js";
-import { itemOptionFields } from "../item-options.js";
+import { itemOptionFields, sortByOption } from "../item-options.js";
 import { equipmentCard, equipmentTypeName, isEquipment } from "../catalog-equipment.js";
 import { mountHistoryDialog } from "../catalog-history.js";
 import { itemSlugFromPath } from "../route-url.js";
@@ -95,7 +95,8 @@ async function renderDetail(root,id) {
   // 설명의 게임 글자색 기호(#c)·붙은 줄을 정리하고, 주문서 효과는 설명 대신 효과 칸에 보인다(sql/073 실행 전 자료도 같은 모습).
   const shown = displayItemText(rawItem);
   const item = {...rawItem, description: shown.description};
-  const stats = rawStats.length ? rawStats : Object.entries(shown.options).map(([stat_key,base_value])=>({stat_key,base_value,minimum_value:null,maximum_value:null}));
+  // 능력치는 장비 옵션과 같은 순서로(공격력·마력·STR·DEX·INT·LUK·HP·MP…).
+  const stats = sortByOption(rawStats.length ? rawStats : Object.entries(shown.options).map(([stat_key,base_value])=>({stat_key,base_value,minimum_value:null,maximum_value:null})));
   const attributes = rawAttributes.map(a=>({...a,attribute_name:stripItemMarks(a.attribute_name),value_text:stripItemMarks(a.value_text)}));
   const signed = v => Number(v) > 0 ? `+${v}` : String(v);
   const effectPanel = `<section class="catalog-detail-panel catalog-effect-panel ym-glass"><h2>효과</h2>${shown.effects.length ? `<ul class="catalog-effect-lines">${shown.effects.map((line,i)=>`<li style="--i:${i}">${text(line)}</li>`).join("")}</ul>` : ""}${stats.length ? `<div class="catalog-stat-grid">${stats.map((r,i)=>`<div class="catalog-stat" style="--i:${i}"><span>${text(labels[r.stat_key] ?? r.stat_key)}</span><strong>${text(signed(r.base_value))}</strong>${r.minimum_value == null ? "" : `<small>${text(r.minimum_value)} ~ ${text(r.maximum_value)}</small>`}</div>`).join("")}</div>` : ""}${shown.effects.length || stats.length ? "" : `<p class="hint">제공된 효과가 없습니다.</p>`}</section>`;

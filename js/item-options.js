@@ -20,6 +20,11 @@ export const itemOptionFields = [
   {"key": "used_upgrades", "label": "사용한 강화 횟수"},
 ];
 
+// 옵션 표시 순서는 장비 옵션 입력칸 순서(itemOptionFields)를 따른다. 목록에 없는 옵션은 뒤로, 같은 순위는 원래 순서 그대로.
+const optionOrder = new Map(itemOptionFields.map(({ key }, index) => [key, index]));
+export const optionRank = (key) => optionOrder.get(key) ?? itemOptionFields.length;
+export const sortByOption = (rows, keyOf = (row) => row.stat_key) => [...rows].sort((a, b) => optionRank(keyOf(a)) - optionRank(keyOf(b)));
+
 export function readItemOptions(values) {
   const result = {};
   for (const { key, label } of itemOptionFields) {
