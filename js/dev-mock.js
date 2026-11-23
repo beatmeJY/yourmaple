@@ -642,13 +642,20 @@ const RPCS = {
     return {quest:{...quest,version:String(updated_at)},conditions:t.conditions.map(link),rewards:t.reward_items.map(link),start_map:map(t.start_map),end_map:map(t.end_map),
       prerequisites:t.prerequisites.flatMap(ref),next_quests:t.next_quests.flatMap(ref),revision:1};
   },
-  catalog_quest_edit_save({p_id,p_version,p_name,p_min_level,p_max_level,p_reward_exp,p_reward_meso,p_reward_fame}) {
+  catalog_quest_edit_save({p_id,p_version,p_name,p_min_level,p_max_level,p_reward_exp,p_reward_meso,p_reward_fame,...places}) {
     assertMockReviewer();const t=mockQuests().find(x=>x.id===p_id);if(!t)throw new Error("퀘스트를 찾을 수 없습니다");
     if(String(t.updated_at)!==String(p_version))throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
     const name=String(p_name??"").trim();if(!name||name.length>200)throw Object.assign(new Error("퀘스트 이름은 1~200자로 입력해 주세요"),{code:"22023"});
     if(p_min_level!=null&&p_max_level!=null&&p_min_level>p_max_level)throw Object.assign(new Error("최소 레벨이 최대 레벨보다 큽니다"),{code:"22023"});
     const next={name,min_level:p_min_level??null,max_level:p_max_level??null,reward_exp:p_reward_exp??null,reward_meso:p_reward_meso??null,reward_fame:p_reward_fame??null};
-    const changes={};for(const [k,v] of Object.entries(next))if(t[k]!==v)changes[k]={before:t[k],after:v};
+    // sql/080: NPC·맵·지역 인자가 오면 함께 고친다(번호 1 이상 정수, 같은 NPC면 그림 버전 유지)
+    if("p_start_npc" in places){
+      const npc=(v,old)=>{if(v==null)return null;if(!/^[1-9]\d{0,9}$/.test(String(v.id))||Number(v.id)>1e9)throw Object.assign(new Error("NPC 번호는 1 이상 정수로 적어 주세요"),{code:"22023"});
+        const o={id:Number(v.id)};const n=String(v.n??"").trim();if(n)o.n=n;if(old?.id===o.id&&old.v)o.v=old.v;return o;};
+      for(const m of [places.p_start_map,places.p_end_map])if(m!=null&&(!Number.isInteger(m)||m<1))throw Object.assign(new Error("맵 번호는 1 이상 정수로 적어 주세요"),{code:"22023"});
+      Object.assign(next,{start_npc:npc(places.p_start_npc,t.start_npc),end_npc:npc(places.p_end_npc,t.end_npc),start_map:places.p_start_map??null,end_map:places.p_end_map??null,region:String(places.p_region??"").trim()||null});
+    }
+    const changes={};for(const [k,v] of Object.entries(next))if(JSON.stringify(t[k]??null)!==JSON.stringify(v))changes[k]={before:t[k]??null,after:v};
     if(Object.keys(changes).length){const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"quest",entity_id:p_id,entity_name:name,operation:"UPDATE",changes,release_label:"운영자 퀘스트 수정",changed_at:iso()});
       Object.assign(t,next,{source:"operator",updated_at:iso()});save();}
     return RPCS.catalog_quest_detail({p_id});

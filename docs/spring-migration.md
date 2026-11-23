@@ -32,6 +32,7 @@
 | 맵 연결 맞추기(수집) | `catalog_import_private.sync_map_monsters()`(`sql/076`) | 비공개 `map_links_in` 에 넣은 수집 연결만 다시 맞춤(관리자 연결은 그대로) |
 | 퀘스트 검색·상세 | `catalog_search_quests`·`catalog_quest_detail`(`sql/077`) | 공개 읽기. 상세는 조건·보상 아이템·몬스터를 번호로 도감과 잇고(지운 몬스터 제외), 시작·완료 맵·선행/다음 퀘스트 이름을 붙임 |
 | 퀘스트 수정(관리자) | `catalog_quest_edit_save`(`sql/077`) | 이름·레벨·보상 수치. `can_review_catalog` 검사·버전 충돌(40001)·`catalog_changes` 에 `quest` 이력·`source` 를 `operator` 로 바꿔 다시 등록해도 고친 칸 유지 |
+| 퀘스트 NPC·맵 수정(관리자) | `catalog_quest_edit_save` 인자 13개(`sql/080`) | 077 수정에 시작·완료 NPC(`catalog_import_private.quest_npc` 검사)·맵·지역을 더함, 같은 NPC면 그림 버전 유지 |
 | 퀘스트 삭제·복구(관리자) | `catalog_quest_set_deleted`·`catalog_quest_deleted_list`(`sql/079`) | 논리 삭제(`deleted_at`·이유), 공개 읽기 정책이 지운 행을 숨김, 이력 `quest` |
 | 퀘스트 조건·보상 수정(관리자) | `catalog_quest_items_save`(`sql/079`) | 항목 검사(`catalog_import_private.quest_entry`)·보상 방식 계산·버전 충돌(40001)·이력·`source='operator'` |
 | 몬스터 검색 | `catalog_search_monsters`(`sql/047`→`048`) | 드랍 아이템으로 찾기 포함 |

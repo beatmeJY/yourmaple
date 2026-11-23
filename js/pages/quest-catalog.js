@@ -176,6 +176,16 @@ async function renderDetail(root, slug, { push = false } = {}) {
   });
 }
 
+// 수정창의 NPC 칸: 그림 · 번호 · 이름 · 맵 번호
+function npcFields(side, label, npc, map) {
+  return `<fieldset class="qc-edit-npc"><legend>${label} NPC</legend>
+    <span class="qc-edit-npc-face" data-npc-face="${side}">${npc ? npcImage(npc, 48) || initial(npc.n) : initial("?")}</span>
+    <label class="field"><span>NPC 번호</span><input name="${side}Npc" type="number" inputmode="numeric" min="1" value="${npc?.id ?? ""}" placeholder="비우면 미제공" /></label>
+    <label class="field"><span>NPC 이름</span><input name="${side}Name" maxlength="100" value="${escapeHtml(npc?.n ?? "")}" placeholder="예: 조교 챙" /></label>
+    <label class="field"><span>맵 번호</span><input name="${side}Map" type="number" inputmode="numeric" min="1" value="${map ?? ""}" placeholder="비우면 미제공" /></label>
+  </fieldset>`;
+}
+
 function npcCard(npc, role, map, mapNumber, same = false) {
   const place = map ? `<a class="qc-npc-map" href="/maps/${encodeURIComponent(String(map.source_id))}/">${escapeHtml(map.name)}${map.street_name && map.street_name !== map.name ? `<small>${escapeHtml(map.street_name)}</small>` : ""}</a>` : mapNumber ? `<span class="qc-npc-map is-plain">맵 ${escapeHtml(String(mapNumber))}</span>` : "";
   return `<div class="qc-npc-card${role === "완료" ? " is-end" : ""}"><span class="qc-npc-role">${role}</span><span class="qc-npc-portrait">${npc ? npcImage(npc, 64) || initial(npc.n) : initial("?")}</span><strong>${escapeHtml(npc?.n ?? "미제공")}</strong>${same ? `<small class="hint">시작과 같음</small>` : ""}${place}</div>`;
@@ -237,7 +247,7 @@ function syncDetailAddress(root, q, push = false) {
   if (canonical) canonical.href = `https://yourmaple.kr${path}`;
 }
 
-// 관리자 퀘스트 수정: 이름·레벨·보상 수치. 저장하면 이 퀘스트는 "관리자"가 되어 다시 등록해도 고친 칸이 그대로 남는다.
+// 관리자 퀘스트 수정: 이름·레벨·보상 수치, 시작·완료 NPC와 맵·지역(sql/080). 저장하면 이 퀘스트는 "관리자"가 되어 다시 등록해도 고친 칸이 그대로 남는다.
 function openQuestEditor(root, q, onSaved) {
   const dialog = document.createElement("dialog");
   dialog.className = "catalog-history-dialog map-edit-dialog qc-edit-dialog";
@@ -246,13 +256,26 @@ function openQuestEditor(root, q, onSaved) {
   dialog.innerHTML = `<form method="dialog"><header class="catalog-history-dialog-head"><div><span class="ym-chip">퀘스트 수정</span><h2 id="quest-edit-title">${escapeHtml(q.name)}</h2></div><button type="button" class="mo-ghost" data-close aria-label="퀘스트 수정 닫기">닫기 ×</button></header>
     <label class="field"><span>퀘스트 이름</span><input name="name" required maxlength="200" value="${escapeHtml(q.name)}" /></label>
     <div class="qc-edit-grid">${num("min", "최소 레벨", q.min_level, 'min="1" max="300"')}${num("max", "최대 레벨", q.max_level, 'min="1" max="300"')}${num("exp", "보상 경험치", q.reward_exp, 'min="0"')}${num("meso", "보상 메소", q.reward_meso)}${num("fame", "보상 인기도", q.reward_fame, 'min="-10000" max="10000"')}</div>
+    ${npcFields("start", "시작", q.start_npc, q.start_map)}${npcFields("end", "완료", q.end_npc, q.end_map)}
+    <label class="field"><span>지역</span><input name="region" maxlength="100" value="${escapeHtml(q.region ?? "")}" placeholder="예: 루디브리엄" /></label>
     <p class="hint" data-status role="status"></p><div class="map-edit-actions"><button type="button" class="mo-ghost" data-close>취소</button><button type="submit" class="catalog-pill-button" data-save>저장</button></div></form>`;
   root.append(dialog);
   const form = dialog.querySelector("form"), status = dialog.querySelector("[data-status]");
   const read = name => { const v = form[name].value.trim(); return v === "" ? null : Number(v); };
   const values = () => ({ name: form.name.value.trim(), min: read("min"), max: read("max"), exp: read("exp"), meso: read("meso"), fame: read("fame") });
-  const original = JSON.stringify(values());
-  const dirty = () => JSON.stringify(values()) !== original;
+  const places = () => ({ sid: read("startNpc"), sn: form.startName.value.trim(), sm: read("startMap"), eid: read("endNpc"), en: form.endName.value.trim(), em: read("endMap"), region: form.region.value.trim() });
+  const original = JSON.stringify(values()), originalPlaces = JSON.stringify(places());
+  const placesDirty = () => JSON.stringify(places()) !== originalPlaces;
+  const dirty = () => JSON.stringify(values()) !== original || placesDirty();
+  // NPC 번호를 적으면 옆 그림이 바로 바뀐다(이름은 직접 적음).
+  form.addEventListener("input", event => {
+    const side = event.target.name === "startNpc" ? "start" : event.target.name === "endNpc" ? "end" : null;
+    if (!side) return;
+    const id = read(`${side}Npc`);
+    const face = dialog.querySelector(`[data-npc-face="${side}"]`);
+    const keep = side === "start" ? q.start_npc : q.end_npc;
+    face.innerHTML = Number.isInteger(id) && id > 0 ? npcImage({ id, v: keep?.id === id ? keep.v : null }, 48) || initial("?") : initial("?");
+  });
   const close = () => { if (dirty() && !window.confirm("고친 내용을 저장하지 않고 닫을까요?")) return; dialog.close(); };
   dialog.addEventListener("close", () => dialog.remove(), { once: true });
   dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
@@ -266,16 +289,29 @@ function openQuestEditor(root, q, onSaved) {
     if ((v.min != null && (v.min < 1 || v.min > 300)) || (v.max != null && (v.max < 1 || v.max > 300))) return bad(v.min != null && (v.min < 1 || v.min > 300) ? "min" : "max", "레벨은 1~300 사이로 적어 주세요.");
     if (v.min != null && v.max != null && v.min > v.max) return bad("max", "최대 레벨이 최소 레벨보다 작아요.");
     if (v.exp != null && v.exp < 0) return bad("exp", "경험치는 0 이상으로 적어 주세요.");
+    const p = places();
+    for (const [id, nameField, idField, mapField, map, label] of [[p.sid, p.sn, "startNpc", "startMap", p.sm, "시작"], [p.eid, p.en, "endNpc", "endMap", p.em, "완료"]]) {
+      if (id != null && (!Number.isInteger(id) || id < 1 || id > 1_000_000_000)) return bad(idField, `${label} NPC 번호는 1 이상 정수로 적어 주세요.`);
+      if (id == null && nameField) return bad(idField, `${label} NPC 이름을 쓰려면 NPC 번호도 적어 주세요.`);
+      if (map != null && (!Number.isInteger(map) || map < 1 || map > 2_000_000_000)) return bad(mapField, `${label} 맵 번호는 1 이상 정수로 적어 주세요.`);
+    }
     if (!dirty()) { dialog.close(); return; }
     const save = dialog.querySelector("[data-save]");
     save.disabled = true;
     status.textContent = "저장하는 중입니다.";
     const client = await getSupabase();
-    const result = await client.rpc("catalog_quest_edit_save", { p_id: q.id, p_version: q.version, p_name: v.name, p_min_level: v.min, p_max_level: v.max, p_reward_exp: v.exp, p_reward_meso: v.meso, p_reward_fame: v.fame });
+    const args = { p_id: q.id, p_version: q.version, p_name: v.name, p_min_level: v.min, p_max_level: v.max, p_reward_exp: v.exp, p_reward_meso: v.meso, p_reward_fame: v.fame };
+    // NPC·맵·지역을 고쳤을 때만 sql/080 의 칸이 늘어난 함수를 부른다(080 실행 전에도 나머지 수정은 된다).
+    if (placesDirty()) Object.assign(args, {
+      p_start_npc: p.sid == null ? null : { id: p.sid, n: p.sn || null }, p_end_npc: p.eid == null ? null : { id: p.eid, n: p.en || null },
+      p_start_map: p.sm, p_end_map: p.em, p_region: p.region || null,
+    });
+    const result = await client.rpc("catalog_quest_edit_save", args);
     if (!dialog.isConnected) return;
     save.disabled = false;
     if (result.error) {
-      status.textContent = result.error.code === "40001" ? "다른 곳에서 먼저 고쳤어요. 닫고 새로 확인한 뒤 다시 고쳐 주세요." : result.error.code === "42501" ? "퀘스트를 고칠 권한이 없습니다." : catalogError(result.error);
+      status.textContent = result.error.code === "40001" ? "다른 곳에서 먼저 고쳤어요. 닫고 새로 확인한 뒤 다시 고쳐 주세요." : result.error.code === "42501" ? "퀘스트를 고칠 권한이 없습니다."
+        : placesDirty() && /Could not find the function|schema cache|does not exist/i.test(result.error.message || "") ? "NPC·맵을 고치려면 sql/080을 먼저 실행해 주세요." : catalogError(result.error);
       return;
     }
     dialog.close();

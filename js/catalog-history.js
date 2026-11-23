@@ -8,6 +8,7 @@ const questEntry = x => `${x.n ?? (x.m ? `몬스터 ${x.m}` : `아이템 ${x.i}`
 function value(v, field) {
   if (field === "reward_method") return ({ fixed: "모두 받음", random: "하나 무작위", select: "하나 고름" })[v] ?? "없음";
   if (field === "deleted") return v ? "삭제함" : "보임";
+  if (["start_npc", "end_npc"].includes(field) && v && typeof v === "object") return `${v.n ?? "이름 없음"} (NPC ${v.id})`;
   if (Array.isArray(v) && ["conditions", "reward_items"].includes(field)) return v.length ? v.map(questEntry).join(" · ") : "없음";
   if (Array.isArray(v)) return v.join(" · ");
   if (["stat_key","requirement_key"].includes(field) && labels[v]) return labels[v];
@@ -19,7 +20,7 @@ function value(v, field) {
 // 수집 경로는 화면에 보여주지 않습니다.
 Object.assign(labels, { mp:"MP",physical_attack:"물리 공격력",magic_attack:"마법 공격력",physical_defense:"물리 방어력",magic_defense:"마법 방어력",movement_speed:"이동속도",knockback_damage:"넉백 기준 피해량",meso_value:"메소",accuracy_reference_level:"명중 기준 레벨", street_name:"지역" });
 labels.level_up_count="레벨업 가능 횟수";
-Object.assign(labels, { min_level:"최소 레벨", max_level:"최대 레벨", reward_exp:"보상 경험치", reward_meso:"보상 메소", reward_fame:"보상 인기도", conditions:"완료 조건", reward_items:"보상 아이템", reward_method:"보상 방식", deleted:"공개 상태", deleted_reason:"삭제 이유" });
+Object.assign(labels, { min_level:"최소 레벨", max_level:"최대 레벨", reward_exp:"보상 경험치", reward_meso:"보상 메소", reward_fame:"보상 인기도", conditions:"완료 조건", reward_items:"보상 아이템", reward_method:"보상 방식", deleted:"공개 상태", deleted_reason:"삭제 이유", start_npc:"시작 NPC", end_npc:"완료 NPC", start_map:"시작 맵", end_map:"완료 맵", region:"지역" });
 const hiddenFields = new Set(["source_url","source","source_hash","response_sha256"]);
 function fields(changes) {
   const result = [];

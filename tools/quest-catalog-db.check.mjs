@@ -30,7 +30,7 @@ await db.exec(sql);
 await db.exec(sql); // 다시 실행해도 안전
 
 // 비공개 도구가 만드는 등록 SQL 과 같은 모양(관리자가 고친 칸은 그대로)
-const editable = ["name", "min_level", "max_level", "reward_exp", "reward_meso", "reward_fame", "conditions", "reward_method", "reward_items"];
+const editable = ["name", "min_level", "max_level", "reward_exp", "reward_meso", "reward_fame", "conditions", "reward_method", "reward_items", "start_npc", "start_map", "region"];
 const cols = ["source_id", "name", "min_level", "max_level", "jobs", "reward_exp", "reward_meso", "reward_fame", "start_npc", "start_map", "region", "conditions", "reward_method", "reward_items", "prerequisites", "next_quests"];
 const lit = v => v === null ? "null" : typeof v === "number" ? String(v) : typeof v === "object" ? `'${JSON.stringify(v).replaceAll("'", "''")}'::jsonb` : `'${String(v).replaceAll("'", "''")}'`;
 const arr = v => `'{${v.join(",")}}'::integer[]`;
@@ -106,9 +106,10 @@ assert.equal(history.length, 1);
 assert.deepEqual(history[0], { entity_type: "quest", changes: { min_level: { before: 8, after: 10 }, reward_exp: { before: 300, after: 350 } } });
 assert.equal((await db.query("select count(*)::int n from catalog_import_private.change_backups")).rows[0].n, 1);
 // 다시 등록해도 관리자가 고친 칸은 그대로, 나머지는 새 값
-await importQuests([{ ...quests[0], min_level: 8, reward_exp: 300, region: "헤네시스 새 지역" }]);
-const after = (await db.query("select min_level,reward_exp,region,source from catalog_quests where source_id=1000")).rows[0];
-assert.deepEqual(after, { min_level: 10, reward_exp: 350, region: "헤네시스 새 지역", source: "operator" });
+await importQuests([{ ...quests[0], min_level: 8, reward_exp: 300, jobs: [100] }]);
+const after = (await db.query("select min_level,reward_exp,jobs,source from catalog_quests where source_id=1000")).rows[0];
+assert.deepEqual(after, { min_level: 10, reward_exp: 350, jobs: [100], source: "operator" });
+await importQuests([quests[0]]); // 직업은 원래대로
 // 잘못된 값은 표가 거절
 await assert.rejects(db.exec("insert into catalog_quests(source_id,name,min_level,max_level) values(9,'x',50,10)"));
 await assert.rejects(db.exec("insert into catalog_quests(source_id,name,reward_method) values(9,'x','maybe')"));
@@ -125,6 +126,12 @@ if (fs.existsSync(real)) {
   assert.equal(await count(), n1);
   assert.ok(n1 > 1000, `실제 등록 개수 ${n1}`);
   console.log(`  실제 등록 SQL 두 번 적용: 표에 퀘스트 ${n1}개(검사용 4개 포함)`);
+  // 2026-11-24 원본 v83·사용자 보정: 정비 부품의 행방은 조교 챙·30레벨·신발 주문서 4종 중 하나
+  const fix = (await db.query("select min_level,start_npc,end_npc,reward_method,reward_items from catalog_quests where source_id=3239")).rows[0];
+  if (fix) {
+    assert.deepEqual([fix.min_level, fix.start_npc.id, fix.end_npc.id, fix.reward_method], [30, 2040003, 2040003, "random"]);
+    assert.deepEqual(fix.reward_items.map(x => [x.i, x.r]), [["2040708", 1], ["2040707", 1], ["2040705", 1], ["2040704", 1]]);
+  }
 }
 // 079: 퀘스트 삭제(숨김·되살리기)·조건/보상 수정
 await db.exec("reset role");
@@ -207,4 +214,45 @@ assert.deepEqual(kept, { conditions: [{ i: "4000019", c: 7 }], reward_items: [{ 
 await db.exec("set role anon");
 await assert.rejects(itemsSave(q2000.id, d.quest.version, [], [], "random"), /permission denied/);
 await db.exec("reset role");
+
+// 080: 관리자 수정에 시작·완료 NPC와 맵·지역(인자 13개). 예전 8개 인자 함수는 그대로 동작.
+const sql080 = fs.readFileSync("sql/080_catalog_quest_npc_edit.sql", "utf8");
+await db.exec(sql080);
+await db.exec(sql080); // 다시 실행해도 안전
+const q2 = (await db.query("select id from catalog_quests where source_id=2000")).rows[0].id;
+const ver = async () => (await detail(q2)).quest.version;
+const save13 = (...a) => db.query("select public.catalog_quest_edit_save($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13) d", a);
+const npcArgs = (start, end, sm, em, region) => [start == null ? null : JSON.stringify(start), end == null ? null : JSON.stringify(end), sm, em, region];
+await db.exec("set role anon");
+await assert.rejects(save13(q2, "x", "엘나스의 눈", 50, null, null, null, null, ...npcArgs({ id: 1 }, null, null, null, null)), /permission denied/);
+await db.exec("reset role; set role authenticated; set test.reviewer=''");
+await assert.rejects(save13(q2, "x", "엘나스의 눈", 50, null, null, null, null, ...npcArgs({ id: 1 }, null, null, null, null)), /권한/);
+await db.exec("set test.reviewer='1'");
+for (const bad of [{ id: 0 }, { id: "1.5" }, { id: "abc" }, { n: "번호 없음" }, { id: 1, n: "가".repeat(101) }, [1]])
+  await assert.rejects(save13(q2, await ver(), "엘나스의 눈", 50, null, null, null, null, ...npcArgs(bad, null, null, null, null)), /NPC/);
+await assert.rejects(save13(q2, await ver(), "엘나스의 눈", 50, null, null, null, null, ...npcArgs(null, null, 0, null, null)), /맵 번호/);
+await assert.rejects(save13(q2, "old", "엘나스의 눈", 50, null, null, null, null, ...npcArgs(null, null, null, null, null)), /다른 화면/);
+// 같은 번호면 예전 그림 버전 유지, 새 NPC 는 버전 없이 저장, 잘못된 버전 글자는 버림
+await db.exec("reset role; update catalog_quests set start_npc='{\"id\":2020000,\"n\":\"스카두르\",\"v\":\"gms/62\"}' where source_id=2000; set role authenticated; set test.reviewer='1'");
+d = (await save13(q2, await ver(), "엘나스의 눈", 50, null, null, null, null, ...npcArgs({ id: 2020000, n: " 스카두르 " }, { id: "2040003", n: "조교 챙", v: "../x" }, 211000000, 220020000, " 엘나스 "))).rows[0].d;
+assert.deepEqual(d.quest.start_npc, { id: 2020000, n: "스카두르", v: "gms/62" });
+assert.deepEqual(d.quest.end_npc, { id: 2040003, n: "조교 챙" });
+assert.deepEqual([d.quest.start_map, d.quest.end_map, d.quest.region, d.quest.source], [211000000, 220020000, "엘나스", "operator"]);
+const npcChange = (await asOwner("select changes from catalog_changes where entity_id=$1 and release_label='운영자 퀘스트 수정' order by id desc limit 1", [q2]))[0].changes;
+assert.deepEqual(Object.keys(npcChange).sort(), ["end_map", "end_npc", "start_map"]); // 지역은 앞뒤 공백만 달라 변경 없음
+// 같은 값으로 다시 저장하면 이력 없음, NPC 를 비우면 null
+const npcHistory = async () => (await asOwner("select count(*)::int n from catalog_changes where entity_id=$1 and release_label='운영자 퀘스트 수정'", [q2]))[0].n;
+const before080 = await npcHistory();
+d = (await save13(q2, await ver(), "엘나스의 눈", 50, null, null, null, null, ...npcArgs({ id: 2020000, n: "스카두르" }, { id: 2040003, n: "조교 챙" }, 211000000, 220020000, "엘나스"))).rows[0].d;
+assert.equal(await npcHistory(), before080);
+d = (await save13(q2, await ver(), "엘나스의 눈", 50, null, null, null, null, ...npcArgs({ id: 2020000, n: "스카두르" }, null, 211000000, null, "엘나스"))).rows[0].d;
+assert.equal(d.quest.end_npc, null);
+// 예전 8개 인자 함수는 NPC 를 건드리지 않음
+d = (await save(q2, await ver(), "엘나스의 눈 (고침)", 50, null, null, null, null)).rows[0].d;
+assert.deepEqual([d.quest.name, d.quest.start_npc.id, d.quest.start_map], ["엘나스의 눈 (고침)", 2020000, 211000000]);
+// 다시 등록해도 관리자가 고친 NPC·맵·지역은 그대로
+await db.exec("reset role");
+await importQuests(quests);
+const keptNpc = (await db.query("select start_npc,start_map,region from catalog_quests where source_id=2000")).rows[0];
+assert.deepEqual([keptNpc.start_npc.id, keptNpc.start_map, keptNpc.region], [2020000, 211000000, "엘나스"]);
 console.log("quest-catalog-db check 통과");
