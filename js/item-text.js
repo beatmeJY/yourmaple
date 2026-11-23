@@ -74,3 +74,31 @@ export function displayItemText(item = {}) {
 
 // 착용 조건 칸 이름처럼 덩어리를 나누지 않는 곳은 기호만 지운다(#c 가 있는 글만).
 export const stripItemMarks = (value) => { const text = String(value ?? ""); return text.includes("#c") ? text.replace(/#c/g, "").replace(/#/g, "") : text; };
+
+// 장비 효과 글("물리방어력 : + 95(90~100) STR : + 6(5~7) … 업그레이드 가능 횟수: 10 상점가: 200000메소")에서
+// 이미 옵션·공격속도·업그레이드 횟수·상점가 칸으로 보여 주는 것과 값이 같은 부분을 뺀다(2026-11-23 사용자 요청).
+// 값이 다르거나 모르는 글은 그대로 남겨 차이를 볼 수 있게 한다. 원문은 바꾸지 않고 화면에서만 뺀다.
+const shownStatKeys = {
+  "물리방어력": "defense", "물리공격력": "attack", "마법방어력": "magic_defense", "마법공격력": "magic_attack",
+  "최대HP": "hp", "최대MP": "mp", STR: "str", DEX: "dex", INT: "int", LUK: "luk",
+  "명중률": "accuracy", "회피율": "avoidability", "이동속도": "speed", "점프력": "jump",
+};
+const shownStatPattern = new RegExp(`(${Object.keys(shownStatKeys).join("|")}) ?: ?([+-]) ?([0-9]+)(?:\\(([0-9]+)~([0-9]+)\\))?`, "g");
+const sameNumber = (a, b) => (a == null || a === "" ? null : Number(a)) === (b == null || b === "" ? null : Number(b));
+
+export function dropShownEffect(raw, { stats = [], attackSpeed = null, shopPrice = null } = {}) {
+  let text = String(raw ?? "");
+  const byKey = new Map(stats.map((row) => [row.stat_key, row]));
+  text = text.replace(shownStatPattern, (whole, label, sign, value, min, max) => {
+    const row = byKey.get(shownStatKeys[label]);
+    if (!row || !sameNumber(row.base_value, Number(value) * (sign === "-" ? -1 : 1))) return whole;
+    const rangeShown = row.minimum_value != null && row.maximum_value != null;
+    if (min != null && rangeShown && !(sameNumber(row.minimum_value, min) && sameNumber(row.maximum_value, max))) return whole;
+    return " ";
+  });
+  text = text.replace(/업그레이드 가능 횟수 ?: ?([0-9]*)/, (whole, value) => sameNumber(byKey.get("remaining_upgrades")?.base_value, value) ? " " : whole);
+  text = text.replace(/상점가 ?: ?([0-9,]*) ?(메소)?/, (whole, value) => sameNumber(shopPrice, value.replace(/,/g, "")) ? " " : whole);
+  text = text.replace(/공격속도 ?: ?(.+?)(?= 업그레이드| 상점가|$)/, (whole, value) =>
+    String(attackSpeed ?? "").replace(/\s+/g, "") === value.replace(/\s+/g, "") ? " " : whole);
+  return text.replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim();
+}

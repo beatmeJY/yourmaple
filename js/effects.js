@@ -1,5 +1,6 @@
 // 게임 같은 연출: 파티클, 성공 오버레이, 효과음.
 // 화면 어디서든 import 해서 쓴다. 파티클·오버레이는 reduced-motion이면 끄고, 효과음은 헤더 토글로 끈다.
+import { GAME_SOUND_URLS, decodeGameSound } from "./game-sound.js";
 
 const SOUND_KEY = "maple-note-sound";
 const quiet = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -28,6 +29,8 @@ export function paletteHue(name) {
 const SOUNDS = {
   entrance: [[98, 0, 0.9, "triangle", 0.12], [147, 0.1, 0.9, "triangle", 0.09], [196, 0.22, 0.8, "triangle", 0.1], [294, 0.4, 0.9, "triangle", 0.1], [392, 0.55, 0.9, "triangle", 0.08]],
   tick: [[1320, 0, 0.06, "sine", 0.05]],
+  // 맵 포탈 이동(게임 소리를 못 받을 때 대신): 위로 올라가는 세 음
+  portalWarp: [[392, 0, 0.18, "sine", 0.08], [587, 0.06, 0.2, "sine", 0.07], [880, 0.12, 0.26, "sine", 0.06]],
   // 혼돈의 주문서 기본 성공음과 옵션 결과에 따른 추가 효과음.
   chaosOk: [[784, 0, 0.06, "triangle", 0.1], [988, 0.05, 0.06, "triangle", 0.1], [1175, 0.1, 0.06, "triangle", 0.1], [1568, 0.15, 0.24, "triangle", 0.1]],
   // 두 번 튀는 리듬으로 올라가고, 장화음과 벨 소리로 마무리한다.
@@ -78,14 +81,20 @@ export function setSoundOn(on) {
   }
 }
 
-export function sfx(name) {
+function audioContext() {
+  // 브라우저는 사용자 동작 뒤에만 소리를 허용하므로 처음 소리를 낼 때 만든다.
+  audio ??= new (window.AudioContext || window.webkitAudioContext)();
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+
+// delay(초)만큼 늦게 시작한다(게임 소리 위에 겹쳐 강조할 때).
+export function sfx(name, delay = 0) {
   const notes = SOUNDS[name];
   if (!notes || !isSoundOn()) return;
   try {
-    // 브라우저는 사용자 동작 뒤에만 소리를 허용하므로 처음 소리를 낼 때 만든다.
-    audio ??= new (window.AudioContext || window.webkitAudioContext)();
-    if (audio.state === "suspended") audio.resume();
-    const start = audio.currentTime;
+    const context = audioContext();
+    const start = context.currentTime + delay;
     for (const [frequency, at, duration, type, volume] of notes) {
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
@@ -94,12 +103,59 @@ export function sfx(name) {
       gain.gain.setValueAtTime(0.0001, start + at);
       gain.gain.exponentialRampToValueAtTime(volume, start + at + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + at + duration);
-      oscillator.connect(gain).connect(audio.destination);
+      oscillator.connect(gain).connect(context.destination);
       oscillator.start(start + at);
       oscillator.stop(start + at + duration + 0.05);
     }
   } catch {
     // 소리를 낼 수 없는 환경이면 조용히 넘어간다.
+  }
+}
+
+// ── 게임 소리 ────────────────────────────────────────────────────────────
+// 주문서 성공·실패음은 공개 게임 데이터 서버(도감 그림과 같은 곳)에서 받아 쓴다(2026-11-23 사용자 요청, js/game-sound.js).
+// 게임 소리 파일은 저장소에 넣지 않는다. 받지 못하면(차단·오프라인) 합성음(fallback)을 낸다.
+const sampleLoads = new Map();
+const sampleBuffers = new Map();
+let sampleSource = null;
+
+/** 화면을 열 때 미리 받아 둔다. 사용자 동작 전이라 소리 장치 대신 오프라인 장치로 풀어 둔다. */
+export function preloadSounds(names = Object.keys(GAME_SOUND_URLS)) {
+  for (const name of names) {
+    if (!GAME_SOUND_URLS[name] || sampleLoads.has(name)) continue;
+    sampleLoads.set(name, (async () => {
+      try {
+        const response = await fetch(GAME_SOUND_URLS[name], { referrerPolicy: "no-referrer" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        const buffer = await new Offline(1, 1, 22050).decodeAudioData(decodeGameSound(data.value));
+        sampleBuffers.set(name, buffer);
+      } catch {
+        // 못 받으면 합성음으로 대신한다. 다음 화면에서 다시 시도할 수 있게 비운다.
+        sampleLoads.delete(name);
+      }
+    })());
+  }
+}
+
+/** 게임 소리를 낸다. 앞에서 내던 게임 소리는 끊는다(연달아 바를 때 쌓이지 않게). 아직 못 받았으면 fallback 합성음. */
+export function playSound(name, fallback) {
+  if (!isSoundOn()) return;
+  const buffer = sampleBuffers.get(name);
+  if (!buffer) { if (fallback) sfx(fallback); return; }
+  try {
+    const context = audioContext();
+    try { sampleSource?.stop(); } catch { /* 이미 끝난 소리 */ }
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    gain.gain.value = 0.55;
+    source.buffer = buffer;
+    source.connect(gain).connect(context.destination);
+    source.start();
+    sampleSource = source;
+  } catch {
+    if (fallback) sfx(fallback);
   }
 }
 

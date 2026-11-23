@@ -1,6 +1,6 @@
 import { CHAOS_STATS, DEFAULT_CHAOS, HORNTAIL_EGG_BONUS, applyChaos, canReachChaosTarget, chaosChangeTotal, chaosGrade, chaosScoreTenths, checkChaosTable, scoreText, statDiff } from "../chaos-calc.js";
 import { escapeHtml, formatCount, readBig } from "../format.js";
-import { burstAt, sfx } from "../effects.js";
+import { burstAt, playSound, preloadSounds, sfx } from "../effects.js";
 import { notify } from "../toast.js";
 import { catalogRpc } from "../catalog-api.js";
 import { catalogError } from "../catalog.js";
@@ -67,6 +67,7 @@ function cloneTable(table) {
 }
 
 export function render(root) {
+  preloadSounds(["scrollSuccess", "scrollFail"]); // 게임 주문서 소리를 미리 받아 둔다(못 받으면 합성음).
   mountCatalogImageFallback(root);
   const stored = loadStore();
   let picked = stored.picked ?? null; // 도감에서 고른 장비 { id, name, image_url, label }
@@ -684,12 +685,14 @@ export function render(root) {
     const label = rollLabel(out.success, changeTotal);
     showResult(out.success, out.changes, label);
     playFx(out.success, label);
+    // 소리(2026-11-23 사용자 결정): 성공·실패는 게임의 주문서 성공·실패음. 대성공·떨어짐만 기존 소리를 겹쳐 강조한다.
+    // 떨어짐은 성공음 위로 내려가는 두 음이 들려 "안 좋은 성공"임을 알린다.
     if (!out.success) {
-      sfx("chaosFail");
-    } else if (label === "떨어짐") {
-      sfx("chaosDown");
+      playSound("scrollFail", "chaosFail");
     } else {
-      sfx(label === "대성공" ? "chaosBonus" : "chaosOk");
+      playSound("scrollSuccess", "chaosOk");
+      if (label === "대성공") sfx("chaosBonus", 0.12);
+      else if (label === "떨어짐") sfx("chaosDown", 0.32);
     }
     if (out.success && label !== "떨어짐" && out.changes.some((change) => change.delta > 0)) burstAt(rollButton.querySelector(".cs-scroll-orb"), ["#ffe28a", "#fff6d0", "#c9a6ff", "#ffffff"], 14, 0.8);
     return true;

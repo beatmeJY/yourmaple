@@ -197,6 +197,7 @@ export function render(root) {
         <div><span>1 HP당 EXP</span><strong>${escapeHtml(formatExpPerHp(row.hp,row.exp))}</strong></div>
       </div>
       <section class="mo-combat"><h3>전투 정보</h3><div data-monster-combat><p class="mo-muted">상세 수치를 불러오는 중입니다.</p></div></section>
+      <section class="mo-maps" data-monster-maps hidden><h3>나오는 맵</h3><div data-monster-map-list></div></section>
       <div class="mo-d-tags">${tags || `<span class="mo-tag is-resist">속성 없음</span>`}</div>
       <div class="mo-accbox" data-accbox>
         <div class="mo-acc-head"><span>명중 계산</span><span class="mo-acc-badge" data-acc-badge></span></div>
@@ -221,6 +222,15 @@ export function render(root) {
       facts.innerHTML = monsterCombatFacts(row);
       paintAccuracy();
     });
+    // 나오는 맵(sql/076). 맵 정보가 아직 없으면(SQL 실행 전·연결 없음) 칸을 숨긴다.
+    void catalogRpc("catalog_monster_maps", { p_monster_id: row.id }).then(result => {
+      if (request !== detailLoadId || !root.isConnected || selectedId !== row.id) return;
+      const section = box.querySelector("[data-monster-maps]");
+      const maps = Array.isArray(result.data) ? result.data : [];
+      if (result.error || !maps.length) return;
+      section.querySelector("[data-monster-map-list]").innerHTML = `<div class="mo-map-chips">${maps.slice(0, 12).map((m, i) => `<a class="mo-map-chip" href="/maps/${encodeURIComponent(String(m.source_id))}/" style="--i:${i}"><b>${escapeHtml(m.name)}</b>${m.street_name ? `<small>${escapeHtml(m.street_name)}</small>` : ""}</a>`).join("")}</div>${maps.length > 12 ? `<a class="mo-map-more" href="/maps/?q=${encodeURIComponent(row.name)}">맵 ${formatCount(maps.length)}곳 모두 보기 →</a>` : ""}`;
+      section.hidden = false;
+    }).catch(() => {});
     reviewer ??= canReviewCatalog();
     void reviewer.then((allowed) => {
       const actions = box.querySelector("[data-monster-admin]");

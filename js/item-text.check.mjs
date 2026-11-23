@@ -27,3 +27,23 @@ assert.equal(stripItemMarks("ID number : XXX#1"), "ID number : XXX#1", "#c 가 �
 assert.equal(tidyItemText("  한 줄 \n  두 줄  "), "한 줄\n두 줄");
 
 console.log(`item-text: 예시 ${itemTextCases.length}개(주문서 효과·옵션·파괴 확률·조건·손재주·마스터리북·줄바꿈·약어), 중복 능력치·빼기·화면 대체 규칙 통과`);
+
+// 장비 효과 글: 보이는 값과 같은 부분만 뺀다.
+{
+  const { dropShownEffect } = await import("./item-text.js");
+  const stats = [
+    { stat_key: "defense", base_value: 95, minimum_value: 90, maximum_value: 100 },
+    { stat_key: "str", base_value: 6, minimum_value: null, maximum_value: null },
+    { stat_key: "avoidability", base_value: 2, minimum_value: 1, maximum_value: 3 },
+    { stat_key: "remaining_upgrades", base_value: 10 },
+  ];
+  const raw = "물리방어력 : + 95(90~100) STR : + 6(5~7) 회피율 : + 2(1~3) 업그레이드 가능 횟수: 10 상점가: 200000메소";
+  assert.equal(dropShownEffect(raw, { stats, shopPrice: "200000" }), "", "모두 같으면 빈 글");
+  assert.equal(dropShownEffect(raw, { stats, shopPrice: 150000 }), "상점가: 200000메소", "상점가가 다르면 남김");
+  assert.equal(dropShownEffect("점프력 : + 10(8~12) 업그레이드 가능 횟수: 5", { stats: [{ stat_key: "jump", base_value: 5 }, { stat_key: "remaining_upgrades", base_value: 5 }] }), "점프력 : + 10(8~12)", "값이 다르면 남김");
+  assert.equal(dropShownEffect("물리방어력 : + 95(80~100)", { stats }), "물리방어력 : + 95(80~100)", "범위가 다르면 남김");
+  assert.equal(dropShownEffect("물리공격력 : + 85(80~90) 공격속도 : 6 (보통) 업그레이드 가능 횟수: 상점가: ", { stats: [{ stat_key: "attack", base_value: 85 }], attackSpeed: "6 (보통)" }), "", "공격속도·빈 횟수·빈 상점가");
+  assert.equal(dropShownEffect("이동속도 : - 5", { stats: [{ stat_key: "speed", base_value: -5 }] }), "", "빼기 수치");
+  assert.equal(dropShownEffect("", {}), "");
+}
+console.log("item-text: 장비 효과 글 중복 빼기 통과");

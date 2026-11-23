@@ -9,6 +9,8 @@ import { equipmentCard, equipmentTypeName, isEquipment } from "../catalog-equipm
 import { mountHistoryDialog } from "../catalog-history.js";
 import { itemSlugFromPath } from "../route-url.js";
 import { displayItemText, stripItemMarks } from "../item-text.js";
+import { sfx } from "../effects.js";
+import { equipmentJobs, equipmentParts, itemKinds, partGroups } from "../equipment-groups.js";
 
 const labels = Object.fromEntries(itemOptionFields.map(f => [f.key, f.label]));
 const text = v => escapeHtml(v == null || v === "" ? "미제공" : String(v));
@@ -20,19 +22,72 @@ export async function render(root) {
   // 주소 /items/<아이템 번호>/ 로 열면 그 아이템 상세를 보여 준다(2026-11-16 사용자 요청, 몬스터 도감과 같은 방식).
   const slug = itemSlugFromPath(location.pathname);
   if (slug) return renderSlug(root, slug);
-  root.innerHTML = `<section class="catalog-page"><header class="ym-page-head"><div><h1>아이템 도감</h1><p>장비 옵션과 착용 조건을 확인하고, 몬스터의 드랍과 연결해 보세요.</p></div></header><div class="catalog-tools"><label class="field catalog-search"><span>아이템 검색</span><input data-catalog-search placeholder="이름 일부·별명도 돼요 (예: 혼주문, 혼줌)" maxlength="100" /></label><button type="button" class="mo-ghost" data-catalog-refresh>새로 확인</button></div><p class="hint" data-catalog-count aria-live="polite"></p><div class="catalog-grid" data-catalog-list></div><nav class="catalog-pager" aria-label="아이템 페이지"><button type="button" data-prev>이전</button><span data-page></span><button type="button" data-next>다음</button></nav></section>`;
+  root.innerHTML = `<section class="catalog-page"><header class="ym-page-head"><div><h1>아이템 도감</h1><p>장비 옵션과 착용 조건을 확인하고, 몬스터의 드랍과 연결해 보세요.</p></div></header><div class="catalog-tools"><label class="field catalog-search"><span>아이템 검색</span><input data-catalog-search placeholder="이름 일부·별명도 돼요 (예: 혼주문, 혼줌)" maxlength="100" /></label><button type="button" class="mo-ghost" data-catalog-refresh>새로 확인</button></div><div class="catalog-filters" data-catalog-filters></div><p class="hint" data-catalog-count aria-live="polite"></p><div class="catalog-grid" data-catalog-list></div><nav class="catalog-pager" aria-label="아이템 페이지"><button type="button" data-prev>이전</button><span data-page></span><button type="button" data-next>다음</button></nav></section>`;
   void canReviewCatalog().then(allowed => {
     if (allowed && root.isConnected) root.querySelector(".ym-page-head").insertAdjacentHTML("beforeend", `<a class="mo-ghost" href="/catalog-review/">비공개 검토 보관함</a>`);
   });
-  let page = 0, loadId = 0, timer;
+  let page = 0, loadId = 0, timer, counts = null;
+  // 분류(2026-11-23): 종류 → 장비면 직업 5개 → 부위. 주소(?kind=&job=&part=&common=0)에 남겨 새로고침·공유해도 그대로.
+  const filter = { kind: params.get("kind") ?? "", job: params.get("job") ?? "", part: params.get("part") ?? "", common: params.get("common") !== "0" };
+  if (!itemKinds.some(k => k.key === filter.kind)) filter.kind = "";
+  if (!equipmentJobs.some(j => j.key === filter.job)) filter.job = "";
+  if (!equipmentParts.some(p => p.key === filter.part)) filter.part = "";
+  if (filter.job || filter.part) filter.kind = "equip";
+  const filtered = () => Boolean(filter.kind || filter.job || filter.part);
+  function syncFilterAddress() {
+    const next = new URLSearchParams(location.search);
+    for (const key of ["kind", "job", "part"]) { if (filter[key]) next.set(key, filter[key]); else next.delete(key); }
+    if (filter.common) next.delete("common"); else next.set("common", "0");
+    const query = next.toString();
+    history.replaceState(history.state, "", location.pathname + (query ? `?${query}` : ""));
+  }
+  const countOf = (group, key) => counts?.[group]?.[key];
+  const countTag = n => n == null ? "" : `<small>${formatCount(n)}</small>`;
+  function paintFilters() {
+    const box = root.querySelector("[data-catalog-filters]");
+    const kindTotal = counts?.kinds ? Object.values(counts.kinds).reduce((a, b) => a + Number(b), 0) : null;
+    const kinds = itemKinds.filter(k => !k.key || !counts?.kinds || countOf("kinds", k.key) || filter.kind === k.key);
+    let html = `<div class="catalog-filter-row" role="group" aria-label="아이템 종류">${kinds.map(k => `<button type="button" class="catalog-filter-chip${filter.kind === k.key ? " is-on" : ""}" data-filter-kind="${k.key}" aria-pressed="${filter.kind === k.key}">${text(k.label)}${countTag(k.key ? countOf("kinds", k.key) : kindTotal)}</button>`).join("")}</div>`;
+    if (filter.kind === "equip") {
+      html += `<div class="catalog-filter-row is-jobs" role="group" aria-label="착용 직업"><button type="button" class="catalog-filter-chip${filter.job ? "" : " is-on"}" data-filter-job="" aria-pressed="${!filter.job}">모든 직업</button>${equipmentJobs.map(j => `<button type="button" class="catalog-filter-chip is-job${filter.job === j.key ? " is-on" : ""}${counts?.jobs && !countOf("jobs", j.key) ? " is-empty" : ""}" style="--job:${j.color}" data-filter-job="${text(j.key)}" aria-pressed="${filter.job === j.key}"><i aria-hidden="true"></i>${text(j.key)}${countTag(counts?.jobs ? countOf("jobs", j.key) ?? 0 : null)}</button>`).join("")}<label class="catalog-filter-common"><input type="checkbox" data-filter-common ${filter.common ? "checked" : ""} ${filter.job ? "" : "disabled"} /><span>공용 장비도 보기${counts?.common == null ? "" : ` <small>${formatCount(counts.common)}</small>`}</span></label></div>`;
+      const parts = equipmentParts.filter(p => !counts?.parts || countOf("parts", p.key) || filter.part === p.key);
+      html += `<div class="catalog-filter-parts" role="group" aria-label="부위"><button type="button" class="catalog-filter-chip is-part${filter.part ? "" : " is-on"}" data-filter-part="" aria-pressed="${!filter.part}">모든 부위</button>${Object.entries(partGroups).map(([group, label]) => {
+        const list = parts.filter(p => p.group === group);
+        return list.length ? `<span class="catalog-filter-group"><b>${text(label)}</b>${list.map(p => `<button type="button" class="catalog-filter-chip is-part${filter.part === p.key ? " is-on" : ""}" data-filter-part="${text(p.key)}" aria-pressed="${filter.part === p.key}">${text(p.label)}${countTag(countOf("parts", p.key))}</button>`).join("")}</span>` : "";
+      }).join("")}</div>`;
+    }
+    // 칩 줄을 다시 그려도 포커스가 있던 칩에 남긴다(키보드 조작).
+    const focused = box.contains(document.activeElement) ? ["data-filter-kind","data-filter-job","data-filter-part","data-filter-common"].find(name => document.activeElement.hasAttribute(name)) : null;
+    const focusedValue = focused ? document.activeElement.getAttribute(focused) ?? "" : null;
+    box.innerHTML = html;
+    if (focused) (box.querySelector(`[${focused}="${CSS.escape(focusedValue)}"]`) ?? box.querySelector(`[${focused}]`))?.focus({ preventScroll: true });
+    // 휴대폰에서 가로로 넘치는 줄은 고른 칩이 보이게 옮긴다.
+    box.querySelectorAll(".catalog-filter-row").forEach(row => {
+      const on = row.querySelector(".is-on");
+      if (!on || row.scrollWidth <= row.clientWidth) return;
+      if (on.offsetLeft < row.scrollLeft || on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = on.offsetLeft - 16;
+    });
+  }
+  function filterArgs() {
+    // 분류를 안 고르면 예전처럼 두 인자만 보낸다(sql/075 실행 전에도 검색이 되게).
+    const args = { p_query: root.querySelector("[data-catalog-search]").value.trim(), p_page: page };
+    if (filtered()) Object.assign(args, { p_kind: filter.kind, p_job: filter.job, p_part: filter.part, p_common: filter.common });
+    return args;
+  }
   async function load() {
     const request = ++loadId;
     const list = root.querySelector("[data-catalog-list]");
     list.innerHTML = `<p class="empty">아이템을 찾는 중입니다.</p>`;
     root.querySelectorAll(".catalog-pager button").forEach(b=>b.disabled=true);
-    const result = await catalogRpc("catalog_search_items", {p_query: root.querySelector("input").value.trim(),p_page:page});
+    const result = await catalogRpc("catalog_search_items", filterArgs());
     if (!root.isConnected || request !== loadId) return;
-    if (result.error) { list.innerHTML = `<p class="empty">${text(catalogError(result.error))}</p>`; return; }
+    if (result.error) {
+      const missing = filtered() && (result.error.code === "PGRST202" || /function/i.test(result.error.message ?? ""));
+      list.innerHTML = `<p class="empty">${text(missing ? "분류로 보기를 준비하고 있어요. 잠시 뒤 다시 시도해 주세요." : catalogError(result.error))}</p>`;
+      return;
+    }
+    counts = result.data?.kinds ? { kinds: result.data.kinds, jobs: result.data.jobs, parts: result.data.parts, common: result.data.common } : null;
+    paintFilters();
     const rows = result.data?.rows ?? [], total = result.data?.total ?? 0;
     root.querySelector("[data-catalog-count]").textContent = `${total}개 중 ${rows.length}개`;
     root.querySelector("[data-page]").textContent = `${page+1} / ${Math.max(1,Math.ceil(total/24))}`;
@@ -40,8 +95,23 @@ export async function render(root) {
     root.querySelector("[data-next]").disabled = (page+1)*24 >= total;
     list.innerHTML = rows.length ? rows.map((item,index)=>`<a class="catalog-item ym-glass" href="${itemHref(item)}" style="--i:${Math.min(index,16)}"><div class="catalog-item-art">${catalogImage(item.image_url) || `<span aria-hidden="true">${text([...item.name][0])}</span>`}</div><div class="catalog-item-copy"><h2 title="${text(item.name)}">${text(item.name)}</h2><p class="catalog-item-meta"><small class="ym-chip">${text(itemKind(item))}</small>${levelBadge(item)}</p></div></a>`).join("") : `<p class="empty">검색 결과가 없습니다.</p>`;
   }
-  root.querySelector("input").addEventListener("input",()=>{clearTimeout(timer);++loadId;page=0;root.querySelectorAll(".catalog-pager button").forEach(b=>b.disabled=true);timer=setTimeout(()=>{if(root.isConnected)void load();},300);});
-  root.addEventListener("click",e=>{if(e.target.closest("[data-prev]"))page=Math.max(0,page-1);else if(e.target.closest("[data-next]"))page++;else if(e.target.closest("[data-catalog-refresh]")){clearCatalogCache();page=0;}else return;clearTimeout(timer);void load();});
+  paintFilters();
+  root.addEventListener("change", e => {
+    if (!e.target.matches("[data-filter-common]")) return;
+    filter.common = e.target.checked; page = 0; syncFilterAddress(); clearTimeout(timer); void load();
+  });
+  root.querySelector("[data-catalog-search]").addEventListener("input",()=>{clearTimeout(timer);++loadId;page=0;root.querySelectorAll(".catalog-pager button").forEach(b=>b.disabled=true);timer=setTimeout(()=>{if(root.isConnected)void load();},300);});
+  root.addEventListener("click",e=>{
+    const chip = e.target.closest("[data-filter-kind],[data-filter-job],[data-filter-part]");
+    if (chip) {
+      if (chip.hasAttribute("data-filter-kind")) { filter.kind = chip.dataset.filterKind; if (filter.kind !== "equip") { filter.job = ""; filter.part = ""; } }
+      else if (chip.hasAttribute("data-filter-job")) { filter.job = chip.dataset.filterJob; filter.kind = "equip"; }
+      else { filter.part = chip.dataset.filterPart; filter.kind = "equip"; }
+      page = 0; syncFilterAddress(); paintFilters(); clearTimeout(timer); void load();
+      sfx("tick");
+      return;
+    }
+    if(e.target.closest("[data-prev]"))page=Math.max(0,page-1);else if(e.target.closest("[data-next]"))page++;else if(e.target.closest("[data-catalog-refresh]")){clearCatalogCache();page=0;}else return;clearTimeout(timer);void load();});
   await load();
 }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

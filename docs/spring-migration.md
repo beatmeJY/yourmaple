@@ -26,7 +26,10 @@
 
 | 기능 | 지금 위치 | 메모 |
 | --- | --- | --- |
-| 아이템 검색 | `catalog_search_items`(`sql/047`→`054`) | 띄어쓰기 무시·글자 순서·별명(`catalog_search_aliases`) 규칙. 화면 쪽 같은 규칙 `js/search-match.js`(+ check)와 반드시 맞춘다 |
+| 아이템 검색 | `catalog_search_items`(`sql/047`→`054`→`075`) | 띄어쓰기 무시·글자 순서·별명(`catalog_search_aliases`) 규칙. 화면 쪽 같은 규칙 `js/search-match.js`(+ check)와 반드시 맞춘다. 075부터 종류·직업 5개·부위 분류와 칩 개수(`catalog_item_kind`·`catalog_item_part`, 화면 규칙 `js/equipment-groups.js`) |
+| 맵 검색·상세·몬스터의 맵 | `catalog_search_maps`·`catalog_map_detail`·`catalog_monster_maps`(`sql/076`) | 지우지 않은 도감 몬스터가 나오는 맵만 공개. 맵 표 `catalog_maps`·연결 `catalog_map_monsters`(수집 `collected`·관리자 `operator`) |
+| 맵 이름 수정(관리자) | `catalog_map_edit_save`(`sql/076`) | `can_review_catalog` 검사·버전 충돌(40001)·`catalog_changes` 에 `map` 이력·이름 출처 `operator` 로 바꿔 다시 수집해도 유지 |
+| 맵 연결 맞추기(수집) | `catalog_import_private.sync_map_monsters()`(`sql/076`) | 비공개 `map_links_in` 에 넣은 수집 연결만 다시 맞춤(관리자 연결은 그대로) |
 | 몬스터 검색 | `catalog_search_monsters`(`sql/047`→`048`) | 드랍 아이템으로 찾기 포함 |
 | 아이템·몬스터 상세 | `catalog_item_detail`(`sql/047`→`049`), `catalog_monster_detail`(`sql/052`) | 공개 응답에 수집 주소를 넣지 않는다 |
 

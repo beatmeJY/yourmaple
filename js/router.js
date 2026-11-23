@@ -15,6 +15,7 @@ const pages = {
   enhance: () => import("./pages/enhance.js"),
   "chaos-scroll": () => import("./pages/chaos-scroll.js"),
   monsters: () => import("./pages/monsters.js"),
+  maps: () => import("./pages/maps.js"),
   "monster-trash": () => import("./pages/monster-trash.js"),
   "item-catalog": () => import("./pages/item-catalog.js"),
   "catalog-review": () => import("./pages/catalog-review.js"),

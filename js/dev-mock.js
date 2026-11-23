@@ -6,6 +6,7 @@
 
 import { ZONES } from "./monster-park-calc.js";
 import { nameMatchRank, normalizeSearch } from "./search-match.js";
+import { itemFilterMatch, itemKindKey, itemPart } from "./equipment-groups.js";
 const DB_KEY = "ym-mock-db";
 const AUTH_KEY = "ym-mock-auth"; // "in" | "out"
 const USER = {
@@ -429,6 +430,38 @@ function mockReviewRows() {
   }
   return db.catalog_review_items;
 }
+function mockMaps() {
+  const maps = rowsOf("catalog_maps");
+  if (!maps.length) {
+    const sample = [
+      ["f0000000-0000-4000-8000-000000000001", 100000000, "헤네시스", "헤네시스", "collected", []],
+      ["f0000000-0000-4000-8000-000000000002", 100010000, "헤네시스동쪽언덕", "헤네시스", "collected", [["d0000000-0000-4000-8000-000000000001", 12], ["d0000000-0000-4000-8000-000000000002", 10], ["d0000000-0000-4000-8000-000000000003", null]]],
+      ["f0000000-0000-4000-8000-000000000003", 270000100, "시간의 신전", "시간의신전", "operator", [["d0000000-0000-4000-8000-000000000002", 3], ["d0000000-0000-4000-8000-000000000004", null]]],
+    ];
+    // 그림·포탈·등장 위치는 실제 수집 값(헤네시스=100000000, 헤네시스동쪽언덕=100010000, 시간의 신전=270000100은 그림 기준점이 없는 경우).
+    // 몬스터 번호만 가짜 도감 몬스터로 바꿨다. 포탈 목적지도 예시 3곳 안으로 맞췄다.
+    const detail = {
+      100000000: { render: {"v":"gms/70","ox":-536,"oy":-477,"w":6894,"h":1193}, minimap: {"v":"gms/70","cx":618,"cy":661,"w":6994,"h":1391}, portals: [{"n":"portal1","x":5917,"y":489,"to":100010000,"t":2,"v":true,"tp":"west00"},{"n":"portal4","x":3030,"y":365,"to":270000100,"t":2,"v":true,"tp":""}], spawns: [] },
+      100010000: { render: {"v":"gms/62","ox":-655,"oy":-607,"w":2677,"h":1363}, minimap: {"v":"gms/62","cx":710,"cy":763,"w":2767,"h":1561}, portals: [{"n":"west00","x":-542,"y":457,"to":100000000,"t":2,"v":true,"tp":"portal1"}],
+        spawns: [{"m":"100100","x":-278,"y":455},{"m":"100100","x":-53,"y":455},{"m":"2300100","x":373,"y":455},{"m":"2300100","x":1372,"y":455},{"m":"9300063","x":679,"y":455},{"m":"9300063","x":1612,"y":455},{"m":"2300100","x":894,"y":305},{"m":"9300063","x":767,"y":305},{"m":"2300100","x":-70,"y":-355},{"m":"100100","x":168,"y":425},{"m":"100100","x":1480,"y":-355},{"m":"2300100","x":1589,"y":-355},{"m":"9300063","x":374,"y":-235},{"m":"9300063","x":565,"y":-235},{"m":"2300100","x":847,"y":-235},{"m":"2300100","x":704,"y":-595},{"m":"2300100","x":810,"y":-595},{"m":"9300063","x":-432,"y":-55},{"m":"100100","x":554,"y":455},{"m":"9300063","x":-283,"y":-55},{"m":"9300063","x":-124,"y":-55},{"m":"100100","x":461,"y":-235},{"m":"9300063","x":917,"y":-235},{"m":"9300063","x":778,"y":-235},{"m":"100100","x":504,"y":-595},{"m":"9300063","x":0,"y":-55},{"m":"9300063","x":694,"y":-235},{"m":"9300063","x":1300,"y":-55},{"m":"100100","x":836,"y":455},{"m":"9300063","x":1471,"y":-55},{"m":"9300063","x":1594,"y":-55},{"m":"9300063","x":1716,"y":-55},{"m":"9300063","x":-471,"y":-355},{"m":"9300063","x":-337,"y":-355},{"m":"100100","x":-263,"y":-355},{"m":"100100","x":1236,"y":455},{"m":"100100","x":1511,"y":455},{"m":"100100","x":1717,"y":455},{"m":"2300100","x":-160,"y":455},{"m":"2300100","x":77,"y":455}] },
+      270000100: { render: {"v":"gms/92"}, minimap: null, portals: [{"n":"portal1","x":2003,"y":490,"to":100000000,"t":2,"v":true,"tp":"portal4"}], spawns: [] },
+    };
+    for (const [id, source_id, name, street_name, name_source, monsters] of sample) {
+      maps.push({ id, source_id, name, street_name, name_en: null, street_name_en: null, name_source, in_old_version: true, updated_at: iso(-5), ...detail[source_id] });
+      rowsOf("catalog_map_monsters").push(...monsters.map(([monster_id, max_count]) => ({ map_id: id, monster_id, source: "collected", max_count })));
+    }
+    save();
+  }
+  return maps;
+}
+function mapMonsters(mapId) {
+  const links = new Map(rowsOf("catalog_map_monsters").filter(l => l.map_id === mapId).map(l => [l.monster_id, l]));
+  const ids = new Set(links.keys());
+  const all = rowsOf("catalog_monsters").filter(m => ids.has(m.id) && !m.deleted_at).sort((a, b) => (a.level ?? 0) - (b.level ?? 0) || a.name.localeCompare(b.name))
+    .map(({ id, name, level, hp, exp, source_id, image_url, image_fallback_url }) => ({ id, name, level, hp, exp, source_id, image_url, image_fallback_url, source: links.get(id)?.source ?? "collected", max_count: links.get(id)?.max_count ?? null }));
+  const levels = all.map(m => m.level).filter(v => v != null);
+  return { all, monster_count: all.length, min_level: levels.length ? Math.min(...levels) : null, max_level: levels.length ? Math.max(...levels) : null };
+}
 function assertMockReviewer() { if (!reviewAllowed()) throw Object.assign(new Error("검토 권한이 없습니다"),{code:"42501"}); }
 
 const RPCS = {
@@ -460,13 +493,23 @@ const RPCS = {
     }
     save();return structuredClone(row);
   },
-  catalog_search_items({p_query="",p_page=0}={}) {
-    // sql/054 와 같은 규칙: 이름 그대로 → 글자 순서만 맞음 → 분류·외부 ID, 같은 순위는 짧은 이름 먼저
+  catalog_search_items({p_query="",p_page=0,p_kind="",p_job="",p_part="",p_common=true}={}) {
+    // sql/054 와 같은 규칙: 이름 그대로 → 글자 순서만 맞음 → 분류·외부 ID, 같은 순위는 짧은 이름 먼저. sql/075 분류·개수도 흉내 낸다.
     const q=p_query.toLowerCase();
     const rank=r=>{const n=nameMatchRank(r.name,p_query);return n??([r.category,r.middle_category].some(v=>String(v??"").toLowerCase().includes(q))||r.source_id===p_query?2:null)};
-    const filtered=rowsOf("catalog_items").filter(r=>!normalizeSearch(p_query)||rank(r)!=null)
+    const jobsOf=r=>rowsOf("catalog_item_jobs").filter(j=>j.item_id===r.id).map(j=>j.job_name);
+    const matched=rowsOf("catalog_items").filter(r=>!normalizeSearch(p_query)||rank(r)!=null);
+    const kind=p_kind||(p_job||p_part?"equip":"");
+    const byKind=matched.filter(r=>itemFilterMatch(r,[],{kind}));
+    const byJob=byKind.filter(r=>itemFilterMatch(r,jobsOf(r),{kind,job:p_job,common:p_common}));
+    const filtered=byJob.filter(r=>itemFilterMatch(r,[],{kind,part:p_part}))
       .sort((a,b)=>(normalizeSearch(p_query)?(rank(a)-rank(b))||(a.name.length-b.name.length):0)||(a.required_level??Infinity)-(b.required_level??Infinity)||String(a.id).localeCompare(String(b.id)));
-    return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1};
+    const tally=(rows,key)=>rows.reduce((o,r)=>{const k=key(r);if(k!=null)o[k]=(o[k]??0)+1;return o;},{});
+    const equipKind=byKind.filter(r=>itemKindKey(r.category)==="equip");
+    const jobs={};for(const j of ["전사","마법사","궁수","도적","해적"]){const n=equipKind.filter(r=>{const js=jobsOf(r);return js.includes(j)||(p_common&&js.includes("공용"));}).length;if(n)jobs[j]=n;}
+    return {rows:filtered.slice(p_page*24,p_page*24+24),total:filtered.length,revision:1,
+      kinds:tally(matched,r=>itemKindKey(r.category)),jobs,common:equipKind.filter(r=>jobsOf(r).includes("공용")).length,
+      parts:tally(byJob.filter(r=>itemKindKey(r.category)==="equip"),r=>itemPart(r.subcategory))};
   },
   catalog_search_monsters({p_query="",p_drop="",p_min=null,p_max=null,p_weak=[],p_resist=[],p_sort="level",p_page=0}={}) {
     const filtered=rowsOf("catalog_monsters").filter(r=>!r.deleted_at&&(String(r.name).toLowerCase().includes(p_query.toLowerCase())||r.source_id===p_query)
@@ -518,6 +561,37 @@ const RPCS = {
       m.image_link_monster_id=p_link??null;save();
     }
     return {id:p_id,image_link_monster_id:p_link??null,image_fallback_url:target?.image_url??null};
+  },
+  // 맵 정보(sql/076 흉내). 처음 열면 연습용 맵 3개를 넣는다(예전 가짜 DB 에도 생기게).
+  catalog_search_maps({p_query="",p_street="",p_page=0}={}) {
+    const norm=v=>String(v??"").replace(/\s+/g,"").toLowerCase(), q=norm(p_query);
+    const matched=mockMaps().map(m=>({...m,...mapMonsters(m.id)})).filter(m=>m.monster_count>0&&(!q||norm(m.name).includes(q)||norm(m.street_name).includes(q)||String(m.source_id)===p_query.trim()||m.all.some(x=>norm(x.name).includes(q))));
+    const filtered=matched.filter(m=>!p_street||m.street_name===p_street).sort((a,b)=>(a.min_level??0)-(b.min_level??0)||a.name.localeCompare(b.name));
+    const streets={};for(const m of matched)streets[m.street_name??""]=(streets[m.street_name??""]??0)+1;
+    return {rows:filtered.slice(p_page*24,p_page*24+24).map(({all,portals:_p,spawns:_s,minimap,render,...m})=>({...m,image_v:minimap?.v??render?.v??null,monsters:all.slice(0,4)})),total:filtered.length,streets,revision:1};
+  },
+  catalog_map_detail({p_id=null,p_source_id=null}={}) {
+    const map=mockMaps().find(m=>m.id===p_id||(p_source_id!=null&&m.source_id===Number(p_source_id)));
+    if(!map)return null;
+    const maps=mockMaps(), mons=rowsOf("catalog_monsters").filter(m=>!m.deleted_at);
+    const portals=(map.portals??[]).flatMap(p=>{const t=maps.find(m=>m.source_id===p.to);return t?[{...p,to_name:t.name,to_street:t.street_name}]:[];});
+    const spawns=(map.spawns??[]).flatMap(sp=>{const m=mons.find(x=>x.source_id===sp.m);return m?[{x:sp.x,y:sp.y,monster_id:m.id}]:[];});
+    const {portals:_p,spawns:_s,minimap=null,render=null,...rest}=map;
+    return {map:{...rest,version:String(map.updated_at)},monsters:mapMonsters(map.id).all,minimap,render,portals,spawns,revision:1};
+  },
+  catalog_monster_maps({p_monster_id}={}) {
+    const ids=new Set(rowsOf("catalog_map_monsters").filter(l=>l.monster_id===p_monster_id).map(l=>l.map_id));
+    return mockMaps().filter(m=>ids.has(m.id)).map(({id,source_id,name,street_name})=>({id,source_id,name,street_name}));
+  },
+  catalog_map_edit_save({p_id,p_version,p_name,p_street_name}) {
+    assertMockReviewer();const m=mockMaps().find(x=>x.id===p_id);if(!m)throw new Error("맵을 찾을 수 없습니다");
+    if(String(m.updated_at)!==String(p_version))throw Object.assign(new Error("다른 곳에서 먼저 고쳤습니다"),{code:"40001"});
+    const name=String(p_name??"").trim(),street=String(p_street_name??"").trim()||null;
+    if(!name||name.length>200)throw Object.assign(new Error("맵 이름은 1~200자로 적어 주세요"),{code:"22023"});
+    const changes={};if(m.name!==name)changes.name={before:m.name,after:name};if(m.street_name!==street)changes.street_name={before:m.street_name,after:street};
+    if(Object.keys(changes).length){const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"map",entity_id:p_id,entity_name:name,operation:"UPDATE",changes,release_label:"운영자 맵 수정",changed_at:iso()});
+      Object.assign(m,{name,street_name:street,name_source:"operator",updated_at:iso()});save();}
+    return RPCS.catalog_map_detail({p_id});
   },
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
   catalog_monster_edit_detail({p_id}) {

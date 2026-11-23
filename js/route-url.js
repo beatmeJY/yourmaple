@@ -5,6 +5,12 @@ const ids = Object.fromEntries(Object.entries(paths).map(([id, path]) => [path, 
 // 몬스터·아이템 하나를 고른 주소 /monsters/<몬스터 번호>/ · /items/<아이템 번호>/ 도 각 도감 화면이다(2026-11-16 사용자 요청).
 const monsterPath = /^\/monsters\/([0-9A-Za-z-]+)\/?$/;
 const itemPath = /^\/items\/([0-9A-Za-z-]+)\/?$/;
+// 맵 하나를 고른 주소 /maps/<맵 번호>/ 도 맵 정보 화면이다(2026-11-23).
+const mapPath = /^\/maps\/([0-9A-Za-z-]+)\/?$/;
+
+export function mapSlugFromPath(pathname) {
+  return pathname.match(mapPath)?.[1] ?? "";
+}
 
 export function monsterSlugFromPath(pathname) {
   return pathname.match(monsterPath)?.[1] ?? "";
@@ -21,6 +27,7 @@ export function routePath(id) {
 export function routeFromPath(pathname) {
   if (monsterPath.test(pathname)) return "monsters";
   if (itemPath.test(pathname)) return "item-catalog";
+  if (mapPath.test(pathname)) return "maps";
   const path = pathname.replace(/\/+$/, "") + "/";
   return ids[path] ?? path.slice(1, -1);
 }

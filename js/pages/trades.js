@@ -137,8 +137,10 @@ export async function render(root) {
   let picked = null;
   // 목록 그림: 도감 ID → { image_url, category, subcategory, required_level }
   const itemInfo = new Map();
-  // 펼친 묶음(같은 아이템 거래가 여러 건)
-  const openGroups = new Set();
+  // 같은 아이템 거래가 여러 건인 묶음은 처음부터 펼쳐 둔다(2026-11-23 사용자 요청). 사용자가 접은 묶음만 기억한다.
+  const closedGroups = new Set();
+  // 펼친 묶음에서 그냥 보여 줄 거래 수. 더 많으면 묶음 안에서 스크롤한다.
+  const LOTS_SHOWN = 3;
   let showAllOptions = false;
   let view = "all";
   let loadId = 0;
@@ -351,7 +353,8 @@ export async function render(root) {
       || group.lots.some((row) => Object.keys(row.item_options ?? {}).length);
     const chips = optionChips(group.lots);
     if (group.lots.length === 1) return `<div class="tr2-group is-single" style="--i:${Math.min(groupIndex, 10)}">${lotCard(first, chips[0], { equipment, inGroup: false, index: 0 })}</div>`;
-    const open = openGroups.has(group.key);
+    const open = !closedGroups.has(group.key);
+    const scroll = group.lots.length > LOTS_SHOWN;
     const totals = groupTotals(group.lots);
     const uniqueCount = new Set(chips.flat().filter((chip) => chip.unique).map((chip) => chip.key)).size;
     return `
@@ -361,7 +364,7 @@ export async function render(root) {
           <span class="tr2-group-copy">
             <strong>${escapeHtml(first.name)}</strong>
             <span class="tr2-tags">${itemTags(first)}<span class="tr2-tag is-count">거래 ${formatCount(group.lots.length)}건${uniqueCount ? ` · 옵션 ${formatCount(group.lots.length)}종` : ""}</span></span>
-            <small>${open ? "거래마다 다른 옵션을 금색으로 표시했어요." : "눌러서 거래마다 다른 옵션을 비교해요."}</small>
+            <small>${groupHint(open, group.lots.length)}</small>
           </span>
           <span class="tr2-group-stats">
             <span><small>보유</small><b>${escapeHtml(formatCount(totals.remaining))}개</b></span>
@@ -370,7 +373,7 @@ export async function render(root) {
           <i class="tr2-chevron" aria-hidden="true"></i>
         </button>
         ${first.item_id ? "" : `<p class="tr2-group-link">${linkButton(group.key, group.lots.length)}<small>별명으로 적었으면 도감에서 찾아 이어 주세요.</small></p>`}
-        <div class="tr2-lots" ${open ? "" : "hidden"}>${group.lots.map((row, index) => lotCard(row, chips[index], { equipment, inGroup: true, index })).join("")}</div>
+        <div class="tr2-lots${scroll ? " is-scroll" : ""}" ${scroll ? `tabindex="0" aria-label="${escapeHtml(first.name)} 거래 ${formatCount(group.lots.length)}건, 스크롤해서 보기"` : ""} ${open ? "" : "hidden"}>${group.lots.map((row, index) => lotCard(row, chips[index], { equipment, inGroup: true, index })).join("")}</div>
       </section>
     `;
   }
@@ -380,6 +383,39 @@ export async function render(root) {
     if (!value || Number.isNaN(date.getTime())) return "—";
     return escapeHtml(new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(date));
   }
+
+  function groupHint(open, count) {
+    if (!open) return "눌러서 거래마다 다른 옵션을 비교해요.";
+    return count > LOTS_SHOWN ? `거래마다 다른 옵션은 금색 · 안에서 스크롤해 ${formatCount(count)}건 모두 봐요.` : "거래마다 다른 옵션을 금색으로 표시했어요.";
+  }
+
+  // 거래가 3건을 넘는 묶음은 3건까지 보이는 높이로 자르고 4번째를 살짝 보여 스크롤할 수 있음을 알린다.
+  // 카드 높이가 화면 폭·옵션 수에 따라 달라 그린 뒤에 잰다.
+  function fitLots(scope = list) {
+    scope.querySelectorAll(".tr2-lots.is-scroll:not([hidden])").forEach((box) => {
+      const cards = box.querySelectorAll(".tr2-lot");
+      const third = cards[LOTS_SHOWN - 1];
+      if (!third) return;
+      const peek = Math.min(36, (cards[LOTS_SHOWN]?.offsetHeight ?? 0) * 0.35);
+      // 휴대폰처럼 3건이 화면보다 길면 화면의 75%까지만(묶음 안 스크롤이 화면 밖으로 나가지 않게).
+      const fit = Math.ceil(third.offsetTop + third.offsetHeight + peek);
+      box.style.maxHeight = `${Math.min(fit, Math.max(320, Math.round(window.innerHeight * 0.75)))}px`;
+      // 고른 거래가 묶음 안 아래쪽에 있으면 보이게 내린다.
+      const picked = box.querySelector(".tr2-lot.is-selected");
+      if (picked && picked.offsetTop + picked.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = picked.offsetTop - 12;
+      markLotsEnd(box);
+    });
+  }
+  // 끝까지 내리면 아래 흐림을 걷는다.
+  const markLotsEnd = (box) => box.classList.toggle("is-end", box.scrollTop + box.clientHeight >= box.scrollHeight - 2);
+  list.addEventListener("scroll", (event) => { if (event.target.matches?.(".tr2-lots.is-scroll")) markLotsEnd(event.target); }, true);
+  let fitTimer = 0;
+  const refit = () => {
+    if (!root.isConnected) { window.removeEventListener("resize", refit); return; }
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(() => fitLots(), 120);
+  };
+  window.addEventListener("resize", refit);
 
   function paintList() {
     root.querySelectorAll("[data-view]").forEach((button) => {
@@ -399,9 +435,10 @@ export async function render(root) {
     }
     // 선택한 거래가 든 묶음은 펼쳐 둔다.
     const selected = rows.find((row) => row.id === selectedId);
-    if (selected) openGroups.add(tradeGroupKey(selected));
+    if (selected) closedGroups.delete(tradeGroupKey(selected));
     const groups = groupTrades(sortedTrades(visible));
     list.innerHTML = `<div class="trade-cards tr2-groups">${groups.map(groupCard).join("")}</div>`;
+    fitLots();
   }
 
   function tradeInputs(id) {
@@ -1233,14 +1270,16 @@ export async function render(root) {
     const groupToggle = event.target.closest("[data-toggle-group]");
     if (groupToggle) {
       const key = groupToggle.dataset.toggleGroup;
-      if (openGroups.has(key)) openGroups.delete(key); else openGroups.add(key);
+      if (closedGroups.has(key)) closedGroups.delete(key); else closedGroups.add(key);
       sfx("tick");
       const section = groupToggle.closest("[data-group]");
-      const open = openGroups.has(key);
+      const open = !closedGroups.has(key);
       section.classList.toggle("is-open", open);
       groupToggle.setAttribute("aria-expanded", String(open));
-      section.querySelector(".tr2-lots").hidden = !open;
-      groupToggle.querySelector(".tr2-group-copy small").textContent = open ? "거래마다 다른 옵션을 금색으로 표시했어요." : "눌러서 거래마다 다른 옵션을 비교해요.";
+      const lots = section.querySelector(".tr2-lots");
+      lots.hidden = !open;
+      if (open) fitLots(section);
+      groupToggle.querySelector(".tr2-group-copy small").textContent = groupHint(open, lots.querySelectorAll(".tr2-lot").length);
       return;
     }
     if (event.target.closest("[data-undo-save]")) { await undoSave(); return; }

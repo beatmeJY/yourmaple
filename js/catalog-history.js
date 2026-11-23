@@ -13,7 +13,7 @@ function value(v, field) {
   return String(v);
 }
 // 수집 경로는 화면에 보여주지 않습니다.
-Object.assign(labels, { mp:"MP",physical_attack:"물리 공격력",magic_attack:"마법 공격력",physical_defense:"물리 방어력",magic_defense:"마법 방어력",movement_speed:"이동속도",knockback_damage:"넉백 기준 피해량",meso_value:"메소",accuracy_reference_level:"명중 기준 레벨" });
+Object.assign(labels, { mp:"MP",physical_attack:"물리 공격력",magic_attack:"마법 공격력",physical_defense:"물리 방어력",magic_defense:"마법 방어력",movement_speed:"이동속도",knockback_damage:"넉백 기준 피해량",meso_value:"메소",accuracy_reference_level:"명중 기준 레벨", street_name:"지역" });
 labels.level_up_count="레벨업 가능 횟수";
 const hiddenFields = new Set(["source_url","source","source_hash","response_sha256"]);
 function fields(changes) {
@@ -34,7 +34,7 @@ export function changeCards(rows) {
   return rows.length ? rows.map(r=>`<article class="catalog-change ym-glass"><div class="catalog-change-head"><strong>${escapeHtml(r.entity_name)}</strong><span class="ym-chip">${({INSERT:"추가",UPDATE:"수정",DELETE:"삭제"})[r.operation] ?? "변경"}</span><time>${escapeHtml(new Date(r.changed_at).toLocaleString("ko-KR"))}</time></div>${r.release_label ? `<p class="hint">${escapeHtml(r.release_label)}</p>` : ""}<dl>${fields(r.changes).map(([k,v])=>`<div><dt>${escapeHtml(labels[k] ?? k)}</dt><dd><del>${escapeHtml(value(v.before,k))}</del><span aria-hidden="true"> → </span><strong>${escapeHtml(value(v.after,k))}</strong></dd></div>`).join("")}</dl></article>`).join("") : `<p class="empty">이력 기록을 시작한 뒤 변경된 정보가 아직 없습니다.</p>`;
 }
 export async function mountEntityHistory(slot, id, entityType) {
-  if (!["item", "monster"].includes(entityType)) throw new Error("도감 이력 종류를 지정해주세요.");
+  if (!["item", "monster", "map"].includes(entityType)) throw new Error("도감 이력 종류를 지정해주세요.");
   let page = 0, loadId = 0;
   slot.innerHTML = `<div data-history-list aria-live="polite"></div><nav class="catalog-pager" data-history-nav aria-label="이 개체의 변경 이력 페이지"><button type="button" data-history-prev>이전</button><span data-history-page></span><button type="button" data-history-next>다음</button></nav>`;
   async function load() {
@@ -81,7 +81,7 @@ export function mountHistoryDialog(button, id, entityType, name) {
     dialog = document.createElement("dialog");
     dialog.className = "catalog-history-dialog";
     dialog.setAttribute("aria-labelledby", titleId);
-    dialog.innerHTML = `<header class="catalog-history-dialog-head"><div><span class="ym-chip">변경 이력</span><h2 id="${titleId}">${escapeHtml(name)}</h2></div><button type="button" class="mo-ghost" data-history-close aria-label="변경 이력 닫기" autofocus>닫기 ×</button></header><p class="hint">이력 기록을 시작한 뒤 변경된 정보입니다.</p><div data-${entityType === "monster" ? "monster" : "item"}-history></div>`;
+    dialog.innerHTML = `<header class="catalog-history-dialog-head"><div><span class="ym-chip">변경 이력</span><h2 id="${titleId}">${escapeHtml(name)}</h2></div><button type="button" class="mo-ghost" data-history-close aria-label="변경 이력 닫기" autofocus>닫기 ×</button></header><p class="hint">이력 기록을 시작한 뒤 변경된 정보입니다.</p><div data-${entityType}-history></div>`;
     button.parentElement.append(dialog);
     dialog.addEventListener("close", () => {
       dialog.remove();
@@ -94,6 +94,6 @@ export function mountHistoryDialog(button, id, entityType, name) {
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
     });
     dialog.showModal();
-    void mountEntityHistory(dialog.querySelector("[data-item-history], [data-monster-history]"), id, entityType);
+    void mountEntityHistory(dialog.querySelector(`[data-${entityType}-history]`), id, entityType);
   });
 }

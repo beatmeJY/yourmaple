@@ -16191,6 +16191,12 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 }
 /* display 를 준 칸도 hidden 이면 숨긴다 */
 .tr2-results[hidden], .tr2-picked[hidden], .tr2-options[hidden], .tr2-more[hidden], .tr2-options-open[hidden], .tr2-lots[hidden] { display: none; }
+/* 거래가 3건을 넘는 묶음: 3건 높이(+4번째 살짝)에서 자르고 안에서 스크롤(2026-11-23). 높이는 trades.js fitLots 가 잰다. */
+.tr2-lots { position: relative; }
+.tr2-lots.is-scroll { max-height: 520px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--gold) 45%, transparent) transparent;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+.tr2-lots.is-scroll.is-end { -webkit-mask-image: none; mask-image: none; }
+.tr2-lots.is-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* 목록 위 막대: 좁으면 상태 버튼 한 줄, 검색·정렬 한 줄 */
 .tr2 .trade-board-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(150px, 190px); align-items: end; gap: 10px; margin-bottom: 14px; }
 .tr2 .trade-board-bar .trade-search, .tr2 .trade-board-bar .trade-sort { width: auto; min-width: 0; margin: 0; }
@@ -17352,3 +17358,155 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .catalog-effect-lines li { padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(250, 204, 21, .28); background: rgba(250, 204, 21, .08); color: var(--text); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; animation: ym-fade-up .4s calc(var(--i, 0) * .05s) both; }
 .catalog-effect-panel .catalog-stat { animation: ym-fade-up .45s calc(.1s + var(--i, 0) * .05s) both; }
 @media (prefers-reduced-motion: reduce) { .catalog-effect-lines li, .catalog-effect-panel .catalog-stat { animation: none; } }
+
+/* 아이템 도감 분류 칩(2026-11-23): 종류 → 직업 5개 → 부위. 직업 색은 거래 옵션 칩과 같은 계열 색. */
+.catalog-filters { display: grid; gap: 10px; margin: 4px 0 6px; }
+.catalog-filter-row { position: relative; }
+.catalog-filter-row, .catalog-filter-parts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.catalog-filter-parts { gap: 8px 14px; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 16px; background: rgba(255, 255, 255, 0.025); animation: ym-fade-up 0.35s var(--ease-out) both; }
+.catalog-filter-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.catalog-filter-group b { margin-right: 2px; color: var(--muted); font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em; }
+.catalog-filter-chip { --job: var(--gold); display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 999px; background: rgba(255, 255, 255, 0.04); color: #d9d3ea; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.25s var(--spring), box-shadow 0.25s; }
+.catalog-filter-chip small { color: var(--muted); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.catalog-filter-chip:hover { transform: translateY(-1px); border-color: rgba(255, 255, 255, 0.22); }
+.catalog-filter-chip:active { transform: scale(0.96); }
+.catalog-filter-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.catalog-filter-chip.is-on { border-color: color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 16%, transparent); color: #fff3d6; box-shadow: 0 0 18px -6px color-mix(in srgb, var(--gold) 70%, transparent); }
+.catalog-filter-chip.is-on small { color: color-mix(in srgb, var(--gold) 70%, white); }
+.catalog-filter-chip.is-job i { width: 8px; height: 8px; border-radius: 50%; background: var(--job); box-shadow: 0 0 8px var(--job); }
+.catalog-filter-chip.is-job.is-on { border-color: color-mix(in srgb, var(--job) 65%, transparent); background: color-mix(in srgb, var(--job) 18%, transparent); color: color-mix(in srgb, var(--job) 55%, white); box-shadow: 0 0 20px -6px var(--job); }
+.catalog-filter-chip.is-job.is-on small { color: color-mix(in srgb, var(--job) 60%, white); }
+.catalog-filter-chip.is-empty:not(.is-on) { opacity: 0.45; }
+.catalog-filter-chip.is-part { min-height: 30px; padding: 4px 10px; font-size: 12.5px; }
+.catalog-filter-common { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; color: var(--muted); font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.catalog-filter-common input { accent-color: var(--gold); width: 16px; height: 16px; }
+.catalog-filter-common:has(input:disabled) { opacity: 0.5; cursor: default; }
+@media (max-width: 600px) {
+  .catalog-filter-row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .catalog-filter-row::-webkit-scrollbar { display: none; }
+  .catalog-filter-chip { flex: none; }
+  .catalog-filter-common { flex: none; }
+  .catalog-filter-parts { max-height: 168px; overflow-y: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .catalog-filter-parts { animation: none; }
+  .catalog-filter-chip { transition: none; }
+  .catalog-filter-chip:hover, .catalog-filter-chip:active { transform: none; }
+}
+
+/* ── 맵 정보(2026-11-23, sql/076) ───────────────────────── */
+.map-page .catalog-filter-row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--gold) 40%, transparent) transparent; }
+.map-page .catalog-filter-chip { flex: none; }
+.map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 14px; }
+.map-card { display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; color: var(--text); text-decoration: none; min-width: 0; animation: ym-fade-up .35s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 28ms); transition: transform .25s var(--spring), border-color .2s, box-shadow .2s; }
+.map-card:hover, .map-card:focus-visible { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); box-shadow: 0 10px 28px -14px color-mix(in srgb, var(--gold) 60%, transparent); }
+.map-card-art { position: relative; height: 118px; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, hsl(150 60% 40%) 22%, transparent), transparent 70%), var(--bg-raised); border-bottom: 1px solid var(--line); overflow: hidden; }
+.map-card-art img, .map-hero-art img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; image-rendering: pixelated; transition: transform .4s var(--spring); }
+.map-card:hover .map-card-art img { transform: scale(1.06); }
+.map-card-art .catalog-image-fallback, .map-hero-art .catalog-image-fallback { font-size: 28px; color: var(--muted); }
+.map-card-copy { display: grid; gap: 6px; padding: 12px 14px 14px; min-width: 0; }
+.map-card-copy h2 { margin: 0; font-size: 15px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.map-card-street { color: hsl(150 55% 62%); font-size: 11.5px; font-weight: 700; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-card-meta { display: flex; align-items: center; gap: 8px; margin: 0; flex-wrap: wrap; }
+.map-card-meta small { color: var(--muted); font-size: 12px; }
+.map-card-faces { display: flex; gap: 4px; flex-wrap: wrap; }
+.map-face { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--glass); border: 1px solid var(--line); overflow: hidden; }
+.map-face img { max-width: 32px; max-height: 32px; width: auto; height: auto; object-fit: contain; }
+.map-face b { font-size: 13px; color: var(--muted); }
+.map-face.is-more { font-size: 11.5px; font-weight: 700; color: var(--gold); }
+.map-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; border-radius: 22px; align-items: center; animation: ym-fade-up .35s var(--ease-out) both; }
+.map-hero-art { height: 220px; display: grid; place-items: center; border-radius: 16px; background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, hsl(150 60% 40%) 26%, transparent), transparent 70%), var(--bg-raised); border: 1px solid var(--line); overflow: hidden; }
+.map-hero-copy { display: grid; gap: 8px; min-width: 0; }
+.map-hero-copy h1 { margin: 0; font-size: clamp(22px, 3vw, 30px); line-height: 1.25; overflow-wrap: anywhere; }
+.map-hero-copy .hint { margin: 0; }
+.map-name-badge { font-size: 11px; vertical-align: middle; }
+.map-name-badge.is-en { color: var(--gold); }
+.map-hero-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; margin-top: 6px; }
+.map-hero-stats > div { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--glass); min-width: 0; }
+.map-hero-stats span { display: block; color: var(--muted); font-size: 11px; }
+.map-hero-stats strong { font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.map-monsters { margin-top: 16px; }
+.map-monster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 10px; margin-bottom: 10px; }
+.map-monster { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--glass); color: var(--text); text-decoration: none; min-width: 0; animation: ym-fade-up .3s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); transition: transform .25s var(--spring), border-color .2s; }
+.map-monster:hover, .map-monster:focus-visible { transform: translateY(-2px); border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
+.map-monster.is-chaos { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+.map-monster-art { width: 64px; height: 64px; flex: none; display: grid; place-items: center; }
+.map-monster-art img { max-width: 64px; max-height: 64px; width: auto; height: auto; object-fit: contain; }
+.map-monster-copy { display: grid; gap: 3px; min-width: 0; }
+.map-monster-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.map-monster-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-monster-copy small { color: var(--muted); font-size: 12px; }
+.map-edit-dialog form { display: grid; gap: 12px; }
+.map-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.mo-maps { margin: 18px 0; }
+.mo-maps h3 { margin: 0 0 10px; font-size: 15px; }
+.mo-map-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mo-map-chip { display: inline-grid; gap: 1px; padding: 7px 11px; border-radius: 12px; border: 1px solid color-mix(in srgb, hsl(150 55% 50%) 40%, var(--line)); background: color-mix(in srgb, hsl(150 55% 40%) 10%, var(--glass)); color: var(--text); text-decoration: none; max-width: 100%; animation: ym-fade-up .3s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 25ms); transition: transform .2s var(--spring), border-color .2s; }
+.mo-map-chip:hover, .mo-map-chip:focus-visible { transform: translateY(-2px); border-color: hsl(150 55% 55%); }
+.mo-map-chip b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mo-map-chip small { color: var(--muted); font-size: 11px; }
+.mo-map-more { display: inline-block; margin-top: 8px; color: var(--gold); font-size: 13px; text-decoration: none; }
+@media (max-width: 720px) {
+  .map-hero { padding: 14px; gap: 12px; }
+  .map-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+  .map-card-art { height: 92px; }
+  .map-card-copy { padding: 10px; }
+  .map-card-copy h2 { font-size: 13.5px; }
+  .map-face { width: 30px; height: 30px; }
+  .map-face img { max-width: 26px; max-height: 26px; }
+}
+/* 맵 무대: 미니맵 위에 몬스터 그림(나오는 자리)과 포탈(누르면 그 맵으로). 넓은 맵은 무대 안에서 가로로 스크롤 */
+.map-stage-wrap { position: relative; overflow: auto; max-height: min(520px, 70vh); border-radius: 16px; border: 1px solid var(--line); background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, hsl(150 60% 40%) 24%, transparent), transparent 70%), var(--bg-raised); scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--gold) 40%, transparent) transparent; display: grid; }
+.map-stage { position: relative; margin: auto; transform-origin: var(--ox, 50%) var(--oy, 50%); transition: transform .42s cubic-bezier(.6,0,.9,.4), opacity .42s ease-in, filter .42s; }
+.map-stage > img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: fill; image-rendering: pixelated; opacity: .92; }
+.map-stage.is-plain { position: static; display: grid; place-items: center; height: 220px; width: 100%; }
+.map-stage.is-plain > img { position: static; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+.map-stage-layer { position: absolute; inset: 0; }
+/* 맵 전체 그림: 크게 줄여 보이므로 부드럽게(미니맵은 도트 그대로). */
+.map-stage.is-full > img { image-rendering: auto; opacity: 1; }
+.map-stage.is-plain > img.map-render-image { image-rendering: auto; }
+.map-stage.is-plain:has(> .map-render-image) { height: min(320px, 46vh); }
+.map-monster-count { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 999px; font-style: normal; font-weight: 700; color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.map-spawn { position: absolute; width: 36px; height: 36px; transform: translate(-50%, -88%); display: grid; place-items: end center; z-index: 1; text-decoration: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); animation: map-spawn-in .5s var(--spring) both; animation-delay: calc(var(--i, 0) * 22ms + .15s); transition: transform .2s var(--spring), filter .2s; }
+.map-spawn img { max-width: 36px; max-height: 36px; width: auto; height: auto; object-fit: contain; }
+.map-spawn b { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--danger); color: #fff; font-size: 10px; }
+.map-spawn:hover, .map-spawn:focus-visible, .map-spawn.is-lit { transform: translate(-50%, -88%) scale(1.45); z-index: 3; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gold) 80%, transparent)); }
+@keyframes map-spawn-in { from { opacity: 0; transform: translate(-50%, -40%) scale(.4); } }
+.map-portal { position: absolute; width: 30px; height: 38px; transform: translate(-50%, -82%); padding: 0; border: 0; background: none; cursor: pointer; z-index: 2; }
+.map-portal i { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(closest-side, #fff 0 14%, hsl(195 100% 70%) 30%, hsl(210 100% 55% / .55) 60%, transparent 72%); box-shadow: 0 0 14px 3px hsl(200 100% 60% / .55); animation: map-portal-pulse 1.6s ease-in-out infinite; }
+.map-portal i::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid transparent; border-top-color: hsl(190 100% 80% / .9); border-bottom-color: hsl(220 100% 70% / .7); animation: map-portal-spin 1.2s linear infinite; }
+.map-portal.is-hidden i { background: radial-gradient(closest-side, hsl(280 80% 85% / .9) 0 14%, hsl(275 70% 60% / .45) 45%, transparent 70%); box-shadow: 0 0 10px 1px hsl(275 70% 60% / .4); opacity: .8; }
+.map-portal.is-hidden i::after { border-style: dashed; border-color: hsl(280 70% 80% / .7); }
+.map-portal-tip { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 9px; background: rgba(10, 12, 22, .92); border: 1px solid color-mix(in srgb, hsl(200 100% 60%) 50%, var(--line)); color: var(--text); font-size: 12px; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s, transform .2s var(--spring); }
+.map-portal:hover .map-portal-tip, .map-portal:focus-visible .map-portal-tip { opacity: 1; transform: translate(-50%, 0); }
+.map-portal:hover i, .map-portal:focus-visible i { box-shadow: 0 0 22px 7px hsl(200 100% 65% / .75); }
+.map-portal:focus-visible { outline: none; }
+.map-portal:focus-visible i { outline: 2px solid var(--gold); outline-offset: 3px; }
+.map-portal.is-entering i { animation: map-portal-suck .42s ease-in forwards; }
+.map-portal.is-arrival i { animation: map-portal-arrive 1.3s ease-out both, map-portal-pulse 1.6s 1.3s ease-in-out infinite; }
+@keyframes map-portal-pulse { 50% { transform: scale(1.12); filter: brightness(1.25); } }
+@keyframes map-portal-spin { to { transform: rotate(360deg); } }
+@keyframes map-portal-suck { to { transform: scale(3); filter: brightness(2); } }
+@keyframes map-portal-arrive { 0% { transform: scale(4); filter: brightness(2.4); box-shadow: 0 0 60px 30px hsl(195 100% 75% / .8); } 100% { transform: scale(1); } }
+[data-map-detail].is-warping .map-stage { transform: scale(1.6); opacity: 0; filter: blur(3px) brightness(1.6); }
+[data-map-detail].is-warping .map-hero-copy, [data-map-detail].is-warping .map-exits, [data-map-detail].is-warping .map-monsters { opacity: .35; transition: opacity .3s; }
+.map-hero.is-arriving .map-stage { animation: map-stage-arrive .55s var(--ease-out) both; }
+@keyframes map-stage-arrive { from { opacity: 0; transform: scale(.82); filter: brightness(1.8) blur(2px); } }
+.map-stage.is-arrival-center::after { content: ""; position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(closest-side, #fff, hsl(195 100% 70% / .5), transparent); animation: map-center-flash .9s ease-out forwards; pointer-events: none; }
+@keyframes map-center-flash { from { transform: translate(-50%, -50%) scale(.5); opacity: 1; } to { transform: translate(-50%, -50%) scale(6); opacity: 0; } }
+.map-exits { margin-top: 16px; padding: 16px 18px; border-radius: 20px; }
+.map-exits h2 { margin: 0 0 10px; font-size: 15px; }
+.map-exit-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.map-exit { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px 8px 10px; border-radius: 14px; border: 1px solid color-mix(in srgb, hsl(200 100% 60%) 40%, var(--line)); background: color-mix(in srgb, hsl(205 100% 50%) 10%, var(--glass)); color: var(--text); cursor: pointer; font: inherit; animation: ym-fade-up .3s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); transition: transform .2s var(--spring), border-color .2s; max-width: 100%; }
+.map-exit i { width: 14px; height: 18px; flex: none; border-radius: 50%; background: radial-gradient(closest-side, #fff 0 18%, hsl(195 100% 70%) 40%, transparent 75%); }
+.map-exit.is-hidden i { background: radial-gradient(closest-side, hsl(280 80% 88%) 0 18%, hsl(275 70% 60% / .6) 45%, transparent 75%); }
+.map-exit b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-exit small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.map-exit:hover, .map-exit:focus-visible { transform: translateY(-2px); border-color: hsl(200 100% 65%); }
+@media (prefers-reduced-motion: reduce) {
+  .map-card, .map-hero, .map-monster, .mo-map-chip { animation: none; transition: none; }
+  .map-stage, .map-spawn, .map-portal i, .map-portal i::after, .map-exit, .map-hero.is-arriving .map-stage, .map-stage.is-arrival-center::after { animation: none; transition: none; }
+  [data-map-detail].is-warping .map-stage { transform: none; filter: none; }
+  .map-card:hover, .map-monster:hover, .mo-map-chip:hover { transform: none; }
+  .map-card:hover .map-card-art img { transform: none; }
+}

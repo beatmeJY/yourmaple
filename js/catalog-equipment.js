@@ -1,6 +1,8 @@
 import { escapeHtml, formatCount, readBig } from "./format.js";
 import { catalogImage } from "./catalog-image.js";
 import { itemOptionFields, sortByOption } from "./item-options.js";
+import { dropShownEffect } from "./item-text.js";
+import { equipmentParts } from "./equipment-groups.js";
 
 const text = value => escapeHtml(value == null || value === "" ? "미제공" : String(value));
 const labels = Object.fromEntries(itemOptionFields.map(field => [field.key, field.label]));
@@ -15,7 +17,8 @@ const types = {
   "Two-Handed Axe": "두손도끼", "One-Handed Blunt Weapon": "한손둔기",
   "Two-Handed Blunt": "두손둔기", "Two-Handed Blunt Weapon": "두손둔기",
 };
-export const equipmentTypeName = type => types[type] ?? type ?? "";
+// 표에 없는 부위(훈장·어깨장식·블레이드 등)는 도감 분류 이름(js/equipment-groups.js)을 쓴다.
+export const equipmentTypeName = type => types[type] ?? equipmentParts.find(part => part.key === type)?.label ?? type ?? "";
 export const isEquipment = item => ["장비", "방어구", "무기", "Equip"].includes(item.category);
 
 export function equipmentCard({ item, stats = [], requirements = [], jobs = [], attributes = [] }) {
@@ -27,8 +30,8 @@ export function equipmentCard({ item, stats = [], requirements = [], jobs = [], 
   const jobNames = ["전사", "마법사", "궁수", "도적", "해적"];
   const allJobs = jobs.includes("공용");
   const price = readBig(item.shop_sell_price, "상점 판매가").value;
-  const typeName = types[item.subcategory] || item.subcategory || "장비";
-  const path = [item.category, item.middle_category, types[item.subcategory] || item.subcategory].filter(Boolean).join(" · ");
+  const typeName = equipmentTypeName(item.subcategory) || "장비";
+  const path = [item.category, item.middle_category, equipmentTypeName(item.subcategory)].filter(Boolean).join(" · ");
   // 가능 범위는 막대로, 기본값은 막대 위 점으로 보여 줍니다. 범위가 없으면 —만 둡니다.
   const rangeBar = (base, min, max, unit="") => {
     if (min == null && max == null) return `<small class="equipment-range is-unknown">—<span class="sr-only"> 범위 미제공</span></small>`;
@@ -39,6 +42,8 @@ export function equipmentCard({ item, stats = [], requirements = [], jobs = [], 
   };
   const row = (label, value, range = `<small class="equipment-range is-unknown">—<span class="sr-only"> 범위 미제공</span></small>`, index = 0) => `<div class="catalog-stat equipment-stat" style="--i:${index}"><dt>${text(label)}</dt><dd><strong>${text(value)}</strong><span class="equipment-range-cell">${range}</span></dd></div>`;
   const ordered = sortByOption(stats);
+  // 효과 글 중 위 옵션·공격속도·업그레이드 횟수·상점가와 같은 부분은 다시 적지 않는다(값이 다른 부분만 남음).
+  const effectText = dropShownEffect(item.effect_description, { stats, attackSpeed: item.attack_speed_label ?? item.attack_speed, shopPrice: item.shop_sell_price });
   const hasSpeed = item.attack_speed_label != null || item.attack_speed != null;
   const statRows = ordered.map((stat, index) => row(
     stat.stat_key === "remaining_upgrades" ? "업그레이드 가능 횟수" : detailLabels[stat.stat_key] || labels[stat.stat_key] || stat.stat_key,
@@ -53,7 +58,7 @@ export function equipmentCard({ item, stats = [], requirements = [], jobs = [], 
     <dl class="equipment-requirements" aria-label="착용 조건">${conditions.map(([label, value]) => `<div class="${value == null || value === "" ? "is-empty" : ""}"><dt>${text(label)}</dt><dd>${value == null || value === "" ? `—<span class="sr-only">미제공</span>` : text(value)}</dd></div>`).join("")}</dl>
     <section class="equipment-options"><div class="equipment-options-head"><h2>기본 옵션</h2><span>기본값</span><span>가능 범위</span></div>
     <dl class="equipment-stats">${hasSpeed ? row("공격속도", item.attack_speed_label ?? item.attack_speed) : ""}${item.level_up_count==null?"":row("레벨업 가능 횟수",`${item.level_up_count}회`)}${statRows || (hasSpeed || item.level_up_count!=null ? "" : `<p class="hint">제공된 수치 옵션이 없습니다.</p>`)}</dl><p class="equipment-options-note">범위는 얻을 때 붙을 수 있는 옵션이에요. —는 범위 미제공이고, 거래되는 물건마다 다를 수 있어요.</p></section>
-    ${item.description?.trim() || item.effect_description?.trim() ? `<section class="equipment-description"><h2>아이템 설명</h2>${item.description?.trim()?`<p>${text(item.description)}</p>`:""}${item.effect_description?.trim()&&item.effect_description!==item.description?`<p>${text(item.effect_description)}</p>`:""}</section>`:""}
+    ${item.description?.trim() || effectText ? `<section class="equipment-description"><h2>아이템 설명</h2>${item.description?.trim()?`<p>${text(item.description)}</p>`:""}${effectText&&effectText!==item.description?`<p>${text(effectText)}</p>`:""}</section>`:""}
     <footer><span>상점 판매가</span><strong>${price == null ? "미제공" : `${text(formatCount(price))} 메소`}</strong></footer>
     ${extraAttributes.length ? `<details class="equipment-extra"><summary>추가 정보<span aria-hidden="true">›</span></summary><dl class="catalog-facts">${extraAttributes.map(attribute => `<div><dt>${text(attribute.attribute_name)}</dt><dd>${text(attribute.value_text)}</dd></div>`).join("")}</dl></details>` : ""}
   </article>`;
