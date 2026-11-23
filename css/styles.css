@@ -17345,3 +17345,10 @@ body:has(.mock-badge) .transport-widget.is-docked { position: relative; inset: a
 .cs2 .cs-final-stats { display: flex; flex-wrap: wrap; gap: 5px; flex-basis: 100%; order: 1; }
 .cs2 .cs-final-stats .cs-chip { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .cs2 .cs-final-stats .cs-chip b { color: var(--text); font-weight: 800; }
+
+/* 아이템 효과 칸(2026-11-23, sql/073): 주문서·소비 아이템은 설명 대신 효과 줄과 능력치 카드로 보인다. */
+.catalog-effect-panel { display: grid; gap: 14px; align-content: start; }
+.catalog-effect-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.catalog-effect-lines li { padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(250, 204, 21, .28); background: rgba(250, 204, 21, .08); color: var(--text); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; animation: ym-fade-up .4s calc(var(--i, 0) * .05s) both; }
+.catalog-effect-panel .catalog-stat { animation: ym-fade-up .45s calc(.1s + var(--i, 0) * .05s) both; }
+@media (prefers-reduced-motion: reduce) { .catalog-effect-lines li, .catalog-effect-panel .catalog-stat { animation: none; } }

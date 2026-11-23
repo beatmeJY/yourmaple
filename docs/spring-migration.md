@@ -59,6 +59,7 @@
 - 2026-11-16 (Claude) 몬스터 그림 점검 `catalog_monster_image_audit`·`catalog_monster_set_image`·`catalog_monster_set_image_link`(`sql/070`) → Spring 관리자 API. 관리자 검증, 지금 값과 다르면 거절(409), 그림 주소는 https만, 자기 자신·그림 없는 몬스터 연결 거절, 연결 변경은 이력 한 건을 직접 남김. 목록 검색(`catalog_search_monsters`)은 이어 둔 몬스터 그림 주소(`image_fallback_url`)를 함께 돌려준다. 원본 그림 API 조회는 브라우저가 직접 한다.
 - 2026-11-16 (Claude) 몬스터 논리 삭제 `catalog_monster_set_deleted`·`catalog_monster_deleted_list`(`sql/071`) → Spring 관리자 API. 관리자 검증, 이유 500자, 같은 상태면 무기록, 삭제·복구 이력 한 건. 공개 조회는 지금 RLS(`deleted_at is null`, 드랍은 몬스터가 보일 때만)로 숨기므로 Spring 조회 API는 같은 조건을 쿼리에 넣어야 한다.
 - 2026-11-16 (Claude) 몬스터 드랍 수정 `catalog_monster_drops_edit_detail/save`(`sql/072`) → Spring 관리자 조회/저장 API. 관리자 검증, 목록 전체 저장(목록에 없는 드랍 삭제·확률/아이템 변경·새 드랍 `source='operator'` 순번), 드랍 행 해시 버전 충돌(409), 확률 0~100 또는 null(미상)·아이템 존재·다른 몬스터 드랍·중복 id 거절, 바뀐 줄마다 이력(`record_catalog_change` 트리거). 수집 재등록은 `collected` 드랍만 지우므로 운영자 드랍은 남는다.
+- 2026-11-23 (Claude) 아이템 설명 정리 `catalog_item_text`·`catalog_item_tidy`·`catalog_item_strip_marks`(`sql/073`)와 정규화 트리거 `catalog_item_columns` → Spring 수집 등록·관리자 저장 때 같은 정리(글자색 기호 제거, 주문서 효과를 기본 옵션·효과 글로 분리, 줄바꿈). 규칙은 `js/item-text.js`와 같고 예시는 `tools/item-text-fixtures.mjs`.
 
 - 2026-11-04 (Codex) 상세 옵션 범위 최신 정의 `sql/060`의 `catalog_item_edit_detail/save`: 범위 전체 전달·최소/기본/최대 검증·빈 범위 제거·0 보존·범위만 수정도 이력 기록. Spring 이전 시 p_ranges 미전달 구 화면 호환과 범위 지원 버전 확인도 유지합니다. [실측]
 

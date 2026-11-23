@@ -65,8 +65,31 @@ def load_live():
     monsters = fetch_all(url, key, "catalog_monsters",
                          "id,name,level,hp,exp,mp,required_accuracy,weak_elements,resist_elements,image_url,source_id,image_link_monster_id", "level.asc,name.asc,id.asc")
     drops = fetch_all(url, key, "catalog_monster_drops", "monster_id,item_id,rate_percent,source_entry", "monster_id.asc,source_entry.asc,id.asc")
-    items = fetch_all(url, key, "catalog_items", "id,name,category,middle_category,subcategory,required_level,description,image_url,source_id", "id.asc")
+    items = fetch_all(url, key, "catalog_items", "id,name,category,middle_category,subcategory,required_level,description,effect_description,base_options,image_url,source_id", "id.asc")
     return monsters, drops, items
+
+
+EQUIP_CATEGORIES = {"장비", "방어구", "무기", "Equip"}
+# js/item-options.js 의 옵션 이름과 같게.
+STAT_LABELS = {"attack": "공격력", "magic_attack": "마력", "str": "STR", "dex": "DEX", "int": "INT", "luk": "LUK", "hp": "HP", "mp": "MP",
+               "hp_percent": "HP 증가율 (%)", "mp_percent": "MP 증가율 (%)", "defense": "물리 방어", "magic_defense": "마법 방어",
+               "accuracy": "명중", "avoidability": "회피", "speed": "이동속도", "jump": "점프력"}
+
+
+def clean_text(value):
+    """설명의 게임 글자색 기호(#c…#)를 지우고 빠진 줄바꿈을 넣는다(js/item-text.js 의 tidyItemText 와 같은 줄바꿈 규칙).
+    주문서 효과 덩어리를 옵션으로 나누는 일은 sql/073 이 한다. 실행 전 자료면 효과 글이 설명에 남는다."""
+    text = str(value or "")
+    if "#c" in text:
+        text = re.sub(r"([.!?])[ \t]*#c", lambda m: m.group(1) + "\n", text).replace("#c", "").replace("#", "")
+    text = re.sub(r"(\S)(직업|조건) : ", r"\1\n\2 : ", text)
+    text = re.sub(r"다\.([가-힣A-Za-z])", r"다.\n\1", text)
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def lines_html(text):
+    return "<br />".join(e(line) for line in text.split("\n"))
 
 
 def fmt(value):
@@ -228,7 +251,15 @@ def item_page(item, drops, monsters, monster_links):
     art = f'<img src="{e(image)}" width="96" height="96" alt="{e(name)}" referrerpolicy="no-referrer" onerror="this.remove()" />' if image else ""
     facts = [("종류", kind), ("착용 레벨", fmt(level) if level not in (None, "") else "미제공")]
     fact_html = "".join(f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>" for k, v in facts)
-    description = f'<p>{e(item["description"])}</p>' if item.get("description") else ""
+    cleaned = clean_text(item.get("description"))
+    description = f'<p>{lines_html(cleaned)}</p>' if cleaned else ""
+    if item.get("category") not in EQUIP_CATEGORIES:
+        effects = [line for line in clean_text(item.get("effect_description")).split("\n") if line]
+        options = item.get("base_options") or {}
+        effects += [f"{STAT_LABELS.get(k, k)} {'+' if isinstance(v, (int, float)) and v > 0 else ''}{v}" for k, v in options.items()]
+        if effects:
+            facts.append(("효과", " · ".join(effects)))
+            fact_html = "".join(f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>" for k, v in facts)
     if rows:
         drop_html = "<ol class=\"mon-drops\">" + "".join(
             f'<li><a href="{e(monster_links.get(d["monster_id"], "/monsters/"))}">{e(monsters[d["monster_id"]]["name"])} '
