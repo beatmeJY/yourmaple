@@ -462,6 +462,34 @@ function mapMonsters(mapId) {
   const levels = all.map(m => m.level).filter(v => v != null);
   return { all, monster_count: all.length, min_level: levels.length ? Math.min(...levels) : null, max_level: levels.length ? Math.max(...levels) : null };
 }
+// 퀘스트 정보(sql/077 흉내). 처음 열면 연습용 퀘스트 5개를 넣는다. 스티지·맵은 가짜 도감 것과 이어진다.
+function mockQuests() {
+  const quests = rowsOf("catalog_quests");
+  if (!quests.length) {
+    const npc = (id, n) => ({ id, n, v: "gms/62" });
+    const base = { min_level: null, max_level: null, jobs: [], reward_exp: null, reward_meso: null, reward_fame: null, start_npc: null, end_npc: null, start_map: null, end_map: null,
+      region: null, region_group: null, start_text: null, progress_text: null, complete_text: null, conditions: [], reward_method: null, reward_items: [], prerequisites: [], next_quests: [], source: "collected" };
+    const sample = [
+      { source_id: 9000001, name: "연습용 스티지 퇴치", min_level: 20, max_level: 40, reward_exp: 3000, reward_meso: 5000, reward_fame: 1, start_npc: npc(1012100, "헬레나"), end_npc: npc(1012101, "마야"),
+        start_map: 100000000, end_map: 100010000, region: "헤네시스", region_group: "빅토리아 아일랜드", start_text: "헬레나에게 말을 걸어 보자.",
+        progress_text: "헤네시스동쪽언덕의 스티지를 30마리 물리치고\n달팽이 껍질 10개를 모아 마야에게 가져가자.", complete_text: "마을이 조금 조용해졌다.",
+        conditions: [{ m: "2300100", c: 30, n: "스티지" }, { i: "4000019", c: 10, n: "달팽이 껍질", v: "gms/62" }],
+        reward_method: "fixed", reward_items: [{ i: "2000000", c: 20, n: "빨간 포션", v: "gms/62" }], next_quests: [9000002] },
+      { source_id: 9000002, name: "연습용 스티지의 날개", min_level: 25, reward_exp: 8000, reward_meso: 0, start_npc: npc(1012101, "마야"), start_map: 100010000, region: "헤네시스", region_group: "빅토리아 아일랜드",
+        conditions: [{ i: "4000059", c: 50, n: "스티지의 날개", v: "gms/62" }], jobs: [100, 110, 200, 210, 300, 310, 400, 410, 500, 510],
+        reward_method: "select", reward_items: [{ i: "1302000", c: 1, n: "검", v: "gms/62" }, { i: "1382000", c: 1, n: "나무 스태프", v: "gms/62" }, { i: "1452002", c: 1, n: "워 보우", v: "gms/62" }],
+        prerequisites: [9000001], next_quests: [9000003] },
+      { source_id: 9000003, name: "연습용 마지막 부탁", min_level: 30, max_level: 50, reward_exp: 12000, reward_meso: 30000, start_npc: npc(1012101, "마야"), region: "헤네시스",
+        reward_method: "random", reward_items: [{ i: "2040001", c: 1, n: "투구 방어력 주문서 60%", v: "gms/62" }, { i: "2040801", c: 1, n: "장갑 민첩 주문서 60%", v: "gms/62" }], prerequisites: [9000002] },
+      { source_id: 9000004, name: "연습용 기사단 수련", min_level: 10, reward_exp: 500, start_npc: npc(1101000, "키넌"), region: "에레브", jobs: [1000, 1100, 1200, 1300, 1400, 1500],
+        conditions: [{ m: "9999990", c: 5, n: "그림 없는 시험 몬스터" }] },
+      { source_id: 9000005, name: "연습용 레벨 없는 퀘스트", start_npc: npc(9010000, "메이플 운영자"), reward_meso: 100 },
+    ];
+    sample.forEach((q, i) => quests.push({ ...base, ...q, id: `c0000000-0000-4000-8000-00000000000${i + 1}`, updated_at: iso(-3) }));
+    save();
+  }
+  return quests;
+}
 function assertMockReviewer() { if (!reviewAllowed()) throw Object.assign(new Error("검토 권한이 없습니다"),{code:"42501"}); }
 
 const RPCS = {
@@ -592,6 +620,38 @@ const RPCS = {
     if(Object.keys(changes).length){const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"map",entity_id:p_id,entity_name:name,operation:"UPDATE",changes,release_label:"운영자 맵 수정",changed_at:iso()});
       Object.assign(m,{name,street_name:street,name_source:"operator",updated_at:iso()});save();}
     return RPCS.catalog_map_detail({p_id});
+  },
+  catalog_search_quests({p_query="",p_region="",p_level=null,p_page=0}={}) {
+    const norm=v=>String(v??"").replace(/\s+/g,"").toLowerCase(), q=norm(p_query), lv=Number(p_level)>=1?Number(p_level):null;
+    const matched=mockQuests().filter(t=>(!q||String(t.source_id)===p_query.trim()||norm(`${t.name}${t.start_npc?.n??""}${t.end_npc?.n??""}${t.region??""}`).includes(q)||[...t.conditions,...t.reward_items].some(x=>norm(x.n).includes(q)))
+      &&(lv==null||((t.min_level==null||t.min_level<=lv)&&(t.max_level==null||t.max_level>=lv))));
+    const filtered=matched.filter(t=>!p_region||(t.region??"")===(p_region==="-"?"":p_region)).sort((a,b)=>(a.min_level??999)-(b.min_level??999)||a.name.localeCompare(b.name));
+    const regions={};for(const t of matched)regions[t.region??""]=(regions[t.region??""]??0)+1;
+    return {rows:filtered.slice(p_page*24,p_page*24+24).map(t=>({id:t.id,source_id:t.source_id,name:t.name,min_level:t.min_level,max_level:t.max_level,jobs:t.jobs,reward_exp:t.reward_exp,reward_meso:t.reward_meso,region:t.region,start_npc:t.start_npc,
+      condition_count:t.conditions.length,reward_count:t.reward_items.length,rewards:t.reward_items.slice(0,4),chain:t.prerequisites.length+t.next_quests.length>0})),total:filtered.length,regions,revision:1};
+  },
+  catalog_quest_detail({p_id=null,p_source_id=null}={}) {
+    const all=mockQuests(), t=all.find(x=>x.id===p_id||(p_source_id!=null&&x.source_id===Number(p_source_id)));
+    if(!t)return null;
+    const mons=rowsOf("catalog_monsters").filter(m=>!m.deleted_at), items=rowsOf("catalog_items"), maps=mockMaps();
+    const link=x=>{const out={...x};const it=x.i&&items.find(r=>r.source_id===x.i);if(it)out.item={id:it.id,name:it.name,image_url:it.image_url,source_id:it.source_id};
+      const mo=x.m&&mons.find(r=>r.source_id===x.m);if(mo)out.monster={id:mo.id,name:mo.name,level:mo.level,image_url:mo.image_url,source_id:mo.source_id};return out;};
+    const map=n=>{const m=maps.find(x=>x.source_id===n);return m?{id:m.id,source_id:m.source_id,name:m.name,street_name:m.street_name}:null;};
+    const ref=n=>{const r=all.find(x=>x.source_id===n);return r?[{id:r.id,source_id:r.source_id,name:r.name,min_level:r.min_level}]:[];};
+    const {updated_at,...quest}=t;
+    return {quest:{...quest,version:String(updated_at)},conditions:t.conditions.map(link),rewards:t.reward_items.map(link),start_map:map(t.start_map),end_map:map(t.end_map),
+      prerequisites:t.prerequisites.flatMap(ref),next_quests:t.next_quests.flatMap(ref),revision:1};
+  },
+  catalog_quest_edit_save({p_id,p_version,p_name,p_min_level,p_max_level,p_reward_exp,p_reward_meso,p_reward_fame}) {
+    assertMockReviewer();const t=mockQuests().find(x=>x.id===p_id);if(!t)throw new Error("퀘스트를 찾을 수 없습니다");
+    if(String(t.updated_at)!==String(p_version))throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
+    const name=String(p_name??"").trim();if(!name||name.length>200)throw Object.assign(new Error("퀘스트 이름은 1~200자로 입력해 주세요"),{code:"22023"});
+    if(p_min_level!=null&&p_max_level!=null&&p_min_level>p_max_level)throw Object.assign(new Error("최소 레벨이 최대 레벨보다 큽니다"),{code:"22023"});
+    const next={name,min_level:p_min_level??null,max_level:p_max_level??null,reward_exp:p_reward_exp??null,reward_meso:p_reward_meso??null,reward_fame:p_reward_fame??null};
+    const changes={};for(const [k,v] of Object.entries(next))if(t[k]!==v)changes[k]={before:t[k],after:v};
+    if(Object.keys(changes).length){const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"quest",entity_id:p_id,entity_name:name,operation:"UPDATE",changes,release_label:"운영자 퀘스트 수정",changed_at:iso()});
+      Object.assign(t,next,{source:"operator",updated_at:iso()});save();}
+    return RPCS.catalog_quest_detail({p_id});
   },
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
   catalog_monster_edit_detail({p_id}) {

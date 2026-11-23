@@ -35,12 +35,26 @@ try {
       { id: "i3", name: "<아대>", category: "Equip", subcategory: "아대", required_level: 70, source_id: "1472000" },
       { id: "i4", name: "번호 겹침", category: "Etc", source_id: "4000019" },
     ],
+    maps: [
+      { id: "p1", source_id: 100010000, name: "헤네시스동쪽언덕", street_name: "빅토리아로드", render: { v: "gms/62", ox: -655, oy: -607, w: 2677, h: 1363 }, minimap: { v: "gms/62" },
+        portals: [{ to: 100000000, t: 2 }, { to: 999, t: 2 }, { to: 100000000, t: 2 }] },
+      { id: "p2", source_id: 100000000, name: "<헤네>&\"", street_name: "", render: null, minimap: { v: "cms/200" }, portals: [] },
+      { id: "p3", source_id: 0, name: "잘못된 번호" },
+      { id: "p4", source_id: 270000100, name: "시간의 신전", render: { v: "../x" }, minimap: null },
+    ],
+    map_monsters: [
+      { map_id: "p1", monster_id: "m6", max_count: 1 },
+      { map_id: "p1", monster_id: "m1", max_count: 12 },
+      { map_id: "p1", monster_id: "m4", max_count: 3 },
+      { map_id: "p1", monster_id: "없는 몬스터", max_count: 3 },
+    ],
   };
   const fixturePath = join(out, "fixture.json");
   writeFileSync(fixturePath, JSON.stringify(fixture));
-  const run = spawnSync("python3", ["tools/build_catalog_pages.py", out, "--fixture", fixturePath], { cwd: root, encoding: "utf8" });
+  // 맵 메뉴가 관리자 전용이어도 생성 내용은 검사할 수 있게 --include-admin 을 준다(관리자 전용일 때 건너뛰는 것은 아래 7)에서 본다).
+  const run = spawnSync("python3", ["tools/build_catalog_pages.py", out, "--fixture", fixturePath, "--include-admin"], { cwd: root, encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
-  assert.match(run.stdout, /몬스터 페이지 5개 · 아이템 페이지 3개/);
+  assert.match(run.stdout, /몬스터 페이지 5개 · 아이템 페이지 3개 · 맵 페이지 3개/);
 
   // 1) 주소는 몬스터 번호, 번호가 없으면 id. 같은 번호·이상한 번호는 건너뛴다.
   const snail = readFileSync(join(out, "monsters", "100100", "index.html"), "utf8");
@@ -98,12 +112,29 @@ try {
   const fake = readFileSync(join(out, "monsters", "8810118", "index.html"), "utf8");
   assert.ok(!fake.includes("/img/horntail.png") && fake.includes("mob/8810118/render/move"));
 
+  // 3-3) 맵 페이지: 번호 주소·맵마다 정한 그림 버전·나오는 몬스터(레벨순·최대 마릿수, 페이지 없는 몬스터 제외)·포탈 맵(겹침·없는 맵 제외)·이스케이프
+  const east = readFileSync(join(out, "maps", "100010000", "index.html"), "utf8");
+  assert.match(east, /<title>메랜 헤네시스동쪽언덕 — 나오는 몬스터·포탈/);
+  assert.ok(east.includes("https://maplestory.io/api/gms/62/map/100010000/render/900"));
+  assert.ok(east.includes('<link rel="canonical" href="https://yourmaple.kr/maps/100010000/"'));
+  assert.ok(east.indexOf('href="/monsters/100100/"') < east.indexOf('href="/monsters/8810018/"'));
+  assert.ok(east.includes("최대 12마리") && !east.includes("같은 번호"));
+  assert.equal((east.match(/href="\/maps\/100000000\/"/g) || []).length, 1);
+  assert.ok(!east.includes("/maps/999/"));
+  const hene = readFileSync(join(out, "maps", "100000000", "index.html"), "utf8");
+  assert.ok(hene.includes("https://maplestory.io/api/cms/200/map/100000000/minimap") && !hene.includes("<헤네>"));
+  assert.ok(east.includes("&lt;헤네&gt;"));
+  const temple = readFileSync(join(out, "maps", "270000100", "index.html"), "utf8");
+  assert.ok(temple.includes("https://maplestory.io/api/gms/83/map/270000100/minimap") && !temple.includes("../x"));
+  assert.ok(!existsSync(join(out, "maps", "0")));
+
   // 4) 사이트맵: 예전 몬스터 주소는 지우고 새 주소만, 기본 주소는 유지
   const sitemap = readFileSync(join(out, "sitemap.xml"), "utf8");
   assert.ok(!sitemap.includes("/monsters/old/"));
   assert.ok(sitemap.includes("<loc>https://yourmaple.kr/monsters/</loc>"));
   assert.equal((sitemap.match(/\/monsters\/[^<]+\/<\/loc>/g) || []).length, 5);
   assert.equal((sitemap.match(/\/items\/[^<]+\/<\/loc>/g) || []).length, 3);
+  assert.equal((sitemap.match(/\/maps\/[^<]+\/<\/loc>/g) || []).length, 3);
 
   // 5) 소개 페이지 목록
   const intro = readFileSync(join(out, "monsters", "index.html"), "utf8");
@@ -115,6 +146,14 @@ try {
   writeFileSync(fixturePath, JSON.stringify({ monsters: [], drops: [], items: [] }));
   const empty = spawnSync("python3", ["tools/build_catalog_pages.py", join(out, "empty"), "--fixture", fixturePath], { cwd: root, encoding: "utf8" });
   assert.notEqual(empty.status, 0);
+  // 7) 맵 메뉴가 관리자 전용이면(js/routes.js) 맵 페이지를 만들지 않고, 아니면 만든다.
+  const routesText = readFileSync(join(root, "js", "routes.js"), "utf8");
+  const adminOnly = /\{[^{}]*id: "maps"[^{}]*\badmin: true\b[^{}]*\}/.test(routesText);
+  writeFileSync(fixturePath, JSON.stringify(fixture));
+  const plain = spawnSync("python3", ["tools/build_catalog_pages.py", join(out, "plain"), "--fixture", fixturePath], { cwd: root, encoding: "utf8" });
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.match(plain.stdout, adminOnly ? /맵 페이지 0개/ : /맵 페이지 3개/);
+  assert.equal(existsSync(join(out, "plain", "maps", "100010000", "index.html")), !adminOnly);
   console.log("catalog-pages check 통과");
 } finally {
   rmSync(out, { recursive: true, force: true });

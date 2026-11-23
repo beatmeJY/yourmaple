@@ -3,7 +3,7 @@ import { signOut, startAuth, translateAuthError } from "./auth.js";
 import { closeLinkPanel, isLinkPanelOpen, openLinkPanel } from "./link-panel.js";
 import { renderLogin, renderSetup } from "./pages/login.js";
 import { followRoute, getRouteId, navigate, navigatePath, normalizeRoute, renderCrumb, renderNav, renderRoute, toggleNavCategory } from "./router.js";
-import { routes } from "./routes.js";
+import { routes, setAdminMode } from "./routes.js";
 import { cancelLogin, currentSession, isLoggedIn, onLoginRequest, pendingReason, rememberNext, setSession, takeNext } from "./session.js";
 import { isSoundOn, setSoundOn, sfx } from "./effects.js";
 import { mountFeatureSearch } from "./feature-search.js";
@@ -11,6 +11,7 @@ import { mountProfile } from "./profile.js";
 import { clearToasts, notify } from "./toast.js";
 import { applyDarkTheme, applyNavPreference, isDesktopNav, mountAmbient, renderShell, setNavCollapsed, setNavOpen } from "./ui.js";
 import { mountTransportWidget } from "./transport-widget.js";
+import { canReviewCatalog } from "./catalog-review.js";
 
 normalizeRoute();
 if (document.body.classList.contains("feature-page")) {
@@ -76,6 +77,12 @@ async function showApp(session) {
       showDeletion(pending, userId);
       return;
     }
+  }
+  // 완성 전 메뉴(맵·퀘스트)는 관리자에게만 보이므로 틀을 그리기 전에 관리자인지 확인한다.
+  if (entered) {
+    const admin = userId ? await canReviewCatalog().catch(() => false) : false;
+    if (ticket !== appTicket) return;
+    setAdminMode(admin);
   }
   if (entered) {
     clearToasts();

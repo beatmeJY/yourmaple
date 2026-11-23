@@ -28,11 +28,12 @@
 - 맥 로컬 실행: `python3 -m http.server 5500` → http://127.0.0.1:5500. Windows에서는 `py -3 -m http.server 5500`을 사용한다. `.claude/launch.json`은 현재 저장소에 없다(2026-10-02 Codex 확인 [실측]).
 - 라우팅: `/characters/` 같은 일반 경로를 쓴다. `js/route-url.js`가 화면 ID와 공개 주소를 연결하며, 예전 해시 링크는 조회 조건을 유지한 채 새 주소로 바꾼다.
   - `js/routes.js`: `homeRoute`와 7개 분류 `categories`(id·이름·아이콘 글자·hue·routes). 평평한 `routes`는 여기서 만든다. `quick: true`는 페이지 이동 대신 버튼으로 동작(예: 링크 패널).
+  - 관리자에게만 보이기(2026-11-23 사용자 요청, 완성 전 맵·퀘스트): `routes.js`의 route에 `admin: true`를 붙이면 운영 주소에서 관리자(`can_review_catalog`)가 아니면 메뉴·검색·홈에서 빠지고 주소로 열어도 홈으로 간다. 관리자 여부는 로그인 뒤 `main.js`가 확인해 `setAdminMode`로 알린다(`categories`·`routes`는 그때 다시 계산). 로컬·`?dev`에서는 늘 보이므로 로컬 확인은 주소마다 `dev=0`. 맵이 관리자 전용인 동안은 배포 생성기가 맵 검색용 페이지·사이트맵 주소를 만들지 않는다. 공개 화면으로 열 때는 `admin: true`만 지우면 된다. 다만 077·076 함수는 비로그인 읽기 그대로라 API로는 자료를 읽을 수 있다
   - 개발 중인 화면·탭 숨기기: `routes.js`의 route에 `dev: true`(메이커 탭은 `TABS`의 `dev: true`)를 붙이면 운영 주소에서는 메뉴·검색·홈 타일에서 빠지고 주소로 열어도 홈으로 간다. 주소에 `?dev`를 붙이면 그 탭을 닫을 때까지 보이고 `?dev=0`이면 끈다. 로컬(127.0.0.1·localhost)에서는 늘 보인다(`js/dev-mode.js`). 2026-10-11 강화 계산·리버스 제작을 숨김 [실측]
   - `js/router.js`: `pages` 맵에 `id → import("./pages/xxx.js")` 등록. 각 페이지 모듈은 `export async function render(root)`를 가진다.
 - 레이아웃·다크 고정·배경(`mountAmbient`)은 `js/ui.js`, 앱 시작과 전역 클릭 처리는 `js/main.js`. 파티클·성공 연출·효과음은 `js/effects.js`(`burst`, `burstAt`, `celebrate`, `sfx`)를 쓴다.
 - 기능 소개 페이지(검색 색인용): `/dojo/`·`/maker/`·`/chaos-scroll/`·`/level-up/`·`/monster-park/`·`/monsters/`·`/items/`·`/transport/`의 `index.html`은 `tools/build_feature_pages.py`로 만든 정적 HTML이다. 앱 스크립트가 같은 경로에서 실제 화면을 그리며, GitHub Pages에 필요한 나머지 메뉴의 index.html도 생성기가 만든다. 무릉·메이커·혼돈·레벨업의 게임 기준값(점수·확률·비용)을 바꾸면 이 파일 문구도 함께 고치고 다시 실행한다. 새 소개 페이지는 `sitemap.xml`·`index.html` 기본 화면·앱 바닥글(`js/ui.js`) 링크에도 추가한다. 기간 이벤트(`until`)는 지나면 종료 안내로 바뀐다(브라우저는 서울 날짜로 바로, 원본 HTML은 생성기를 다시 실행해야 바뀜). 도감 소개에는 수집처 이름을 쓰지 않는다(2026-11-04).
-- 몬스터·아이템 검색용 페이지 `/monsters/<몬스터 번호>/`·`/items/<아이템 번호>/`는 배포 때 `tools/build_catalog_pages.py _site`가 공개 도감(비로그인 읽기)으로 만들고 sitemap·몬스터 소개 원본 목록(`<!-- monster-list -->` 자리)에 더한다. 저장소에는 넣지 않고, 도감을 못 읽으면 배포가 멈춘다. 이 페이지는 검색 로봇용 원본 내용과 함께 앱(main.js)을 띄운다. 몬스터는 도감 화면에서 그 번호로 검색·선택하고 고르면 주소·탭 제목·canonical을 바꾸며, 아이템은 그 아이템 상세를 열고 주소(예전 `?id=`도)를 번호 주소로 바꾼다(`route-url.js` `monsterSlugFromPath`·`itemSlugFromPath`). 배포 뒤 새로 생긴 번호는 생성기가 만드는 `404.html`(앱 틀, noindex)이 열어 준다. 로컬 실행은 `SSL_CERT_FILE=/etc/ssl/cert.pem python3 tools/build_catalog_pages.py <임시 폴더>`, 검사는 `tools/catalog-pages.check.mjs`(고정 자료). 2026-11-16 (Claude)
+- 몬스터·아이템·맵 검색용 페이지 `/monsters/<몬스터 번호>/`·`/items/<아이템 번호>/`·`/maps/<맵 번호>/`(맵은 2026-11-23, 076 표를 못 읽으면 맵만 건너뜀)는 배포 때 `tools/build_catalog_pages.py _site`가 공개 도감(비로그인 읽기)으로 만들고 sitemap·몬스터 소개 원본 목록(`<!-- monster-list -->` 자리)에 더한다. 저장소에는 넣지 않고, 도감을 못 읽으면 배포가 멈춘다. 이 페이지는 검색 로봇용 원본 내용과 함께 앱(main.js)을 띄운다. 몬스터는 도감 화면에서 그 번호로 검색·선택하고 고르면 주소·탭 제목·canonical을 바꾸며, 아이템은 그 아이템 상세를 열고 주소(예전 `?id=`도)를 번호 주소로 바꾼다(`route-url.js` `monsterSlugFromPath`·`itemSlugFromPath`). 배포 뒤 새로 생긴 번호는 생성기가 만드는 `404.html`(앱 틀, noindex)이 열어 준다. 로컬 실행은 `SSL_CERT_FILE=/etc/ssl/cert.pem python3 tools/build_catalog_pages.py <임시 폴더>`, 검사는 `tools/catalog-pages.check.mjs`(고정 자료). 2026-11-16 (Claude)
 - 스타일은 `css/styles.css` 한 파일. 색은 `:root` 토큰(`--bg`, `--bg-raised`, `--line`, `--text`, `--muted`, `--accent`, `--gain`, `--danger`, `--shadow`, 디자인 전용 `--gold`, `--glass`, `--cta`, `--spring` 등)만 쓴다. 파일 끝 "리디자인 1단계 공통 기반" 블록이 기존 공통 부품을 덮는다.
 
 ## 4. 코드 규칙
@@ -68,6 +69,14 @@
 메이커 계산, 리버스 제작, 장비 옵션 부여, 링크 패널, 강화 계산, 캐릭터 규칙은 `docs/domain.md`에 있다. 해당 기능을 고치기 전에 그 파일의 관련 절을 읽고, 새 규칙도 그 파일에 적는다.
 
 ## 7. 현재 상태 (2026-10-29 요약, 상세 이력은 git, 결정은 `docs/domain.md`)
+
+- 2026-11-23 (Claude) 맵·퀘스트 관리자 전용(사용자 요청: 완성 전이라 관리자 계정에만): route `admin: true`·`setAdminMode`, 몬스터 상세 "나오는 맵" 칸도 관리자만, 기능 검색 목록을 찾을 때마다 만들게 바꿈, 맵이 관리자 전용이면 배포 생성기가 맵 페이지를 만들지 않음(검사 `--include-admin`). ?dev=0 으로 일반 로그인·비로그인은 메뉴·홈·검색·주소 열기·나오는 맵 칸 모두 없음, 관리자(?mock=reviewer&dev=0)는 모두 보임·열림, 검사 49개 통과 [실측]. 미커밋·미배포
+
+- 2026-11-23 (Claude) 퀘스트 정보(할 일 5번, 사용자 수집 완료 [진술]): `sql/077_catalog_quests.sql`(퀘스트 표·검색/상세·관리자 수정 RPC, 이력 `quest`) — 사용자 실행 필요, 그다음 비공개 도구가 만든 `data/local/quest-collect/quests.sql`(1,037개, 게임 글 기호는 이름으로·사이트 글 제외). 화면 `/quests/` 목록(검색·내 레벨·지역 칩)·`/quests/<번호>/` 상세(시작·완료 NPC와 맵, 완료 조건 → 도감 아이템·몬스터, 보상 방식, 안내 글, 연속 퀘스트), 관리자 수정·변경 이력. 예전 개인 퀘스트 화면은 `/my-quests/`(숨김)로 옮김, 직업 번호 이름 `js/quest-jobs.js`+check. PGlite 077 검사(공개 읽기·쓰기 막힘·검색·레벨·연결·관리자 권한/버전/범위/이력·재등록 시 고친 칸 유지·재실행)·실제 등록 SQL 두 번 적용, 검사 49개 통과, ?mock 목록·레벨 45 거르기·상세·연속 퀘스트 이동·뒤로가기, ?mock=reviewer 수정(잘못된 레벨 거절·저장·이력 2건), ?mock 수정 버튼 없음, 모바일 375 넘침 없음, ?mock=0 077 전 준비 중 안내 [실측]. 미커밋·미배포
+
+- 2026-11-23 (Claude) 맵 검색용 페이지(사용자 요청): 배포 때 `tools/build_catalog_pages.py`가 공개 읽기 catalog_maps·catalog_map_monsters로 `/maps/<맵 번호>/` 생성(이름·지역·맵마다 정한 버전 그림·나오는 몬스터 레벨순·최대 마릿수·포탈로 이어진 맵, 사이트맵 추가, 맵 표 못 읽으면 맵만 건너뜀). 운영 공개 읽기로 몬스터 802·아이템 3,701·맵 1,124쪽 29.97MB·sitemap xmllint 통과, 배포 흉내 사이트에서 /maps/100010000/ 앱 상세·몬스터 6·canonical·HTTP 200, 모바일 375 넘침 없음·새 탭 콘솔 오류 없음, catalog-pages 검사에 맵 고정 자료 추가·검사 47개 통과 [실측]. 미커밋·미배포
+
+- 2026-11-23 (Claude) 맵 정보·아이템 분류·주문서 소리·거래 묶음 871305e 배포(Actions 45178842212 check→deploy 성공, 공개 v=871305e). 사용자 sql/076·maps.sql·map-monsters.sql 실행 완료 [진술], 운영 공개 읽기로 맵 1,124·연결 1,752·목록 748·지역 39·헤네시스동쪽언덕 그림/포탈 3/위치 47/최대 마릿수·비로그인 수정 401 확인, 공개 화면 목록 748곳·상세 몬스터 위치·포탈 west00 → 헤네시스 도착 portal1 [실측]. 남은 점: /maps/<번호>/ 는 검색용 페이지가 없어 404.html 앱 틀(HTTP 404 상태)로 열림 — 몬스터·아이템처럼 배포 때 생성할지 사용자 결정 필요
 
 - 2026-11-23 (Claude) sql/076 운영 첫 실행이 42703(catalog_monsters.image_fallback_url 없음)으로 실패 [진술]. 원인: 070은 대체 그림을 칸이 아니라 image_link_monster_id 로 이어 둔 몬스터의 image_url 로 찾는데, 076과 검사용 가짜 표가 칸으로 가정함. 076을 이어 둔 몬스터 조회로 고치고 검사 표를 실제 구조로 맞춤, 대체 그림 검사 추가. 검사 47개·실제 생성 SQL 적용 통과 [실측]. 076은 begin~commit 이라 실패 때 아무것도 반영 안 됨, 전체 다시 실행 필요
 

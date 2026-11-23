@@ -3,6 +3,9 @@
 // hue는 분류 색(oklch(0.8 0.13 hue))이고, glyph는 사이드바 아이콘 글자입니다. icon(그림 경로)이 있으면 글자 대신 그림을 씁니다(무릉도장, 2026-10-21).
 // quick: true는 페이지 이동 대신 버튼으로 동작합니다(예: 링크 패널).
 // dev: true는 개발 중이라 운영 주소에서는 숨깁니다(주소에 ?dev 를 붙이면 보임, js/dev-mode.js).
+// admin: true는 아직 완성되지 않아 관리자(도감 검토 운영자) 계정에만 보입니다(2026-11-23 사용자 요청: 맵·퀘스트).
+//   운영 주소에서 관리자가 아니면 메뉴·검색·홈에서 빠지고 주소로 열어도 홈으로 갑니다. 로컬·?dev 에서는 늘 보입니다.
+//   관리자 여부는 로그인 뒤 main.js 가 확인해 setAdminMode 로 알려 줍니다.
 // until: "YYYY-MM-DD"는 이벤트 화면이라 그날(서울)이 지나면 운영 주소에서 숨깁니다(몬스터파크, 2026-10-27).
 import { devMode } from "./dev-mode.js";
 import { accountMenuFaceUrl } from "./profile.js";
@@ -17,9 +20,9 @@ const allCategories = [
   { id: "dojo", label: "무릉도장", glyph: "武", icon: "img/dojo-icon.png", hue: 25, routes: [{ id: "dojo", label: "층별 기록 · 허리띠 시세" }] },
   { id: "maker", label: "메이커", glyph: "◆", icon: "img/maker-icon.png", hue: 210, routes: [{ id: "maker", label: "보석 제작" }, { id: "maker-craft", label: "리버스 제작" }, { id: "maker-enchant", label: "장비 옵션 부여" }] },
   { id: "enhance", label: "강화", glyph: "⚒", icon: "img/enhance-icon.png", hue: 285, routes: [{ id: "chaos-scroll", label: "혼돈의 주문서" }, { id: "enhance", label: "강화 계산", dev: true }] },
-  { id: "quest", label: "퀘스트 정보", glyph: "Q", icon: "img/quest-icon.png", hue: 85, routes: [{ id: "quests", label: "퀘스트 정보", dev: true }] }, // 2026-11-01 등록된 퀘스트가 없어 숨김
+  { id: "quest", label: "퀘스트 정보", glyph: "Q", icon: "img/quest-icon.png", hue: 85, routes: [{ id: "quests", label: "퀘스트 정보", admin: true }, { id: "my-quests", label: "내 퀘스트 기록", dev: true }] }, // 2026-11-23 공용 퀘스트 정보(sql/077)는 완성 전이라 관리자만, 예전 개인 기록 화면은 숨김
   { id: "monster", label: "몬스터 정보", glyph: "M", icon: "img/monster-icon.png", hue: 65, routes: [{ id: "monsters", label: "몬스터 도감" }] },
-  { id: "map", label: "맵 정보", glyph: "맵", hue: 150, routes: [{ id: "maps", label: "맵 정보" }] },
+  { id: "map", label: "맵 정보", glyph: "맵", hue: 150, routes: [{ id: "maps", label: "맵 정보", admin: true }] }, // 2026-11-23 완성 전이라 관리자만
   { id: "item", label: "아이템 정보", glyph: "템", icon: "https://maplestory.io/api/gms/100/item/2070006/icon?resize=2", hue: 75, routes: [{ id: "item-catalog", label: "아이템 정보" }] },
   // 거래 내역은 아이템 정보 아래(2026-11-23 사용자 요청).
   { id: "trade", label: "거래 내역", glyph: "⇄", icon: "img/trade-icon.png", hue: 180, routes: [{ id: "trades", label: "거래 내역" }] },
@@ -29,18 +32,30 @@ const allCategories = [
 ];
 
 const seoulToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-const hiddenRoute = (route) => !devMode && (route.dev || (route.until && seoulToday > route.until));
+let adminMode = false;
+const hiddenRoute = (route) => !devMode && (route.dev || (route.admin && !adminMode) || (route.until && seoulToday > route.until));
 
-export const categories = allCategories
+const visibleCategories = () => allCategories
   .map((category) => ({ ...category, routes: category.routes.filter((route) => !hiddenRoute(route)) }))
   .filter((category) => category.routes.length);
+// 관리자 여부가 바뀌면 다시 계산한다(가져다 쓰는 쪽은 같은 이름으로 새 값을 본다).
+export let categories = visibleCategories();
 
 /** 숨긴 화면인지(운영 주소에서 dev 없이 연 경우, 기간이 끝난 이벤트 화면) */
 export function isHiddenRoute(id) {
   return allCategories.some((category) => category.routes.some((route) => route.id === id && hiddenRoute(route)));
 }
 
-export const routes = [homeRoute, ...categories.flatMap((category) => category.routes)];
+export let routes = [homeRoute, ...categories.flatMap((category) => category.routes)];
+
+/** 관리자 계정인지 알려 준다. 바뀌었으면 true(메뉴를 다시 그려야 함). */
+export function setAdminMode(on) {
+  if (adminMode === Boolean(on)) return false;
+  adminMode = Boolean(on);
+  categories = visibleCategories();
+  routes = [homeRoute, ...categories.flatMap((category) => category.routes)];
+  return true;
+}
 
 export function categoryOf(routeId) {
   return categories.find((category) => category.routes.some((route) => route.id === routeId)) ?? null;

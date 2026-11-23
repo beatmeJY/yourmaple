@@ -7,7 +7,8 @@ import { categories, glyphInner, homeRoute } from "./routes.js";
 // 평소에는 돋보기 버튼만 보이고(그 자리에 교통 위젯), 누르거나 "/" 를 누르면 검색칸이 펼쳐지고 교통 위젯은 잠깐 숨는다.
 // 기능을 고르거나 Esc·바깥 클릭으로 닫으면 다시 접힌다(2026-10-28 사용자 요청). 좁은 화면에서는 헤더 위로 펼쳐진다.
 
-const items = [
+// 관리자 전용 메뉴가 로그인 뒤 바뀌므로 찾을 때마다 만든다.
+const featureItems = () => [
   { id: homeRoute.id, label: homeRoute.label, category: "", hue: 40, glyph: homeRoute.glyph },
   ...categories.flatMap((category) =>
     category.routes.map((route) => ({
@@ -28,6 +29,7 @@ function normalize(text) {
 
 export function searchFeatures(query) {
   const key = normalize(query);
+  const items = featureItems();
   if (!key) return items;
   return items.filter((item) => normalize(`${item.label}${item.category}`).includes(key));
 }

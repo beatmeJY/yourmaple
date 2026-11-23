@@ -421,7 +421,7 @@ export async function render(root) {
           ${faceHtml(row)}
           <span class="character-copy">
             <span class="character-title"><strong class="character-name">${escapeHtml(row.name)}</strong><span class="character-level">Lv.${escapeHtml(formatCount(row.level))}</span></span>
-            <span class="character-job">${jobText}${row.quests_hidden && !isHiddenRoute("quests") ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
+            <span class="character-job">${jobText}${row.quests_hidden && !isHiddenRoute("my-quests") ? `<span class="tag">퀘스트 제외</span>` : ""}</span>
           </span>
         </button>
         ${expBar(row)}
@@ -650,7 +650,7 @@ export async function render(root) {
     for (const field of form.querySelectorAll("[data-progress-field]")) field.hidden = !progressReady;
     syncFaceField();
     // 퀘스트 화면을 숨긴 동안(routes.js dev)은 퀘스트 관련 칸·배지도 숨긴다.
-    questsHiddenFields.hidden = !questsHiddenReady || isHiddenRoute("quests");
+    questsHiddenFields.hidden = !questsHiddenReady || isHiddenRoute("my-quests");
     accounts = sortByName(accountResult.data ?? []);
     jobs = jobResult.data ?? [];
     rows = characters.data ?? [];

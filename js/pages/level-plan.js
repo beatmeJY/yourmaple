@@ -183,7 +183,7 @@ export async function render(root) {
             </div>
             <p class="lp-note" data-plan-note></p>
           </section>
-          <section class="lp-panel lp-quests"${isHiddenRoute("quests") ? " hidden" : ""}>
+          <section class="lp-panel lp-quests"${isHiddenRoute("my-quests") ? " hidden" : ""}>
             <h2>퀘스트로 채우면</h2>
             <div data-quest-fill><p class="lp-muted">불러오는 중입니다.</p></div>
           </section>

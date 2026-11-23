@@ -15,6 +15,7 @@ function value(v, field) {
 // 수집 경로는 화면에 보여주지 않습니다.
 Object.assign(labels, { mp:"MP",physical_attack:"물리 공격력",magic_attack:"마법 공격력",physical_defense:"물리 방어력",magic_defense:"마법 방어력",movement_speed:"이동속도",knockback_damage:"넉백 기준 피해량",meso_value:"메소",accuracy_reference_level:"명중 기준 레벨", street_name:"지역" });
 labels.level_up_count="레벨업 가능 횟수";
+Object.assign(labels, { min_level:"최소 레벨", max_level:"최대 레벨", reward_exp:"보상 경험치", reward_meso:"보상 메소", reward_fame:"보상 인기도" });
 const hiddenFields = new Set(["source_url","source","source_hash","response_sha256"]);
 function fields(changes) {
   const result = [];
@@ -34,7 +35,7 @@ export function changeCards(rows) {
   return rows.length ? rows.map(r=>`<article class="catalog-change ym-glass"><div class="catalog-change-head"><strong>${escapeHtml(r.entity_name)}</strong><span class="ym-chip">${({INSERT:"추가",UPDATE:"수정",DELETE:"삭제"})[r.operation] ?? "변경"}</span><time>${escapeHtml(new Date(r.changed_at).toLocaleString("ko-KR"))}</time></div>${r.release_label ? `<p class="hint">${escapeHtml(r.release_label)}</p>` : ""}<dl>${fields(r.changes).map(([k,v])=>`<div><dt>${escapeHtml(labels[k] ?? k)}</dt><dd><del>${escapeHtml(value(v.before,k))}</del><span aria-hidden="true"> → </span><strong>${escapeHtml(value(v.after,k))}</strong></dd></div>`).join("")}</dl></article>`).join("") : `<p class="empty">이력 기록을 시작한 뒤 변경된 정보가 아직 없습니다.</p>`;
 }
 export async function mountEntityHistory(slot, id, entityType) {
-  if (!["item", "monster", "map"].includes(entityType)) throw new Error("도감 이력 종류를 지정해주세요.");
+  if (!["item", "monster", "map", "quest"].includes(entityType)) throw new Error("도감 이력 종류를 지정해주세요.");
   let page = 0, loadId = 0;
   slot.innerHTML = `<div data-history-list aria-live="polite"></div><nav class="catalog-pager" data-history-nav aria-label="이 개체의 변경 이력 페이지"><button type="button" data-history-prev>이전</button><span data-history-page></span><button type="button" data-history-next>다음</button></nav>`;
   async function load() {

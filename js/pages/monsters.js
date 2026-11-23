@@ -17,6 +17,7 @@ import { openMonsterDelete } from "../monster-delete.js";
 import { loadMainCharacter, mainCharacterId } from "../profile.js";
 import { renderRecords } from "../record-page.js";
 import { monsterSlugFromPath } from "../route-url.js";
+import { isHiddenRoute } from "../routes.js";
 
 const columns =
   "id, name, level, hp, exp, required_accuracy, hp_per_exp, accuracy_per_level, weak_elements, resist_elements, updated_at, image_url";
@@ -222,8 +223,8 @@ export function render(root) {
       facts.innerHTML = monsterCombatFacts(row);
       paintAccuracy();
     });
-    // 나오는 맵(sql/076). 맵 정보가 아직 없으면(SQL 실행 전·연결 없음) 칸을 숨긴다.
-    void catalogRpc("catalog_monster_maps", { p_monster_id: row.id }).then(result => {
+    // 나오는 맵(sql/076). 맵 정보가 아직 없으면(SQL 실행 전·연결 없음)·맵 메뉴가 관리자 전용일 때 관리자가 아니면 칸을 숨긴다.
+    if (!isHiddenRoute("maps")) void catalogRpc("catalog_monster_maps", { p_monster_id: row.id }).then(result => {
       if (request !== detailLoadId || !root.isConnected || selectedId !== row.id) return;
       const section = box.querySelector("[data-monster-maps]");
       const maps = Array.isArray(result.data) ? result.data : [];

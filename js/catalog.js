@@ -2,6 +2,7 @@ import { getSupabase } from "./supabase-client.js";
 import { translateDbError } from "./db-error.js";
 
 export function catalogError(error) {
+  if (/catalog_(search_quests|quest_detail|quest_edit_save|quests)/i.test(`${error?.message} ${error?.details}`) && /schema cache|could not find|does not exist/i.test(`${error?.message} ${error?.details}`)) return "퀘스트 정보를 준비하고 있어요. 운영자가 sql/077을 실행하면 보여요.";
   if (/catalog_(search_maps|map_detail|monster_maps|map_edit_save|maps)/i.test(`${error?.message} ${error?.details}`) && /schema cache|could not find|does not exist/i.test(`${error?.message} ${error?.details}`)) return "맵 정보를 준비하고 있어요. 운영자가 sql/076을 실행하면 보여요.";
   if (/catalog_monster_detail/i.test(`${error?.message} ${error?.details}`) && /schema cache|could not find|does not exist/i.test(`${error?.message} ${error?.details}`)) return "상세 전투 정보는 SQL052 적용 후 표시됩니다.";
   if (/catalog_search_|catalog_item_detail|catalog_changes/i.test(`${error?.message} ${error?.details}`) && /schema cache|could not find|does not exist/i.test(`${error?.message} ${error?.details}`)) return "도감 검색·변경 이력을 준비 중입니다. 운영자가 SQL047을 실행해야 합니다.";

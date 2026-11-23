@@ -7,6 +7,12 @@ const monsterPath = /^\/monsters\/([0-9A-Za-z-]+)\/?$/;
 const itemPath = /^\/items\/([0-9A-Za-z-]+)\/?$/;
 // 맵 하나를 고른 주소 /maps/<맵 번호>/ 도 맵 정보 화면이다(2026-11-23).
 const mapPath = /^\/maps\/([0-9A-Za-z-]+)\/?$/;
+// 퀘스트 하나를 고른 주소 /quests/<퀘스트 번호>/ 도 퀘스트 정보 화면이다(2026-11-23).
+const questPath = /^\/quests\/([0-9A-Za-z-]+)\/?$/;
+
+export function questSlugFromPath(pathname) {
+  return pathname.match(questPath)?.[1] ?? "";
+}
 
 export function mapSlugFromPath(pathname) {
   return pathname.match(mapPath)?.[1] ?? "";
@@ -28,6 +34,7 @@ export function routeFromPath(pathname) {
   if (monsterPath.test(pathname)) return "monsters";
   if (itemPath.test(pathname)) return "item-catalog";
   if (mapPath.test(pathname)) return "maps";
+  if (questPath.test(pathname)) return "quests";
   const path = pathname.replace(/\/+$/, "") + "/";
   return ids[path] ?? path.slice(1, -1);
 }

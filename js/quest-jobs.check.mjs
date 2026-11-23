@@ -1,0 +1,23 @@
+import assert from "node:assert/strict";
+import { questJobGroups, questJobName, questJobText } from "./quest-jobs.js";
+
+assert.equal(questJobName(0), "초보자");
+assert.equal(questJobName(112), "전사");
+assert.equal(questJobName(434), "듀얼블레이드");
+assert.equal(questJobName(422), "도적");
+assert.equal(questJobName(532), "캐논슈터");
+assert.equal(questJobName(512), "해적");
+assert.equal(questJobName(1000), "노블레스");
+assert.equal(questJobName(1312), "윈드브레이커");
+assert.equal(questJobName(2112), "아란");
+assert.equal(questJobName(3212), "배틀메이지");
+assert.equal(questJobName(99999), "직업 99999");
+assert.equal(questJobName("x"), "");
+assert.deepEqual(questJobGroups(null), []);
+assert.deepEqual(questJobGroups([300, 310, 311, 312, 320]), ["궁수"]);
+assert.deepEqual(questJobGroups([100, 110, 200, 300, 400, 500, 1000]), ["모험가", "노블레스"]);
+assert.deepEqual(questJobGroups([1100, 1200, 1300, 1400, 1500, 3200]), ["시그너스 기사단", "배틀메이지"]);
+assert.deepEqual(questJobGroups([3200, 100, 200]), ["배틀메이지", "전사", "마법사"]);
+assert.equal(questJobText([]), "");
+assert.equal(questJobText([3200, 3300, 3500, 3700, 3100], 3), "배틀메이지·와일드헌터·메카닉 외 2");
+console.log("quest-jobs check 통과");
