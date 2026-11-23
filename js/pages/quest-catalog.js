@@ -12,6 +12,8 @@ import { questJobGroups, questJobText } from "../quest-jobs.js";
 import { getSupabase } from "../supabase-client.js";
 import { notify } from "../toast.js";
 import { sfx } from "../effects.js";
+import { openQuestItemsEditor } from "../quest-items-editor.js";
+import { openQuestDelete } from "../quest-delete.js";
 
 const API = "https://maplestory.io/api";
 const safeVersion = v => /^[a-z]{3}\/\d{1,4}$/.test(String(v ?? "").toLowerCase()) ? String(v).toLowerCase() : "";
@@ -19,7 +21,7 @@ const questHref = q => `/quests/${encodeURIComponent(String(q.source_id))}/`;
 const levelText = q => q.min_level == null && q.max_level == null ? "레벨 제한 없음"
   : q.max_level == null ? `Lv.${formatCount(q.min_level)}~` : q.min_level == null ? `~Lv.${formatCount(q.max_level)}`
   : q.min_level === q.max_level ? `Lv.${formatCount(q.min_level)}` : `Lv.${formatCount(q.min_level)}~${formatCount(q.max_level)}`;
-const METHOD = { fixed: ["모두 받아요", "보상 아이템을 모두 받아요."], random: ["하나를 무작위로", "아래 중 하나를 무작위로 받아요."], select: ["하나를 골라요", "아래 중 하나를 골라서 받아요."] };
+const METHOD = { fixed: ["모두 받아요", "보상 아이템을 모두 받아요."], random: ["하나를 무작위로", "아래 중 하나를 무작위로 받아요."], select: ["하나를 골라요", "아래 중 하나를 골라서 받아요."], always: ["늘 받아요", "아래 보상은 늘 받아요."] };
 
 // 그림: 정해진 버전 → 옛 버전(gms/83) → 최신 한국판(kms/284) 순서로 시도한다(맵 정보와 같은 방식).
 function apiImage(kind, id, version, className, size) {
@@ -146,7 +148,7 @@ async function renderDetail(root, slug, { push = false } = {}) {
       <section class="qc-panel ym-glass qc-goal"><h2><span class="qc-panel-icon" aria-hidden="true">!</span>완료 조건</h2>${conditions.length ? `<ul class="qc-entries">${conditions.map((x, i) => entryRow(x, i, true)).join("")}</ul>` : `<p class="qc-empty-note">모을 아이템이나 잡을 몬스터가 없어요. NPC에게 말을 걸거나 정해진 일을 하면 끝나요.</p>`}</section>
       <section class="qc-panel ym-glass qc-reward"><h2><span class="qc-panel-icon is-gold" aria-hidden="true">★</span>보상</h2>
         <div class="qc-reward-stats">${rewardStat("경험치", q.reward_exp, "is-exp")}${rewardStat("메소", q.reward_meso, "is-meso")}${rewardStat("인기도", q.reward_fame, "is-fame")}</div>
-        ${rewards.length ? `<p class="qc-method"><span class="ym-badge is-gold">${escapeHtml(METHOD[q.reward_method]?.[0] ?? "보상 아이템")}</span> ${escapeHtml(METHOD[q.reward_method]?.[1] ?? "")}</p><ul class="qc-entries is-reward${q.reward_method === "fixed" ? "" : " is-choice"}">${rewards.map((x, i) => entryRow(x, i, false)).join("")}</ul>` : `<p class="qc-empty-note">보상 아이템은 없어요.</p>`}
+        ${rewards.length ? rewardGroups(q.reward_method, rewards) : `<p class="qc-empty-note">보상 아이템은 없어요.</p>`}
       </section>
     </div>
     ${storyPanel(q)}
@@ -156,9 +158,21 @@ async function renderDetail(root, slug, { push = false } = {}) {
   actions.querySelector("[data-quest-refresh]").addEventListener("click", () => { clearCatalogCache(); void renderDetail(root, String(q.source_id)); });
   void canReviewCatalog().then(allowed => {
     if (!allowed || !actions.isConnected || !slot.isConnected) return;
-    actions.insertAdjacentHTML("beforeend", `<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-edit-quest>퀘스트 수정</button>`);
+    actions.insertAdjacentHTML("beforeend", `<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-edit-quest>퀘스트 수정</button><button type="button" class="catalog-pill-button" data-edit-quest-items>조건·보상 수정</button><button type="button" class="catalog-pill-button qc-delete-button" data-delete-quest>퀘스트 삭제</button><a class="catalog-pill-button" href="/quest-trash/">삭제한 퀘스트</a>`);
     mountHistoryDialog(actions.querySelector("[data-open-history]"), q.id, "quest", q.name);
-    actions.querySelector("[data-edit-quest]").addEventListener("click", () => openQuestEditor(root, q, () => { clearCatalogCache(); void renderDetail(root, String(q.source_id)); }));
+    const reload = () => { clearCatalogCache(); void renderDetail(root, String(q.source_id)); };
+    actions.querySelector("[data-edit-quest]").addEventListener("click", () => openQuestEditor(root, q, reload));
+    actions.querySelector("[data-edit-quest-items]").addEventListener("click", () => openQuestItemsEditor(root, q, conditions, rewards, saved => {
+      sfx("check");
+      notify(`조건 ${saved.conditions}개·보상 ${saved.rewards}개로 고쳐 공개했어요.`, "success");
+      reload();
+    }));
+    actions.querySelector("[data-delete-quest]").addEventListener("click", () => openQuestDelete(root, q, () => {
+      notify(`${q.name}을(를) 퀘스트 정보에서 숨겼어요.`, "success", { label: "삭제한 퀘스트 보기", onClick: () => { location.href = "/quest-trash/"; } });
+      // 지운 퀘스트 주소는 뒤로가기에 남기지 않고 목록으로 바꾼다(라우터가 탭 제목·메뉴도 다시 맞춘다).
+      history.replaceState(null, "", "/quests/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }));
   });
 }
 
@@ -172,11 +186,26 @@ function rewardStat(label, value, tone) {
   return `<div class="qc-stat ${tone}"><span>${label}</span><strong>${Number(value) > 0 && tone === "is-fame" ? "+" : ""}${escapeHtml(formatCount(value))}</strong></div>`;
 }
 
+// 보상 묶음: 게임 원본 대조로 항목마다 r(그중 하나)이 붙어 있으면 늘 받는 것과 그중 하나를 나눠 보인다.
+// r이 하나도 없으면(원본 대조 전 자료) 예전처럼 퀘스트의 보상 방식 하나로 보인다.
+function rewardGroups(method, rewards) {
+  const group = (m, list, start) => `<p class="qc-method"><span class="ym-badge is-gold">${escapeHtml(METHOD[m]?.[0] ?? "보상 아이템")}</span> ${escapeHtml(METHOD[m]?.[1] ?? "")}</p><ul class="qc-entries is-reward${m === "fixed" || m === "always" ? "" : " is-choice"}">${list.map((x, i) => entryRow(x, start + i, false)).join("")}</ul>`;
+  const note = rewards.some(x => x.j) ? `<p class="qc-reward-note">직업(또는 성별)에 맞는 보상만 받아요.</p>` : "";
+  return note + rewardList(method, rewards, group);
+}
+
+function rewardList(method, rewards, group) {
+  const pick = rewards.filter(x => x.r);
+  if (!pick.length || pick.length === rewards.length) return group(method, rewards, 0);
+  const always = rewards.filter(x => !x.r);
+  return group("always", always, 0) + group(method === "select" ? "select" : "random", pick, always.length);
+}
+
 function entryRow(x, index, goal) {
   const part = entryParts(x, 44);
   const name = part.href ? `<a href="${part.href}">${escapeHtml(part.name)}</a>` : `<span>${escapeHtml(part.name)}</span>`;
   const verb = goal ? (part.kind === "monster" ? "물리치기" : "모으기") : "";
-  return `<li class="qc-entry is-${part.kind}" style="--i:${Math.min(index, 16)}"><span class="qc-entry-art">${part.art || initial(part.name)}</span><span class="qc-entry-copy"><b>${name}</b><small>${goal ? `${part.kind === "monster" ? "몬스터" : "아이템"} ${verb}` : part.kind === "monster" ? "몬스터" : "아이템"}${part.level != null ? ` · Lv.${escapeHtml(formatCount(part.level))}` : ""}${part.href ? "" : " · 도감 미등록"}</small></span><span class="qc-entry-count" aria-label="${formatCount(x.c ?? 1)}${part.kind === "monster" ? "마리" : "개"}">×${escapeHtml(formatCount(x.c ?? 1))}</span></li>`;
+  return `<li class="qc-entry is-${part.kind}" style="--i:${Math.min(index, 16)}"><span class="qc-entry-art">${part.art || initial(part.name)}</span><span class="qc-entry-copy"><b>${name}</b><small>${goal ? `${part.kind === "monster" ? "몬스터" : "아이템"} ${verb}` : part.kind === "monster" ? "몬스터" : "아이템"}${part.level != null ? ` · Lv.${escapeHtml(formatCount(part.level))}` : ""}${!goal && x.j ? " · 맞는 직업만" : ""}${part.href ? "" : " · 도감 미등록"}</small></span><span class="qc-entry-count" aria-label="${formatCount(x.c ?? 1)}${part.kind === "monster" ? "마리" : "개"}">×${escapeHtml(formatCount(x.c ?? 1))}</span></li>`;
 }
 
 function storyPanel(q) {

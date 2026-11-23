@@ -42,7 +42,7 @@ async function showPage() {
   // renderRoute 가 #main 을 새 요소로 바꾸므로(이전 화면의 처리기 정리) 화면 이름은 그 안에서 적는다.
   const activeId = await renderRoute(main);
   if (!activeId) return;
-  const label = routes.find((route) => route.id === activeId)?.label ?? ({ transport: "배 시간표·헬리오스탑", "catalog-review": "비공개 검토", "monster-trash": "삭제한 몬스터" })[activeId];
+  const label = routes.find((route) => route.id === activeId)?.label ?? ({ transport: "배 시간표·헬리오스탑", "catalog-review": "비공개 검토", "monster-trash": "삭제한 몬스터", "quest-trash": "삭제한 퀘스트" })[activeId];
   // 화면이 정한 제목(예: 고른 몬스터)이 있으면 그것을 쓴다.
   document.title = document.querySelector("#main")?.dataset.docTitle || (activeId === "dashboard" ? "Your Maple 유얼메이플 | 메랜·메이플랜드 계산기·도감·시간표"
     : `${activeId === "dojo" ? "무릉도장 계산기" : label ?? "Your Maple"} | Your Maple`);

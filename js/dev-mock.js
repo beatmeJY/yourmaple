@@ -480,7 +480,7 @@ function mockQuests() {
         reward_method: "select", reward_items: [{ i: "1302000", c: 1, n: "검", v: "gms/62" }, { i: "1382000", c: 1, n: "나무 스태프", v: "gms/62" }, { i: "1452002", c: 1, n: "워 보우", v: "gms/62" }],
         prerequisites: [9000001], next_quests: [9000003] },
       { source_id: 9000003, name: "연습용 마지막 부탁", min_level: 30, max_level: 50, reward_exp: 12000, reward_meso: 30000, start_npc: npc(1012101, "마야"), region: "헤네시스",
-        reward_method: "random", reward_items: [{ i: "2040001", c: 1, n: "투구 방어력 주문서 60%", v: "gms/62" }, { i: "2040801", c: 1, n: "장갑 민첩 주문서 60%", v: "gms/62" }], prerequisites: [9000002] },
+        reward_method: "random", reward_items: [{ i: "2000000", c: 30, n: "빨간 포션", v: "gms/62" }, { i: "2040001", c: 1, n: "투구 방어력 주문서 60%", v: "gms/62", r: 1 }, { i: "2040801", c: 1, n: "장갑 민첩 주문서 60%", v: "gms/62", r: 1, j: 1 }], prerequisites: [9000002] },
       { source_id: 9000004, name: "연습용 기사단 수련", min_level: 10, reward_exp: 500, start_npc: npc(1101000, "키넌"), region: "에레브", jobs: [1000, 1100, 1200, 1300, 1400, 1500],
         conditions: [{ m: "9999990", c: 5, n: "그림 없는 시험 몬스터" }] },
       { source_id: 9000005, name: "연습용 레벨 없는 퀘스트", start_npc: npc(9010000, "메이플 운영자"), reward_meso: 100 },
@@ -623,7 +623,7 @@ const RPCS = {
   },
   catalog_search_quests({p_query="",p_region="",p_level=null,p_page=0}={}) {
     const norm=v=>String(v??"").replace(/\s+/g,"").toLowerCase(), q=norm(p_query), lv=Number(p_level)>=1?Number(p_level):null;
-    const matched=mockQuests().filter(t=>(!q||String(t.source_id)===p_query.trim()||norm(`${t.name}${t.start_npc?.n??""}${t.end_npc?.n??""}${t.region??""}`).includes(q)||[...t.conditions,...t.reward_items].some(x=>norm(x.n).includes(q)))
+    const matched=mockQuests().filter(t=>!t.deleted_at).filter(t=>(!q||String(t.source_id)===p_query.trim()||norm(`${t.name}${t.start_npc?.n??""}${t.end_npc?.n??""}${t.region??""}`).includes(q)||[...t.conditions,...t.reward_items].some(x=>norm(x.n).includes(q)))
       &&(lv==null||((t.min_level==null||t.min_level<=lv)&&(t.max_level==null||t.max_level>=lv))));
     const filtered=matched.filter(t=>!p_region||(t.region??"")===(p_region==="-"?"":p_region)).sort((a,b)=>(a.min_level??999)-(b.min_level??999)||a.name.localeCompare(b.name));
     const regions={};for(const t of matched)regions[t.region??""]=(regions[t.region??""]??0)+1;
@@ -631,7 +631,7 @@ const RPCS = {
       condition_count:t.conditions.length,reward_count:t.reward_items.length,rewards:t.reward_items.slice(0,4),chain:t.prerequisites.length+t.next_quests.length>0})),total:filtered.length,regions,revision:1};
   },
   catalog_quest_detail({p_id=null,p_source_id=null}={}) {
-    const all=mockQuests(), t=all.find(x=>x.id===p_id||(p_source_id!=null&&x.source_id===Number(p_source_id)));
+    const all=mockQuests().filter(x=>!x.deleted_at), t=all.find(x=>x.id===p_id||(p_source_id!=null&&x.source_id===Number(p_source_id)));
     if(!t)return null;
     const mons=rowsOf("catalog_monsters").filter(m=>!m.deleted_at), items=rowsOf("catalog_items"), maps=mockMaps();
     const link=x=>{const out={...x};const it=x.i&&items.find(r=>r.source_id===x.i);if(it)out.item={id:it.id,name:it.name,image_url:it.image_url,source_id:it.source_id};
@@ -652,6 +652,34 @@ const RPCS = {
     if(Object.keys(changes).length){const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"quest",entity_id:p_id,entity_name:name,operation:"UPDATE",changes,release_label:"운영자 퀘스트 수정",changed_at:iso()});
       Object.assign(t,next,{source:"operator",updated_at:iso()});save();}
     return RPCS.catalog_quest_detail({p_id});
+  },
+  catalog_quest_items_save({p_id,p_version,p_conditions,p_rewards,p_pick="random"}) {
+    assertMockReviewer();const t=mockQuests().find(x=>x.id===p_id);if(!t)throw new Error("퀘스트를 찾을 수 없습니다");
+    if(String(t.updated_at)!==String(p_version))throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
+    if(!Array.isArray(p_conditions)||!Array.isArray(p_rewards)||p_conditions.length>100||p_rewards.length>100)throw Object.assign(new Error("조건·보상 목록 형식이 올바르지 않습니다"),{code:"22023"});
+    const clean=kind=>x=>{const id=x.i??x.m;if(kind==="r"&&x.m)throw Object.assign(new Error("보상에는 아이템만 넣을 수 있습니다"),{code:"22023"});
+      if((x.i==null)===(x.m==null)||!/^[1-9]\d{0,9}$/.test(String(id)))throw Object.assign(new Error("아이템·몬스터 번호가 올바르지 않습니다"),{code:"22023"});
+      if(!Number.isInteger(x.c??1)||(x.c??1)<1||(x.c??1)>1e9)throw Object.assign(new Error("개수는 1~1,000,000,000 사이 정수로 적어 주세요"),{code:"22023"});
+      const o=x.m?{m:String(x.m)}:{i:String(x.i)};o.c=x.c??1;if(x.n)o.n=x.n;if(x.v)o.v=x.v;if(kind==="r"&&x.r)o.r=1;if(kind==="r"&&x.j)o.j=1;return o;};
+    const conditions=p_conditions.map(clean("c")),reward_items=p_rewards.map(clean("r"));
+    const reward_method=!reward_items.length?null:reward_items.some(x=>x.r)?(p_pick==="select"?"select":"random"):"fixed";
+    const next={conditions,reward_items,reward_method},changes={};for(const [k,v] of Object.entries(next))if(JSON.stringify(t[k]??null)!==JSON.stringify(v))changes[k]={before:t[k]??null,after:v};
+    if(Object.keys(changes).length){const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"quest",entity_id:p_id,entity_name:t.name,operation:"UPDATE",changes,release_label:"운영자 퀘스트 조건·보상 수정",changed_at:iso()});
+      Object.assign(t,next,{source:"operator",updated_at:iso()});save();}
+    return RPCS.catalog_quest_detail({p_id});
+  },
+  catalog_quest_set_deleted({p_id,p_deleted,p_reason=null}) {
+    assertMockReviewer();const t=mockQuests().find(x=>x.id===p_id);if(!t)throw new Error("퀘스트를 찾을 수 없습니다");
+    if(!!t.deleted_at!==!!p_deleted){const reason=String(p_reason??"").trim()||null;
+      Object.assign(t,{deleted_at:p_deleted?iso():null,deleted_reason:p_deleted?reason:null});
+      const log=rowsOf("catalog_changes");log.push({id:(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1,entity_type:"quest",entity_id:p_id,entity_name:t.name,operation:"UPDATE",
+        changes:{deleted:{before:!p_deleted,after:!!p_deleted},...(p_deleted&&reason?{deleted_reason:{before:null,after:reason}}:{})},release_label:p_deleted?"운영자 퀘스트 삭제":"운영자 퀘스트 복구",changed_at:iso()});save();}
+    return {id:t.id,deleted_at:t.deleted_at??null,deleted_reason:t.deleted_reason??null};
+  },
+  catalog_quest_deleted_list() {
+    assertMockReviewer();
+    return mockQuests().filter(t=>t.deleted_at).sort((a,b)=>String(b.deleted_at).localeCompare(String(a.deleted_at)))
+      .map(t=>({id:t.id,source_id:t.source_id,name:t.name,min_level:t.min_level,max_level:t.max_level,region:t.region,start_npc:t.start_npc,deleted_at:t.deleted_at,deleted_reason:t.deleted_reason,condition_count:t.conditions.length,reward_count:t.reward_items.length}));
   },
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
   catalog_monster_edit_detail({p_id}) {

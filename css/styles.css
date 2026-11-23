@@ -17600,6 +17600,8 @@ a.qc-npc-map:hover { color: var(--gold); text-decoration: underline; }
 .qc-stat.is-meso strong { color: var(--gold); }
 .qc-stat.is-fame strong { color: var(--violet); }
 .qc-method { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; color: var(--text-soft); font-size: 13px; }
+.qc-reward-note { margin: 0 0 10px; padding: 7px 10px; border-radius: 10px; border: 1px dashed var(--line); color: var(--text-soft); font-size: 12.5px; }
+.qc-entries.is-reward + .qc-method { margin-top: 14px; }
 .qc-story-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .qc-story-steps li { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: start; animation: ym-fade-up .35s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
 .qc-story-label { padding: 4px 0; border-radius: 10px; background: color-mix(in srgb, hsl(85 60% 50%) 16%, transparent); color: hsl(85 65% 72%); font-size: 12px; font-weight: 800; text-align: center; }
@@ -17636,3 +17638,26 @@ a.qc-chain-link:hover, a.qc-chain-link:focus-visible { transform: translateY(-2p
   .qc-card, .qc-entry, .qc-chain-link { transition: none; }
   .qc-card:hover, .qc-entry:hover, a.qc-chain-link:hover { transform: none; }
 }
+
+/* ── 퀘스트 조건·보상 수정창·삭제(도감 관리자, sql/079) ── */
+.qie-dialog { width: min(680px, calc(100vw - 24px)); }
+.qie-section { display: grid; gap: 8px; margin-bottom: 18px; }
+.qie-section h3 { margin: 0; }
+.qie-find { display: grid; gap: 6px; }
+.qie-kind { display: flex; flex-wrap: wrap; gap: 6px; }
+.qie-name { align-items: center; }
+.qie-flags { display: flex; flex-wrap: wrap; gap: 4px; flex-basis: 100%; margin-top: 2px; }
+.catalog-edit-dialog label.qie-flag { position: relative; display: inline-flex; align-items: center; gap: 0; margin: 0; cursor: pointer; }
+.qie-flag input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.qie-flag span { padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 700; transition: background .15s, color .15s, border-color .15s, transform .2s var(--spring); }
+.qie-flag input:checked + span { border-color: color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 18%, transparent); color: var(--gold); transform: translateY(-1px); }
+.qie-flag input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qie-count i { color: var(--muted); font-style: normal; font-weight: 800; }
+.qie-pick { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); border-radius: 12px; animation: ym-fade-up .2s ease both; }
+.qie-pick legend { padding: 0 4px; color: var(--gold); font-size: 12.5px; font-weight: 800; }
+.catalog-edit-dialog .qie-pick label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.catalog-edit-dialog .qie-pick input { width: auto; min-width: 0; min-height: 0; height: auto; margin: 0; padding: 0; accent-color: var(--gold); }
+.qie-pick[hidden] { display: none; }
+.qc-delete-button { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.qc-delete-button:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+@media (prefers-reduced-motion: reduce) { .qie-pick { animation: none; } .qie-flag span { transition: none; } .qie-flag input:checked + span { transform: none; } }

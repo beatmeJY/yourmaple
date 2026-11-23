@@ -4,7 +4,11 @@ import { itemOptionFields } from "./item-options.js";
 
 const labels = Object.fromEntries(itemOptionFields.map(f => [f.key, f.label]));
 Object.assign(labels, {name:"이름",category:"분류",middle_category:"중분류",subcategory:"상세 분류",required_level:"착용 레벨",level:"레벨",exp:"경험치",rate_percent:"드랍 확률(%)",rate_text:"확률 표기",item_id:"드랍 아이템",source_entry:"드랍 항목",base_options:"기본 옵션",requirements:"착용 조건",option_ranges:"옵션 범위",extra_effects:"추가 효과",shop_sell_price:"상점 판매가",attack_speed_label:"공격속도",image_url:"이미지",description:"설명",effect_description:"효과",required_accuracy:"필요 명중",accuracy_per_level:"레벨별 필요 명중",weak_elements:"약점",resist_elements:"반감",gender_restriction:"성별",stat_key:"능력치",base_value:"기본값",minimum_value:"최솟값",maximum_value:"최댓값",requirement_key:"착용 조건",required_value:"필요 수치",job_name:"직업",attribute_name:"항목",value_text:"내용"});
+const questEntry = x => `${x.n ?? (x.m ? `몬스터 ${x.m}` : `아이템 ${x.i}`)} ×${x.c ?? 1}${x.r ? "(그중 하나)" : ""}${x.j ? "(맞는 직업만)" : ""}`;
 function value(v, field) {
+  if (field === "reward_method") return ({ fixed: "모두 받음", random: "하나 무작위", select: "하나 고름" })[v] ?? "없음";
+  if (field === "deleted") return v ? "삭제함" : "보임";
+  if (Array.isArray(v) && ["conditions", "reward_items"].includes(field)) return v.length ? v.map(questEntry).join(" · ") : "없음";
   if (Array.isArray(v)) return v.join(" · ");
   if (["stat_key","requirement_key"].includes(field) && labels[v]) return labels[v];
   if (v == null) return "미제공";
@@ -15,7 +19,7 @@ function value(v, field) {
 // 수집 경로는 화면에 보여주지 않습니다.
 Object.assign(labels, { mp:"MP",physical_attack:"물리 공격력",magic_attack:"마법 공격력",physical_defense:"물리 방어력",magic_defense:"마법 방어력",movement_speed:"이동속도",knockback_damage:"넉백 기준 피해량",meso_value:"메소",accuracy_reference_level:"명중 기준 레벨", street_name:"지역" });
 labels.level_up_count="레벨업 가능 횟수";
-Object.assign(labels, { min_level:"최소 레벨", max_level:"최대 레벨", reward_exp:"보상 경험치", reward_meso:"보상 메소", reward_fame:"보상 인기도" });
+Object.assign(labels, { min_level:"최소 레벨", max_level:"최대 레벨", reward_exp:"보상 경험치", reward_meso:"보상 메소", reward_fame:"보상 인기도", conditions:"완료 조건", reward_items:"보상 아이템", reward_method:"보상 방식", deleted:"공개 상태", deleted_reason:"삭제 이유" });
 const hiddenFields = new Set(["source_url","source","source_hash","response_sha256"]);
 function fields(changes) {
   const result = [];

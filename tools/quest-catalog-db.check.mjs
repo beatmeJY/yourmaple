@@ -30,7 +30,7 @@ await db.exec(sql);
 await db.exec(sql); // 다시 실행해도 안전
 
 // 비공개 도구가 만드는 등록 SQL 과 같은 모양(관리자가 고친 칸은 그대로)
-const editable = ["name", "min_level", "max_level", "reward_exp", "reward_meso", "reward_fame"];
+const editable = ["name", "min_level", "max_level", "reward_exp", "reward_meso", "reward_fame", "conditions", "reward_method", "reward_items"];
 const cols = ["source_id", "name", "min_level", "max_level", "jobs", "reward_exp", "reward_meso", "reward_fame", "start_npc", "start_map", "region", "conditions", "reward_method", "reward_items", "prerequisites", "next_quests"];
 const lit = v => v === null ? "null" : typeof v === "number" ? String(v) : typeof v === "object" ? `'${JSON.stringify(v).replaceAll("'", "''")}'::jsonb` : `'${String(v).replaceAll("'", "''")}'`;
 const arr = v => `'{${v.join(",")}}'::integer[]`;
@@ -126,4 +126,85 @@ if (fs.existsSync(real)) {
   assert.ok(n1 > 1000, `실제 등록 개수 ${n1}`);
   console.log(`  실제 등록 SQL 두 번 적용: 표에 퀘스트 ${n1}개(검사용 4개 포함)`);
 }
+// 079: 퀘스트 삭제(숨김·되살리기)·조건/보상 수정
+await db.exec("reset role");
+const sql079 = fs.readFileSync("sql/079_catalog_quest_items_delete.sql", "utf8");
+await db.exec(sql079);
+await db.exec(sql079); // 다시 실행해도 안전
+const id1001 = (await db.query("select id from catalog_quests where source_id=1001")).rows[0].id;
+const setDeleted = (...a) => db.query("select public.catalog_quest_set_deleted($1,$2,$3) r", a);
+await db.exec("set role anon");
+await assert.rejects(setDeleted(id1001, true, null), /permission denied/);
+await db.exec("reset role; set role authenticated; set test.reviewer=''");
+await assert.rejects(setDeleted(id1001, true, null), /권한/);
+await assert.rejects(db.query("select public.catalog_quest_deleted_list()"), /권한/);
+await db.exec("set test.reviewer='1'");
+const del = (await setDeleted(id1001, true, " 메이플랜드에 없음 ")).rows[0].r;
+assert.ok(del.deleted_at && del.deleted_reason === "메이플랜드에 없음");
+await setDeleted(id1001, true, "두 번째"); // 이미 지운 것은 그대로(이력 추가 없음)
+const trash = (await db.query("select public.catalog_quest_deleted_list() r")).rows[0].r;
+assert.deepEqual(trash.map(x => [x.source_id, x.deleted_reason]), [[1001, "메이플랜드에 없음"]]);
+await db.exec("reset role; set role anon");
+assert.equal((await search("", "", null, 0)).total, (await db.query("select count(*)::int n from catalog_quests")).rows[0].n, "anon 개수와 검색 개수 같음");
+assert.ok(!(await search("", "", null, 0)).rows.some(x => x.source_id === 1001), "지운 퀘스트는 목록에서 빠짐");
+assert.equal(await detail(null, 1001), null, "지운 퀘스트 상세 없음");
+assert.deepEqual((await detail(null, 1000)).next_quests, [], "다른 퀘스트의 다음 퀘스트에서도 빠짐");
+await db.exec("reset role");
+await importQuests(quests); // 다시 등록해도 삭제 표시는 그대로
+assert.ok((await db.query("select deleted_at from catalog_quests where source_id=1001")).rows[0].deleted_at);
+await db.exec("set role authenticated; set test.reviewer='1'");
+assert.equal((await setDeleted(id1001, false, "무시")).rows[0].r.deleted_at, null);
+await db.exec("reset role; set role anon");
+assert.equal((await detail(null, 1000)).next_quests[0].source_id, 1001, "되살리면 연결도 돌아옴");
+await db.exec("reset role");
+const delHistory = (await db.query("select changes,release_label from catalog_changes where entity_id=$1 order by id", [id1001])).rows;
+assert.deepEqual(delHistory.map(x => x.release_label), ["운영자 퀘스트 삭제", "운영자 퀘스트 복구"]);
+assert.deepEqual(delHistory[0].changes, { deleted: { before: false, after: true }, deleted_reason: { before: null, after: "메이플랜드에 없음" } });
+
+// 조건·보상 저장
+await db.exec("set role authenticated; set test.reviewer='1'");
+let q2000 = (await detail(null, 2000)).quest;
+const itemsSave = (id, version, conds, rewards, pick) => db.query("select public.catalog_quest_items_save($1,$2,$3,$4,$5) d", [id, version, JSON.stringify(conds), JSON.stringify(rewards), pick]);
+const bad = async (conds, rewards, pattern, pick = "random") => assert.rejects(itemsSave(q2000.id, q2000.version, conds, rewards, pick), pattern);
+await bad([{ i: "1", c: 0 }], [], /개수/);
+await bad([{ i: "1", c: 1.5 }], [], /개수/);
+await bad([{ i: "1", c: "3" }], [], /숫자/);
+await bad([{ i: "1", m: "2", c: 1 }], [], /하나/);
+await bad([{ i: "abc", c: 1 }], [], /번호/);
+await bad([], [{ m: "100100", c: 1 }], /아이템만/);
+await bad([], [{ i: "1", c: 1 }], /방식/, "maybe");
+await bad(Array.from({ length: 101 }, (_, k) => ({ i: String(k + 1), c: 1 })), [], /100개/);
+await assert.rejects(itemsSave(q2000.id, "old", [], [], "random"), /다른 화면/);
+d = (await itemsSave(q2000.id, q2000.version,
+  [{ m: "100100", c: 3, n: "달팽이", junk: 1 }],
+  [{ i: "2000000", c: 5, n: "빨간 포션", r: 1 }, { i: "4000019", c: 1, n: "껍질", r: 1, j: 1 }, { i: "4999999", c: 2, n: "없는 아이템", v: "bad version" }], "select")).rows[0].d;
+assert.equal(d.quest.reward_method, "select");
+assert.equal(d.quest.source, "operator");
+assert.deepEqual(d.quest.conditions, [{ m: "100100", c: 3, n: "달팽이" }], "모르는 칸은 버림");
+assert.deepEqual(d.quest.reward_items, [{ i: "2000000", c: 5, n: "빨간 포션", r: 1 }, { i: "4000019", c: 1, n: "껍질", r: 1, j: 1 }, { i: "4999999", c: 2, n: "없는 아이템" }], "틀린 그림 버전은 버림");
+assert.equal(d.conditions[0].monster.name, "달팽이");
+assert.equal(d.rewards[0].item.name, "빨간 포션");
+// 같은 값으로 다시 저장하면 이력 없음, 그중 하나를 모두 빼면 fixed, 보상이 없으면 null
+// 이력 표는 검사용 표라 소유자 역할로 읽고 다시 관리자로 돌아온다.
+const asOwner = async (query, args) => { await db.exec("reset role"); try { return (await db.query(query, args)).rows; } finally { await db.exec("set role authenticated; set test.reviewer='1'"); } };
+const itemHistory = async () => (await asOwner("select count(*)::int n from catalog_changes where entity_id=$1 and release_label='운영자 퀘스트 조건·보상 수정'", [q2000.id]))[0].n;
+d = (await itemsSave(q2000.id, d.quest.version, d.quest.conditions, d.quest.reward_items, "select")).rows[0].d;
+assert.equal(await itemHistory(), 1);
+d = (await itemsSave(q2000.id, d.quest.version, [], [{ i: "2000000", c: 5 }], "select")).rows[0].d;
+assert.equal(d.quest.reward_method, "fixed");
+d = (await itemsSave(q2000.id, d.quest.version, [], [], "random")).rows[0].d;
+assert.equal(d.quest.reward_method, null);
+assert.equal(await itemHistory(), 3);
+const firstChange = (await asOwner("select changes from catalog_changes where entity_id=$1 and release_label='운영자 퀘스트 조건·보상 수정' order by id limit 1", [q2000.id]))[0].changes;
+assert.deepEqual(Object.keys(firstChange).sort(), ["conditions", "reward_items", "reward_method"]);
+assert.deepEqual(firstChange.reward_method, { before: null, after: "select" });
+// 수집 자료를 다시 등록해도 관리자가 고친 조건·보상은 그대로
+d = (await itemsSave(q2000.id, d.quest.version, [{ i: "4000019", c: 7 }], [{ i: "2000000", c: 9 }], "random")).rows[0].d;
+await db.exec("reset role");
+await importQuests(quests);
+const kept = (await db.query("select conditions,reward_items,reward_method from catalog_quests where source_id=2000")).rows[0];
+assert.deepEqual(kept, { conditions: [{ i: "4000019", c: 7 }], reward_items: [{ i: "2000000", c: 9 }], reward_method: "fixed" });
+await db.exec("set role anon");
+await assert.rejects(itemsSave(q2000.id, d.quest.version, [], [], "random"), /permission denied/);
+await db.exec("reset role");
 console.log("quest-catalog-db check 통과");
