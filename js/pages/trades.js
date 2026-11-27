@@ -80,7 +80,7 @@ export async function render(root) {
         <div data-list></div>
       </section>
       <aside class="trade-side">
-        <form class="editor trade-editor ym-glass" id="trade-form" autocomplete="off">
+        <form class="editor trade-editor ym-glass" id="trade-form" autocomplete="off" novalidate>
           <h2 data-form-title>거래 추가</h2>
           <div class="tr2-picker span-all">
             <label class="field"><span>아이템</span>
@@ -109,7 +109,7 @@ export async function render(root) {
               <label class="field"><span>개당 가격</span><input name="sell_price" inputmode="numeric" placeholder="아직 안 팔렸으면 비움" autocomplete="off" /><small data-selected-value="sell_price" hidden aria-live="polite"></small></label>
               <label class="field"><span>개수</span><input name="sell_qty" inputmode="numeric" placeholder="아직 안 팔렸으면 비움" autocomplete="off" /><small data-selected-value="sell_qty" hidden aria-live="polite"></small></label>
               <button class="secondary-button" type="button" data-save-sell>매도 저장</button>
-              <small>목록에서 선택한 거래에 이번 판매분을 추가합니다.</small>
+              <small>선택한 거래에 판매분을 추가해요. 새 아이템은 판 수량만큼 매수가 0원으로 등록해요. 매수가를 채우기 전 수익은 원가 0원 기준이에요.</small>
             </fieldset>
           </div>
           <div class="button-row span-all">
@@ -494,6 +494,7 @@ export async function render(root) {
       sellQty = qty.value;
     }
     if (sellQty > buyQty) return { error: "판 개수는 산 개수보다 많을 수 없습니다." };
+    if ((sellPrice == null) !== (sellQty === 0)) return { error: "판 가격과 개수를 모두 입력해 주세요." };
     return { sellPrice, sellQty };
   }
 
@@ -567,7 +568,6 @@ export async function render(root) {
       const parsed = readInline(row, inputs);
       if (parsed.error) {
         showStatus(parsed.error, "error");
-        restoreTradeInputs(row);
         return;
       }
       if (sameTrade(row, parsed.value)) {
@@ -821,10 +821,12 @@ export async function render(root) {
   }
 
   function readForm(mode = "all") {
-    if (mode === "sell") {
-      const selected = rows.find((row) => row.id === selectedId);
-      if (!selected) return { error: "매도할 보유 거래를 목록에서 선택해 주세요." };
-      if (tradeName(form.elements.name.value) !== tradeName(selected.name)) return { error: "아이템명이 선택한 거래와 다릅니다. 매도할 거래를 다시 선택해 주세요." };
+    const saleOnly = mode === "sell" || (mode === "all" && !form.dataset.editingId &&
+      !form.elements.buy_price.value.trim() && !form.elements.buy_qty.value.trim() &&
+      Boolean(form.elements.sell_price.value.trim() || form.elements.sell_qty.value.trim()));
+    const selected = rows.find((row) => row.id === selectedId &&
+      tradeName(form.elements.name.value) === tradeName(row.name));
+    if (saleOnly && selected) {
       const descriptor = readTradeItem();
       if (descriptor.error) return descriptor;
       if (tradeItemKey({ name: selected.name, ...descriptor.value }) !== tradeItemKey(selected)) return { error: "선택한 거래와 옵션이 다릅니다. 거래를 다시 선택하거나 수정으로 옵션을 변경해 주세요." };
@@ -835,12 +837,18 @@ export async function render(root) {
       const sellQty = selected.sell_qty + sold.sellQty;
       const revenue = BigInt(selected.sell_price ?? 0) * BigInt(selected.sell_qty) + BigInt(sold.sellPrice) * BigInt(sold.sellQty);
       const sellPrice = Number((revenue + BigInt(sellQty) / 2n) / BigInt(sellQty));
-      return { value: { item_id: selected.item_id ?? null, item_snapshot: selected.item_snapshot ?? {}, item_options: selected.item_options ?? {}, name: selected.name, buy_price: selected.buy_price, buy_qty: selected.buy_qty, sell_price: sellPrice, sell_qty: sellQty } };
+      return { id: selected.id, value: { item_id: selected.item_id ?? null, item_snapshot: selected.item_snapshot ?? {}, item_options: selected.item_options ?? {}, name: selected.name, buy_price: selected.buy_price, buy_qty: selected.buy_qty, sell_price: sellPrice, sell_qty: sellQty } };
     }
     const descriptor = readTradeItem();
     if (descriptor.error) return descriptor;
     const name = form.elements.name.value.trim();
     if (!name) return { error: "아이템명을 입력해 주세요." };
+    if (saleOnly) {
+      const sold = readSellFields(form.elements.sell_price.value.trim(), form.elements.sell_qty.value.trim(), Number.MAX_SAFE_INTEGER);
+      if (sold.error) return sold;
+      if (sold.sellPrice == null || !sold.sellQty) return { error: "이번에 판 가격과 개수를 모두 입력해 주세요." };
+      return { id: "", value: { ...descriptor.value, name, buy_price: 0, buy_qty: sold.sellQty, sell_price: sold.sellPrice, sell_qty: sold.sellQty } };
+    }
     const buyPrice = readCount(form.elements.buy_price.value, "개당 산 가격", 0);
     if (buyPrice.error) return buyPrice;
     if (buyPrice.value == null) return { error: "개당 산 가격을 입력해 주세요." };
@@ -1238,7 +1246,11 @@ export async function render(root) {
 
   root.addEventListener("focusout", (event) => {
     const input = event.target.closest?.("[data-trade-field]");
-    if (input) saveInline(input);
+    if (!input) return;
+    // 같은 거래의 다음 입력칸으로 옮기는 동안에는 가격·수량을 함께 편집한다.
+    const next = event.relatedTarget?.closest?.("[data-trade-field]");
+    if (next?.dataset.tradeId === input.dataset.tradeId) return;
+    saveInline(input);
   });
 
   root.addEventListener("click", async (event) => {
@@ -1304,6 +1316,7 @@ export async function render(root) {
         form.dataset.editingId = "";
         title.textContent = "거래 추가";
         form.elements.name.value = selected.name;
+        for (const field of ["buy_price", "buy_qty", "sell_price", "sell_qty"]) form.elements[field].value = "";
         fillTradeItem(selected);
         paintSelection();
         form.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -1372,7 +1385,7 @@ export async function render(root) {
     buttons.forEach((button) => button.disabled = true);
     try {
       showStatus("저장하는 중입니다.", "info");
-      const id = mode === "buy" ? "" : mode === "sell" ? selectedId : form.dataset.editingId;
+      const id = parsed.id ?? (mode === "buy" ? "" : form.dataset.editingId);
       const saved = await persistTrade(id, parsed.value);
       if (saved.error) {
         showStatus(saveError(saved.error), "error");
