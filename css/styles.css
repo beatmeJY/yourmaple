@@ -14510,7 +14510,7 @@ body.nav-open .transport-widget { visibility: hidden; }
 .transport-times > span { display: grid; gap: 4px; }
 .transport-times b { font-size: 14px; }
 .transport-note { margin: 12px 0 0; font-size: 10px; color: var(--muted); text-align: center; }
-.transport-widget[data-ship-phase="boarding"] [data-ship-state] { color: var(--gain); }
+.transport-widget[data-ship-phase="boarding"] :is([data-ship-state], [data-ship-badge], [data-ship-remain], [data-mini-ship] small) { color: var(--gain); }
 .transport-widget[data-ship-phase="closed"] [data-ship-state] { color: var(--danger); }
 @keyframes transport-arrive { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .transport-toggle { transition: none; } .transport-toggle:hover { transform: none; } .transport-panel { animation: none; } }
