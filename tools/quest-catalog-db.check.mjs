@@ -1,4 +1,4 @@
-// sql/077 검사(PGlite): 퀘스트 정보 — 공개 읽기·쓰기 막힘, 목록 검색(이름·NPC·조건 아이템·번호, 지역·레벨), 상세에서 도감 아이템·몬스터·맵·
+// sql/077~081 검사(PGlite): 퀘스트 정보 — 공개 읽기·쓰기 막힘, 목록 검색(이름·NPC·조건 아이템·번호, 지역·레벨), 상세에서 도감 아이템·몬스터·맵·
 // 선행/다음 퀘스트 연결, 등록 다시 실행(관리자가 고친 칸 보존), 관리자 수정(권한·버전·범위·이력), 다시 실행해도 안전한지 본다.
 // 로컬에 비공개 도구가 만든 실제 등록 SQL(data/local/quest-collect/quests.sql)이 있으면 두 번 적용해 개수도 본다.
 process.on("uncaughtException", error => { console.error(error.stack); process.exit(1); });
@@ -132,6 +132,11 @@ if (fs.existsSync(real)) {
     assert.deepEqual([fix.min_level, fix.start_npc.id, fix.end_npc.id, fix.reward_method], [30, 2040003, 2040003, "random"]);
     assert.deepEqual(fix.reward_items.map(x => [x.i, x.r]), [["2040708", 1], ["2040707", 1], ["2040705", 1], ["2040704", 1]]);
   }
+  // 2026-11-24 원본 v83 완료 조건·선행 레벨: 스노우맨 저지는 90레벨(설원의 거대 생물에서 이어짐)·스노우맨 1마리, 네로를 지켜라는 몬스터 3종 각 50마리
+  const snow = (await db.query("select min_level,conditions from catalog_quests where source_id=3109")).rows[0];
+  if (snow) assert.deepEqual([snow.min_level, snow.conditions.map(x => [x.m, x.c])], [90, [["8220001", 1]]]);
+  const nero = (await db.query("select conditions from catalog_quests where source_id=3064")).rows[0];
+  if (nero) assert.deepEqual(nero.conditions.map(x => [x.i ?? `m${x.m}`, x.c]), [["4000073", 50], ["m3210200", 50], ["m3210201", 50], ["m3210202", 50]]);
 }
 // 079: 퀘스트 삭제(숨김·되살리기)·조건/보상 수정
 await db.exec("reset role");
@@ -255,4 +260,74 @@ await db.exec("reset role");
 await importQuests(quests);
 const keptNpc = (await db.query("select start_npc,start_map,region from catalog_quests where source_id=2000")).rows[0];
 assert.deepEqual([keptNpc.start_npc.id, keptNpc.start_map, keptNpc.region], [2020000, 211000000, "엘나스"]);
+// 081: 퀘스트 검토함 — 관리자만 목록·결정, 경험치 반영(버전·이력·operator), 빠진 퀘스트 추가(이름 필수·선행의 다음 칸·이력), 건너뜀·되돌리기, 다시 등록해도 결정 유지
+const sql081 = fs.readFileSync("sql/081_catalog_quest_reviews.sql", "utf8");
+await db.exec(sql081);
+await db.exec(sql081); // 다시 실행해도 안전
+const reviewImport = (rows) => db.exec(`insert into public.catalog_quest_reviews(source_id,kind,data) values ${rows.map(([q, k, d]) => `(${q},'${k}',${lit(d)})`).join(",")}
+on conflict(source_id,kind) do update set data=excluded.data, updated_at=now() where catalog_quest_reviews.status='open' and catalog_quest_reviews.data is distinct from excluded.data;`);
+const missingQuest = { min_level: 35, start_npc: { id: 1012100, n: "헬레나", v: "gms/83" }, end_npc: null, start_map: 100000000, end_map: 100000000, region: "헤네시스",
+  conditions: [{ m: "100100", c: 20, n: "달팽이" }, { i: "4000019", c: 30 }], reward_method: "fixed", reward_items: [{ i: "2000000", c: 10, n: "빨간 포션", r: 1 }], prerequisites: [1000] };
+await reviewImport([[3000, "exp", { name: "레벨 없는 퀘스트", ours: { exp: null, meso: null }, v83: { exp: 1250, meso: 0 }, recommend: "v83" }],
+  [99001, "missing", { name_en: "Sakura and the Seal", min_level: 35, exp: 4000, meso: null, quest: missingQuest }],
+  [99002, "missing", { name_en: "Event", quest: {} }]]);
+await db.exec("set role anon");
+await assert.rejects(db.query("select public.catalog_quest_review_list('exp')"), /permission denied/);
+await assert.rejects(db.query("select count(*) from public.catalog_quest_reviews"), /permission denied/);
+await db.exec("reset role; set role authenticated; set test.reviewer=''");
+await assert.rejects(db.query("select public.catalog_quest_review_list('exp')"), /권한/);
+await assert.rejects(db.query("select count(*) from public.catalog_quest_reviews"), /permission denied/);
+await db.exec("set test.reviewer='1'");
+await assert.rejects(db.query("select public.catalog_quest_review_list('nope')"), /종류/);
+const reviews = async (kind) => (await db.query("select public.catalog_quest_review_list($1) r", [kind])).rows[0].r;
+const decide = (...a) => db.query("select public.catalog_quest_review_decide($1,$2,$3,$4,$5,$6) r", a);
+let expRows = await reviews("exp");
+assert.equal(expRows.length, 1);
+assert.deepEqual([expRows[0].quest.name, expRows[0].quest.reward_exp, expRows[0].status], ["레벨 없는 퀘스트", null, "open"]);
+await assert.rejects(decide(expRows[0].id, "applied", null, 1250, 0, "old"), /다른 화면/);
+await assert.rejects(decide(expRows[0].id, "applied", null, -1, 0, expRows[0].quest.version), /범위/);
+await assert.rejects(decide(expRows[0].id, "maybe", null, null, null, null), /결정/);
+let rv = (await decide(expRows[0].id, "applied", null, 1250, 0, expRows[0].quest.version)).rows[0].r;
+const q3000 = (await asOwner("select id,reward_exp,reward_meso,source from catalog_quests where source_id=3000"))[0];
+assert.deepEqual([q3000.reward_exp, q3000.reward_meso, q3000.source, rv.quest_id], [1250, 0, "operator", q3000.id]);
+const expHistory = await asOwner("select changes from catalog_changes where entity_id=$1 and release_label='운영자 퀘스트 검토 반영'", [q3000.id]);
+assert.deepEqual(Object.keys(expHistory[0].changes).sort(), ["reward_exp", "reward_meso"]);
+await assert.rejects(decide(expRows[0].id, "open", null, null, null, null), /이미 반영/);
+// 빠진 퀘스트: 이름 없으면 거절, 추가하면 선행 퀘스트의 다음 칸에 들어가고 이력이 남는다
+let missingRows = await reviews("missing");
+const sakura = missingRows.find(x => x.source_id === 99001), eventQ = missingRows.find(x => x.source_id === 99002);
+await assert.rejects(decide(sakura.id, "applied", "  ", 4000, null, null), /이름/);
+rv = (await decide(sakura.id, "applied", " 사쿠라의 물개인형 ", 4000, null, null)).rows[0].r;
+const added = (await db.query("select public.catalog_quest_detail(null,99001) d")).rows[0].d.quest;
+assert.deepEqual([added.name, added.min_level, added.reward_exp, added.reward_meso, added.start_npc.id, added.region, added.reward_method, added.source],
+  ["사쿠라의 물개인형", 35, 4000, null, 1012100, "헤네시스", "fixed", "operator"]);
+assert.deepEqual(added.conditions.map(x => [x.m ?? x.i, x.c]), [["100100", 20], ["4000019", 30]]);
+assert.deepEqual(added.reward_items, [{ i: "2000000", c: 10, n: "빨간 포션", r: 1 }]);
+assert.deepEqual([added.prerequisites, (await asOwner("select next_quests from catalog_quests where source_id=1000"))[0].next_quests.includes(99001)], [[1000], true]);
+assert.equal((await asOwner("select count(*)::int n from catalog_changes where entity_id=$1 and operation='INSERT'", [rv.quest_id]))[0].n, 1);
+await assert.rejects(decide(sakura.id, "applied", "다시", 1, null, null), /이미 반영/);
+// 건너뜀 → 되돌리기 → 다시 건너뜀
+assert.equal((await decide(eventQ.id, "skipped", null, null, null, null)).rows[0].r.status, "skipped");
+assert.equal((await decide(eventQ.id, "open", null, null, null, null)).rows[0].r.status, "open");
+await decide(eventQ.id, "skipped", null, null, null, null);
+// 다시 등록: 반영·건너뜀한 항목은 그대로, 안 본 항목만 새 자료
+await db.exec("reset role");
+await reviewImport([[3000, "exp", { name: "바뀜" }], [99001, "missing", { name_en: "바뀜" }], [99002, "missing", { name_en: "바뀜" }], [99003, "missing", { name_en: "새 항목", quest: {} }]]);
+const states = (await db.query("select source_id,status,data->>'name_en' n from catalog_quest_reviews order by source_id")).rows.map(x => [x.source_id, x.status, x.n]);
+assert.deepEqual(states, [[3000, "applied", null], [99001, "applied", "Sakura and the Seal"], [99002, "skipped", "Event"], [99003, "open", "새 항목"]]);
+await db.exec(sql081); // 자료가 있어도 다시 실행 안전
+// 다시 등록해도 추가한 퀘스트·검토로 바꾼 경험치는 그대로
+await importQuests(quests);
+assert.equal((await db.query("select reward_exp from catalog_quests where source_id=3000")).rows[0].reward_exp, 1250);
+assert.equal((await db.query("select name from catalog_quests where source_id=99001")).rows[0].name, "사쿠라의 물개인형");
+// 로컬 실제 검토함 등록 SQL(있을 때만): 두 번 적용해도 개수 그대로
+const realReviews = "data/local/quest-collect/quest-reviews.sql";
+if (fs.existsSync(realReviews) && fs.existsSync(real)) {
+  const text = fs.readFileSync(realReviews, "utf8");
+  await db.exec(text);
+  const n1 = (await db.query("select count(*)::int n from catalog_quest_reviews")).rows[0].n;
+  await db.exec(text);
+  assert.equal((await db.query("select count(*)::int n from catalog_quest_reviews")).rows[0].n, n1);
+  console.log(`  실제 검토함 SQL 두 번 적용: 검토 항목 ${n1}개`);
+}
 console.log("quest-catalog-db check 통과");

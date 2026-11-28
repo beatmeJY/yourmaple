@@ -69,7 +69,7 @@ export async function render(root) {
 
   root.innerHTML = `<section class="mt-page">
     <header class="ym-page-head"><div><h1>삭제한 퀘스트</h1><p>퀘스트 목록·검색·연속 퀘스트에서 숨긴 퀘스트예요. 되살리면 바로 다시 보여요.</p></div>
-      <div><span class="ym-badge">관리자 전용</span><a class="mo-ghost" href="/quests/">퀘스트 정보로</a></div></header>
+      <div><span class="ym-badge">관리자 전용</span><a class="mo-ghost" href="/quest-review/">퀘스트 검토함</a><a class="mo-ghost" href="/quests/">퀘스트 정보로</a></div></header>
     <div class="mt-bar"><label class="field"><span>찾기</span><input data-trash-search placeholder="이름·퀘스트 번호" autocomplete="off" /></label><p class="mt-count" data-trash-count></p></div>
     <div class="mt-list" data-trash-list aria-live="polite"><p class="hint">불러오는 중입니다.</p></div>
   </section>`;

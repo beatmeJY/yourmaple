@@ -88,7 +88,7 @@ function seed() {
     catalog_monster_drops: [],
     hunts: [], level_exp: [], quests: [], character_quests: [], quest_notes: [], monsters: [], links: [],
     trades: [],
-    maker_gem_prices: [], maker_reverse_prices: [], enhance_profiles: [], account_deletions: [],
+    maker_gem_prices: [], maker_reverse_prices: [], enhance_profiles: [], account_deletions: [], meso_point_rates: [],
   };
 }
 
@@ -462,6 +462,28 @@ function mapMonsters(mapId) {
   const levels = all.map(m => m.level).filter(v => v != null);
   return { all, monster_count: all.length, min_level: levels.length ? Math.min(...levels) : null, max_level: levels.length ? Math.max(...levels) : null };
 }
+// 퀘스트 검토함(sql/081 흉내) 연습 항목
+function mockQuestReviews() {
+  const reviews = rowsOf("catalog_quest_reviews");
+  if (!reviews.length) {
+    mockQuests();
+    const row = (n, source_id, kind, data) => ({ id: `d0000000-0000-4000-8000-00000000000${n}`, source_id, kind, data, status: "open", decided: null, decided_at: null });
+    reviews.push(
+      row(1, 9000001, "exp", { name: "연습용 스티지 퇴치", region: "헤네시스", min_level: 20, start_npc: "헬레나", ours: { exp: 3000, meso: 5000 }, v83: { exp: 1800, meso: 5000 }, recommend: "v83",
+        ours_items: [{ i: "2000000", c: 20, n: "빨간 포션" }], v83_items: [{ i: "2000000", c: 20, n: "빨간 포션" }], v83_start_items: [] }),
+      row(2, 9000003, "exp", { name: "연습용 마지막 부탁", region: "헤네시스", min_level: 30, start_npc: "마야", ours: { exp: 12000, meso: 30000 }, v83: { exp: 36000, meso: 30000 }, recommend: "ours",
+        ours_items: [{ i: "2000000", c: 30, n: "빨간 포션" }], v83_items: [{ i: "2000000", c: 30, n: "빨간 포션" }, { i: "2040001", c: 1, n: "투구 방어력 주문서 60%", r: 1 }], v83_start_items: [{ i: "4031013", c: 1, n: "검은 구슬" }] }),
+      row(3, 8049, "missing", { name_en: "Sakura and the Seal", name_ko: null, min_level: 35, region: "헤네시스", start_npc: "헬레나", exp: 4000, meso: null,
+        start_items: [], quest: { min_level: 35, start_npc: { id: 1012100, n: "헬레나", v: "gms/83" }, end_npc: { id: 1012100, n: "헬레나", v: "gms/83" }, start_map: 100000000, end_map: 100000000,
+          region: "헤네시스", conditions: [{ m: "2300100", c: 20, n: "스티지" }, { i: "4000019", c: 30, n: "달팽이 껍질" }], reward_method: "fixed", reward_items: [{ i: "2000000", c: 10, n: "빨간 포션" }], prerequisites: [9000001] } }),
+      row(4, 8050, "missing", { name_en: "Event Only Quest", name_ko: "이벤트 퀘스트", min_level: null, region: null, start_npc: "메이플 운영자", exp: 100, meso: 1000,
+        start_items: [{ i: "4031013", c: 1, n: "검은 구슬" }], quest: { start_npc: { id: 9010000, n: "메이플 운영자", v: "gms/83" }, conditions: [], reward_items: [], prerequisites: [] } }),
+    );
+    save();
+  }
+  return reviews;
+}
+
 // 퀘스트 정보(sql/077 흉내). 처음 열면 연습용 퀘스트 5개를 넣는다. 스티지·맵은 가짜 도감 것과 이어진다.
 function mockQuests() {
   const quests = rowsOf("catalog_quests");
@@ -687,6 +709,38 @@ const RPCS = {
     assertMockReviewer();
     return mockQuests().filter(t=>t.deleted_at).sort((a,b)=>String(b.deleted_at).localeCompare(String(a.deleted_at)))
       .map(t=>({id:t.id,source_id:t.source_id,name:t.name,min_level:t.min_level,max_level:t.max_level,region:t.region,start_npc:t.start_npc,deleted_at:t.deleted_at,deleted_reason:t.deleted_reason,condition_count:t.conditions.length,reward_count:t.reward_items.length}));
+  },
+  // sql/081 퀘스트 검토함 흉내. 처음 열면 연습용 검토 항목(경험치 2·빠진 퀘스트 2)을 넣는다.
+  catalog_quest_review_list({p_kind}={}) {
+    assertMockReviewer();if(!["exp","missing"].includes(p_kind))throw new Error("검토 종류가 잘못되었습니다");
+    const reviews=mockQuestReviews();const quests=mockQuests();
+    return reviews.filter(r=>r.kind===p_kind).map(r=>{const q=quests.find(x=>x.source_id===r.source_id);
+      return {...r,quest:q?{id:q.id,name:q.name,reward_exp:q.reward_exp,reward_meso:q.reward_meso,min_level:q.min_level,region:q.region,start_npc:q.start_npc,source:q.source,deleted:!!q.deleted_at,version:String(q.updated_at)}:null};})
+      .sort((a,b)=>((a.quest?.min_level??a.data.min_level??999)-(b.quest?.min_level??b.data.min_level??999))||a.source_id-b.source_id);
+  },
+  catalog_quest_review_decide({p_review,p_status,p_name=null,p_exp=null,p_meso=null,p_version=null}) {
+    assertMockReviewer();const r=mockQuestReviews().find(x=>x.id===p_review);if(!r)throw new Error("검토 항목을 찾을 수 없습니다");
+    if(!["open","applied","skipped"].includes(p_status))throw new Error("결정이 잘못되었습니다");
+    if(r.status==="applied")throw new Error("이미 반영한 항목입니다. 바꾸려면 퀘스트 정보에서 직접 고쳐 주세요");
+    if(p_status!=="applied"){Object.assign(r,{status:p_status,decided:null,decided_at:p_status==="open"?null:iso()});save();return {id:r.id,status:p_status};}
+    if((p_exp!=null&&(p_exp<0||p_exp>1e11))||(p_meso!=null&&Math.abs(p_meso)>1e11))throw new Error("보상 값이 범위를 벗어났습니다");
+    const quests=mockQuests();const log=rowsOf("catalog_changes");const nextId=()=>(log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0))+1;let name;
+    if(r.kind==="exp"){const t=quests.find(x=>x.source_id===r.source_id);if(!t)throw new Error("퀘스트를 찾을 수 없습니다");
+      if(String(t.updated_at)!==String(p_version))throw Object.assign(new Error("다른 화면에서 수정되었습니다"),{code:"40001"});
+      const changes={};if((t.reward_exp??null)!==p_exp)changes.reward_exp={before:t.reward_exp??null,after:p_exp};if((t.reward_meso??null)!==p_meso)changes.reward_meso={before:t.reward_meso??null,after:p_meso};
+      if(Object.keys(changes).length){log.push({id:nextId(),entity_type:"quest",entity_id:t.id,entity_name:t.name,operation:"UPDATE",changes,release_label:"운영자 퀘스트 검토 반영",changed_at:iso()});
+        Object.assign(t,{reward_exp:p_exp,reward_meso:p_meso,source:"operator",updated_at:iso()});}
+      name=t.name;
+    }else{name=String(p_name??"").trim();if(!name||name.length>200)throw new Error("퀘스트 이름은 1~200자로 입력해 주세요");
+      if(quests.some(x=>x.source_id===r.source_id))throw new Error("이미 등록된 퀘스트 번호입니다");
+      const q=r.data.quest??{};const id=`c1000000-0000-4000-8000-${String(r.source_id).padStart(12,"0")}`;
+      quests.push({min_level:null,max_level:null,jobs:[],reward_fame:null,region_group:null,start_text:null,progress_text:null,complete_text:null,next_quests:[],
+        ...q,id,source_id:r.source_id,name,reward_exp:p_exp,reward_meso:p_meso,prerequisites:q.prerequisites??[],conditions:q.conditions??[],reward_items:q.reward_items??[],source:"operator",updated_at:iso()});
+      for(const p of quests)if((q.prerequisites??[]).includes(p.source_id)&&!p.next_quests.includes(r.source_id))p.next_quests=[...p.next_quests,r.source_id].sort((a,b)=>a-b);
+      log.push({id:nextId(),entity_type:"quest",entity_id:id,entity_name:name,operation:"INSERT",changes:{name:{before:null,after:name},reward_exp:{before:null,after:p_exp},reward_meso:{before:null,after:p_meso}},release_label:"운영자 퀘스트 추가(원본)",changed_at:iso()});
+    }
+    Object.assign(r,{status:"applied",decided_at:iso(),decided:Object.fromEntries(Object.entries({name,exp:p_exp,meso:p_meso}).filter(([,v])=>v!=null))});save();
+    return {id:r.id,status:"applied",name};
   },
   catalog_monster_detail({p_id}={}) { const monster=rowsOf("catalog_monsters").find(row=>row.id===p_id); return monster ? {monster} : null; },
   catalog_monster_edit_detail({p_id}) {

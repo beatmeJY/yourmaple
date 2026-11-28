@@ -46,13 +46,14 @@ export async function render(root) {
   if (slug) return renderDetail(root, slug);
   const params = new URLSearchParams(location.search);
   let region = params.get("region") ?? "", page = 0, loadId = 0, timer, regions = null;
-  root.innerHTML = `<section class="catalog-page qc-page"><header class="ym-page-head"><div><h1>퀘스트 정보</h1><p>받을 수 있는 퀘스트를 찾고, 모아야 할 것과 보상·연속 퀘스트를 한눈에 확인해 보세요.</p></div></header>
+  root.innerHTML = `<section class="catalog-page qc-page"><header class="ym-page-head"><div><h1>퀘스트 정보</h1><p>받을 수 있는 퀘스트를 찾고, 모아야 할 것과 보상·연속 퀘스트를 한눈에 확인해 보세요.</p></div><div><a class="mo-ghost" href="/quest-review/" data-quest-review-link hidden>퀘스트 검토함</a></div></header>
     <div class="catalog-tools qc-tools"><label class="field catalog-search"><span>퀘스트 검색</span><input data-quest-search placeholder="퀘스트·NPC·아이템·몬스터 이름 (예: 달팽이, 헬레나)" maxlength="100" value="${escapeHtml(params.get("q") ?? "")}" /></label>
     <label class="field qc-level"><span>내 레벨</span><input data-quest-level type="number" inputmode="numeric" min="1" max="300" placeholder="모든 레벨" value="${escapeHtml(/^\d{1,3}$/.test(params.get("lv") ?? "") ? params.get("lv") : "")}" /></label>
     <button type="button" class="mo-ghost" data-quest-refresh>새로 확인</button></div>
     <div class="catalog-filters" data-quest-regions></div><p class="hint" data-quest-count aria-live="polite"></p><div class="qc-grid" data-quest-list></div>
     <nav class="catalog-pager" aria-label="퀘스트 페이지"><button type="button" data-prev>이전</button><span data-page></span><button type="button" data-next>다음</button></nav></section>`;
   const search = root.querySelector("[data-quest-search]");
+  void canReviewCatalog().then(allowed => { const link = root.querySelector("[data-quest-review-link]"); if (allowed && link) link.hidden = false; });
   const levelInput = root.querySelector("[data-quest-level]");
   const level = () => { const n = Number(levelInput.value); return Number.isInteger(n) && n >= 1 && n <= 300 ? n : null; };
   function syncAddress() {
@@ -158,7 +159,7 @@ async function renderDetail(root, slug, { push = false } = {}) {
   actions.querySelector("[data-quest-refresh]").addEventListener("click", () => { clearCatalogCache(); void renderDetail(root, String(q.source_id)); });
   void canReviewCatalog().then(allowed => {
     if (!allowed || !actions.isConnected || !slot.isConnected) return;
-    actions.insertAdjacentHTML("beforeend", `<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-edit-quest>퀘스트 수정</button><button type="button" class="catalog-pill-button" data-edit-quest-items>조건·보상 수정</button><button type="button" class="catalog-pill-button qc-delete-button" data-delete-quest>퀘스트 삭제</button><a class="catalog-pill-button" href="/quest-trash/">삭제한 퀘스트</a>`);
+    actions.insertAdjacentHTML("beforeend", `<button type="button" class="catalog-history-button" data-open-history>변경 이력</button><button type="button" class="catalog-pill-button" data-edit-quest>퀘스트 수정</button><button type="button" class="catalog-pill-button" data-edit-quest-items>조건·보상 수정</button><button type="button" class="catalog-pill-button qc-delete-button" data-delete-quest>퀘스트 삭제</button><a class="catalog-pill-button" href="/quest-trash/">삭제한 퀘스트</a><a class="catalog-pill-button" href="/quest-review/">퀘스트 검토함</a>`);
     mountHistoryDialog(actions.querySelector("[data-open-history]"), q.id, "quest", q.name);
     const reload = () => { clearCatalogCache(); void renderDetail(root, String(q.source_id)); };
     actions.querySelector("[data-edit-quest]").addEventListener("click", () => openQuestEditor(root, q, reload));

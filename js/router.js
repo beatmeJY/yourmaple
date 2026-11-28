@@ -18,7 +18,10 @@ const pages = {
   maps: () => import("./pages/maps.js"),
   "monster-trash": () => import("./pages/monster-trash.js"),
   "quest-trash": () => import("./pages/quest-trash.js"),
+  "quest-review": () => import("./pages/quest-review.js"),
   "item-catalog": () => import("./pages/item-catalog.js"),
+  potions: () => import("./pages/potions.js"),
+  "meso-point": () => import("./pages/meso-point.js"),
   "catalog-review": () => import("./pages/catalog-review.js"),
   trades: () => import("./pages/trades.js"),
   quests: () => import("./pages/quest-catalog.js"),
@@ -187,5 +190,5 @@ export function renderCrumb(crumb, activeId) {
   const route = routes.find((item) => item.id === activeId);
   crumb.innerHTML = category
     ? `<span class="crumb-cat" style="--cat:${hueColor(category.hue)}"><i aria-hidden="true"></i>${category.label}</span><span class="crumb-sep" aria-hidden="true">›</span><span class="crumb-page">${route?.label ?? ""}</span>`
-    : `<span class="crumb-page">${({ "catalog-review": "비공개 검토", "monster-trash": "삭제한 몬스터", "quest-trash": "삭제한 퀘스트" })[activeId] ?? homeRoute.label}</span>`;
+    : `<span class="crumb-page">${({ "catalog-review": "비공개 검토", "monster-trash": "삭제한 몬스터", "quest-trash": "삭제한 퀘스트", "quest-review": "퀘스트 검토함" })[activeId] ?? homeRoute.label}</span>`;
 }

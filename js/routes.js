@@ -24,6 +24,10 @@ const allCategories = [
   { id: "monster", label: "몬스터 정보", glyph: "M", icon: "img/monster-icon.png", hue: 65, routes: [{ id: "monsters", label: "몬스터 도감" }] },
   { id: "map", label: "맵 정보", glyph: "맵", hue: 150, routes: [{ id: "maps", label: "맵 정보", admin: true }] }, // 2026-11-23 완성 전이라 관리자만
   { id: "item", label: "아이템 정보", glyph: "템", icon: "https://maplestory.io/api/gms/100/item/2070006/icon?resize=2", hue: 75, routes: [{ id: "item-catalog", label: "아이템 정보" }] },
+  // 물약 효율 순위(2026-11-28 사용자 요청).
+  { id: "potion", label: "물약 효율", glyph: "물", icon: "https://maplestory.io/api/gms/100/item/2000000/icon?resize=2", hue: 15, routes: [{ id: "potions", label: "물약 효율" }] },
+  // 현금·메소·포인트 가치 비교(2026-11-28 사용자 요청).
+  { id: "money", label: "현금·메소 계산", glyph: "₩", hue: 55, routes: [{ id: "meso-point", label: "현금·메소·포인트" }] },
   // 거래 내역은 아이템 정보 아래(2026-11-23 사용자 요청).
   { id: "trade", label: "거래 내역", glyph: "⇄", icon: "img/trade-icon.png", hue: 180, routes: [{ id: "trades", label: "거래 내역" }] },
   { id: "memo", label: "메모", glyph: "✎", hue: 340, routes: [{ id: "notes", label: "메모" }] },
